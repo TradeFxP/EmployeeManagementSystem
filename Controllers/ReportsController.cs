@@ -367,8 +367,8 @@ namespace UserRoles.Controllers
             if (string.IsNullOrWhiteSpace(task) || string.IsNullOrWhiteSpace(note))
                 return BadRequest("Task and Note are required.");
 
-            if (reportedTo == null || !reportedTo.Any())
-                return BadRequest("Please select Admin or Manager.");
+            //if (reportedTo == null || !reportedTo.Any())
+            //    return BadRequest("Please select Admin or Manager.");
 
             var report = new DailyReport
             {
@@ -448,7 +448,7 @@ namespace UserRoles.Controllers
         /* ================= INLINE UPDATE ================= */
         [Authorize(Roles = "Admin,Manager")]
         [HttpPost]
-        [IgnoreAntiforgeryToken] // IMPORTANT for AJAX
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> InlineUpdate(
     int id,
     string task,
@@ -461,14 +461,28 @@ namespace UserRoles.Controllers
 
             var currentUserId = _userManager.GetUserId(User);
 
-            // ❌ Cannot edit own report
-            if (report.ApplicationUserId == currentUserId)
+            // Admin can review anyone
+            if (User.IsInRole("Admin"))
+            {
+                // allowed
+            }
+            else if (User.IsInRole("Manager"))
+            {
+                // Manager can review only User-submitted reports
+                if (!string.Equals(report.SubmittedByRole, "User",
+                    StringComparison.OrdinalIgnoreCase))
+                    return Forbid();
+            }
+            else
+            {
                 return Forbid();
+            }
 
-            // ❌ Manager can edit only User reports
+
             if (User.IsInRole("Manager") && !User.IsInRole("Admin"))
             {
-                if (!string.Equals(report.SubmittedByRole, "User", StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(report.SubmittedByRole, "User",
+                    StringComparison.OrdinalIgnoreCase))
                     return Forbid();
             }
 
@@ -476,10 +490,11 @@ namespace UserRoles.Controllers
             report.Note = note?.Trim();
             report.ReviewerComment = reviewerComment?.Trim();
 
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(); // ✅ DB UPDATE
 
             return Ok(new { message = "Report updated successfully" });
         }
+
 
 
         [Authorize(Roles = "Admin")]
@@ -519,14 +534,17 @@ namespace UserRoles.Controllers
 
         [Authorize(Roles = "Admin,Manager")]
         [HttpGet]
-        public IActionResult EditInlinePanel(int id)
+        public async Task<IActionResult> EditInlinePanel(int id)
         {
-            var report = _context.DailyReports
+            var report = await _context.DailyReports
                 .AsNoTracking()
-                .FirstOrDefault(r => r.Id == id);
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (report == null)
                 return NotFound();
+
+            // 🔴 IMPORTANT: ALWAYS SET THIS
+            ViewBag.TargetUserId = report.ApplicationUserId;
 
             var vm = new ReportViewModel
             {
@@ -539,6 +557,8 @@ namespace UserRoles.Controllers
 
             return PartialView("_EditReportPanel", vm);
         }
+
+
         //pdf download
         [Authorize(Roles = "Admin,Manager")]
         [HttpGet]

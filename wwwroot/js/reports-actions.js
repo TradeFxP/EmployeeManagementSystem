@@ -50,3 +50,27 @@ function deleteReport(reportId) {
             alert("Delete failed");
         });
 }
+
+// ================= LOAD REPORTS PANEL =================
+// Fetches the user reports partial and renders it into the #detailsPanel element.
+window.loadReports = function (userId) {
+    if (!userId) return;
+
+    const panel = document.getElementById("detailsPanel");
+    if (!panel) return;
+
+    panel.innerHTML = "<div class='p-3 text-muted'>Loading reports...</div>";
+
+    fetch(`/Reports/UserReportsPanel?userId=${encodeURIComponent(userId)}`)
+        .then(res => {
+            if (!res.ok) throw new Error();
+            return res.text();
+        })
+        .then(html => {
+            panel.innerHTML = html;
+        })
+        .catch(() => {
+            panel.innerHTML = "<div class='p-3 text-danger'>Failed to load reports</div>";
+        });
+};
+

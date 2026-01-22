@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace UserRoles.ViewModels
 {
@@ -21,7 +22,9 @@ namespace UserRoles.ViewModels
 
         public string Note { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "Please select who you are reporting to.")]
         public string ReportedTo { get; set; } = string.Empty;
+
 
         // ✅ FIX: Added to match views
         public string SubmittedByRole { get; set; } = string.Empty;

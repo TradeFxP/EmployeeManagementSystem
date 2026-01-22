@@ -1,4 +1,5 @@
-﻿@model UserRoles.ViewModels.ReportViewModel
+﻿@* admin manager edit report panel of user reports *@
+@model UserRoles.ViewModels.ReportViewModel
 
 <div class="card shadow-sm">
     <div class="card-body">
@@ -49,8 +50,25 @@
 </div>
 
 <script>
+    // Fallback cancel: reload reports panel for the same user
+    function cancelEdit() {
+        const userId = "@(ViewBag.TargetUserId ?? "")";
+        if (userId && typeof loadReports === "function") {
+            loadReports(userId);
+            return;
+        }
+        // otherwise clear details panel
+        const panel = document.getElementById("detailsPanel");
+        if (panel) panel.innerHTML = "";
+    }
+
     document.getElementById("editReportForm").addEventListener("submit", async function (e) {
         e.preventDefault();
+
+        const id = document.getElementById("editReportId").value;
+        const task = document.getElementById("editTask").value;
+        const note = document.getElementById("editNote").value;
+        const reviewerComment = document.getElementById("editReviewerComment").value;
 
         const response = await fetch("/Reports/InlineUpdate", {
             method: "POST",
@@ -58,11 +76,12 @@
                 "Content-Type": "application/x-www-form-urlencoded"
             },
             body: new URLSearchParams({
-                id: document.getElementById("editReportId").value,
-                task: document.getElementById("editTask").value,
-                note: document.getElementById("editNote").value,
-                reviewerComment: document.getElementById("editReviewerComment").value
-            })
+                id: id,
+                task: task,
+                note: note,
+                reviewerComment: reviewerComment
+            }),
+            credentials: "same-origin"
         });
 
         if (!response.ok) {
@@ -70,14 +89,31 @@
             return;
         }
 
-        // reload reports panel
-        if (typeof loadReports === "function") {
-            loadReports();
-        }
-    });
+        // Update table row in-place if present
+        try {
+            const row = document.getElementById('report-row-' + id);
+            if (row) {
+                const textCells = row.querySelectorAll('.report-text');
+                if (textCells && textCells.length >= 2) {
+                    textCells[0].textContent = task;
+                    textCells[1].textContent = note;
+                }
 
-    function cancelEdit() {
-        document.getElementById("detailsPanel").innerHTML =
-            "<div class='text-muted p-3'>Edit cancelled</div>";
-    }
+                const reviewCell = row.querySelector('.col-review');
+                if (reviewCell) {
+                    reviewCell.textContent = reviewerComment && reviewerComment.trim() !== '' ? reviewerComment : '—';
+                }
+            }
+        } catch (err) {
+            // ignore DOM update errors
+            console.error(err);
+        }
+
+        // Call loadReports to ensure panel and pagination stay consistent
+        const userId = "@(ViewBag.TargetUserId ?? "")";
+        if (userId && typeof loadReports === "function") {
+            loadReports(userId);
+        }
+
+    });
 </script>

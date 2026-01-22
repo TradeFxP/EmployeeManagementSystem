@@ -72,7 +72,7 @@ else
     </div>
 }
 
-<!-- ================= ADD REPORT (FOR OTHERS) ================= -->
+@* <!-- ================= ADD REPORT (FOR OTHERS) ================= -->
 @if (showAddReportForOthers)
 {
     <div class="card mb-3 shadow-sm">
@@ -185,7 +185,7 @@ else
 
         </div>
     </div>
-}
+} *@
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <div class="mt-2 text-muted">
@@ -202,13 +202,13 @@ else
     <table class="table table-bordered table-hover align-middle fixed-table">
 
         <colgroup>
-            <col style="width: 5%" />   <!-- Date -->
-            <col style="width: 11%" />  <!-- Task -->
-            <col style="width: 11%" />  <!-- Note -->
-            <col style="width: 11%" />  <!-- Reviewer Comment -->
+            <col style="width: 4%" />   <!-- Date -->
+            <col style="width: 12%" />  <!-- Task -->
+            <col style="width: 12%" />  <!-- Note -->
+            <col style="width: 12%" />  <!-- Reviewer Comment -->
             <col style="width: 6%" />   <!-- Reported To -->
             <col style="width: 5%" />
-            <col style="width: 5%" /><!-- Submitted By (holds actions on hover) -->
+            <col style="width: 4%" /><!-- Submitted By (holds actions on hover) -->
         </colgroup>
         <thead class="table-light">
             <tr class="text-center align-middle">       
@@ -260,20 +260,29 @@ else
                             @if (isUser)
                             {
                                 <div class="form-check">
-                                    <input class="form-check-input"
-                                           type="checkbox"
-                                           name="reportedTo"
-                                           value="Manager"
-                                           checked />
+                                <input class="form-check-input reported-to"
+                                       type="checkbox"
+                                       name="reportedTo" 
+                                       value="Manager"
+                                       checked />
+
                                     <label class="form-check-label">Manager</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input"
-                                           type="checkbox"
-                                           name="reportedTo"
-                                           value="Admin" />
+                                <input class="form-check-input reported-to"
+                                       type="checkbox"
+                                       name="reportedTo"
+                                       value="Admin" />
+
                                     <label class="form-check-label">Admin</label>
                                 </div>
+                                <input type="text"
+                                   class="reported-to-native-validator"
+                                   style="position:absolute; opacity:0; height:0; width:0; pointer-events:none;"
+                                   required />
+
+                            
+
                             }
                             else if (isManager)
                             {
@@ -296,9 +305,9 @@ else
                     <!-- Action column -->
                     <td class="text-center">
                         <button class="btn btn-success btn-sm">Submit</button>
-                        <a asp-action="UserReports"
+                        @* <a asp-action="UserReports"
                            asp-route-userId="@targetUserId"
-                           class="btn btn-secondary btn-sm ms-1">Cancel</a>
+                           class="btn btn-secondary btn-sm ms-1">Cancel</a> *@
                     </td>
 
                     </form>
@@ -466,21 +475,41 @@ else
 
 @section Scripts {
     <script>
-        function validateReportedTo(form) {
-            const checked = form.querySelectorAll(
-                'input[name="reportedTo"]:checked'
-            );
+        document.addEventListener('change', function (e) {
 
-            const error = form.querySelector(".reportedToError");
+            if (!e.target.classList.contains('reported-to')) return;
 
-            if (checked.length === 0) {
-                error.classList.remove("d-none");
-                return false; // ❌ stop submit
-            }
+            const form = e.target.closest('form');
+            if (!form) return;
 
-            error.classList.add("d-none");
-            return true; // ✅ allow submit
-        }
+            const checkboxes = form.querySelectorAll('.reported-to');
+            const validator = form.querySelector('.reported-to-native-validator');
+            if (!validator) return;
+
+            const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+
+            // THIS IS THE KEY
+            validator.value = anyChecked ? 'ok' : '';
+        });
+    </script>
+
+
+    <script>
+        // function validateReportedTo(form) {
+        //     const checked = form.querySelectorAll(
+        //         'input[name="reportedTo"]:checked'
+        //     );
+
+        //     const error = form.querySelector(".reportedToError");
+
+        //     if (checked.length === 0) {
+        //         error.classList.remove("d-none");
+        //         return false; ❌ stop submit
+        //     }
+
+        //     error.classList.add("d-none");
+        //     return true; ✅ allow submit
+        // }
 
         // ================= CHARACTER COUNTER =================
         document.addEventListener("input", function (e) {
