@@ -1,16 +1,72 @@
 ﻿
 // ===============================
-// Drag preparation (GLOBAL)
+// CSRF TOKEN HELPER (REQUIRED)
 // ===============================
-//function prepareDrag(ev) {
-//    const node = ev.target.closest(".org-node");
-//    if (!node) return;
+function getCsrfToken() {
+    const tokenInput = document.querySelector(
+        'input[name="__RequestVerificationToken"]'
+    );
+    return tokenInput ? tokenInput.value : '';
+}
 
-//    node.setAttribute("draggable", "true");
-//}
+window.drag = function (ev) {
+    if (!window.__isAdmin) return;
 
+    const node = ev.target.closest(".org-node");
+    if (!node) return;
 
-// Global org chart helpers (idempotent)
+    const draggedNode = {
+        id: node.dataset.id,
+        role: node.dataset.role,
+        fromParent: node.dataset.parentId || "ADMIN",
+        name: node.querySelector(".node-title")?.innerText?.trim()
+    };
+
+    console.log("✅ DRAG STARTED:", draggedNode);
+
+    ev.dataTransfer.effectAllowed = "move";
+    ev.dataTransfer.setData(
+        "application/json",
+        JSON.stringify(draggedNode)
+    );
+};
+
+window.allowDrop = function (ev) {
+    if (!window.__isAdmin) return;
+    ev.preventDefault(); // REQUIRED
+};
+
+window.drop = function (event, newParentId) {
+    event.preventDefault();
+    if (!window.__isAdmin) return;
+
+    const data = event.dataTransfer.getData("application/json");
+    if (!data) return;
+
+    const dragged = JSON.parse(data);
+    console.log("⬇️ DROP:", dragged, "→", newParentId);
+
+    // ❌ prevent self-drop
+    if (dragged.id === newParentId) return;
+
+    fetch('/Users/MoveOrgNode', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            userId: dragged.id,
+            newParentId: newParentId
+        })
+    })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) location.reload();
+        })
+        .catch(err => console.error(err));
+};
+
 (function () {
 
     if (window.__orgchart_loaded) return;
@@ -76,92 +132,7 @@
         }
     }
 
-    // ---------------- Drag / Drop ----------------
-
    
-    let draggedNode = null;
-
-    function drag(ev) {
-        if (!window.__isAdmin) return;
-
-        const node = ev.target.closest(".org-node");
-        if (!node) return;
-
-        draggedNode = {
-            id: node.dataset.id,
-            role: node.dataset.role,
-            fromParent: node.dataset.parentId || null,
-            name: node.querySelector(".node-title")?.innerText?.trim()
-        };
-
-        console.log("✅ DRAG STARTED:", draggedNode);
-
-        ev.dataTransfer.effectAllowed = "move";
-
-        // ✅ STORE JSON (NOT text/plain)
-        ev.dataTransfer.setData(
-            "application/json",
-            JSON.stringify(draggedNode)
-        );
-    }
-
-
-
-
-
-
-    function allowDrop(ev) {
-        if (!window.__isAdmin) return;
-        ev.preventDefault(); // 🚨 REQUIRED
-    }
-
-
-    function drop(event, newParentId) {
-        event.preventDefault();
-
-        if (!window.__isAdmin) return;
-
-        const data = event.dataTransfer.getData("application/json");
-        if (!data) {
-            console.warn("❌ No drag data found");
-            return;
-        }
-
-        const dragged = JSON.parse(data);
-
-        console.log("⬇️ DROP:", dragged, "→", newParentId);
-
-        fetch('/Users/MoveOrgNode', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': getCsrfToken()
-            },
-            body: JSON.stringify({
-                userId: dragged.id,
-                newParentId: newParentId // "ADMIN" or managerId
-            })
-        })
-            .then(r => {
-                if (!r.ok) throw new Error("Move failed");
-                return r.json();
-            })
-            .then(res => {
-                if (res.success) {
-                    location.reload();
-                } else {
-                    alert('Move failed');
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Error while moving user');
-            });
-    }
-
-
-
-
 
     // ---------------- Load reports ----------------
     window.loadReports = function (userId) {

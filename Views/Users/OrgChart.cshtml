@@ -26,6 +26,8 @@
 
 
 
+
+
 <div class="org-wrapper-full">
 
     @* Toasts *@
@@ -56,7 +58,11 @@
             <!-- ================= ADMIN (show ONLY to Admin) ================= -->
             @if (currentRole == "Admin" && admin != null)
             {
-                <div class="org-admin"
+                
+
+                <div class="org-admin org-node"
+                     data-id="ADMIN"
+                     data-role="Admin"
                      ondragover="allowDrop(event)"
                      ondrop="drop(event,'ADMIN')">
 
@@ -72,6 +78,7 @@
                                onclick="openAddModal('', 'ADMIN')">+</a>
                         </div>
                     </div>
+
 
 
                     @* Admin-held users (users with ParentUserId == null) *@
@@ -125,10 +132,11 @@
                          data-id="@manager.Id"
                          data-role="Manager"
                          draggable="true"
-                         @* onmousedown="prepareDrag(event)" *@
                          ondragstart="drag(event)"
                          ondragover="allowDrop(event)"
                          ondrop="drop(event,'@manager.Id')">
+
+
 
 
                         @* ACTION ICONS: allow Admin and Manager to edit (delete Admin-only); reports available to both *@
@@ -223,6 +231,7 @@
                     </div>
                 </div>
             }
+            
 
 
         </div>

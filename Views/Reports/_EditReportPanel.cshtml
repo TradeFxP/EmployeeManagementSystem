@@ -6,46 +6,45 @@
 
         <h6 class="mb-3">✏️ Edit Report</h6>
 
-        <form id="editReportForm">
+        <form asp-action="InlineUpdate"
+              asp-controller="Reports"
+              method="post"
+              class="inline-edit-form">
 
-            <input type="hidden" id="editReportId" value="@Model.Id" />
+
+            @Html.AntiForgeryToken()
+
+            <!-- REQUIRED -->
+            <input type="hidden" name="Id" value="@Model.Id" />
 
             <div class="mb-3">
                 <label class="form-label">Task</label>
-                <textarea class="form-control"
-                          id="editTask"
-                          rows="2"
+                <textarea name="Task"
+                          class="form-control"
                           required>@Model.Task</textarea>
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Note</label>
-                <textarea class="form-control"
-                          id="editNote"
-                          rows="3"
+                <textarea name="Note"
+                          class="form-control"
                           required>@Model.Note</textarea>
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Reviewer Comment</label>
-                <textarea class="form-control"
-                          id="editReviewerComment"
-                          rows="2">@Model.ReviewerComment</textarea>
+                <textarea name="ReviewerComment"
+                          class="form-control">@Model.ReviewerComment</textarea>
             </div>
 
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">
-                    Update
-                </button>
-
-                @* <button type="button"
-                        class="btn btn-secondary"
-                        onclick="cancelEdit()">
-                    Cancel
-                </button> *@
-            </div>
-
+            <button type="submit" class="btn btn-primary">Update</button>
+            <button type="button"
+                    class="btn btn-secondary"
+                    onclick="loadReports('@Model.ApplicationUserId')">
+                Cancel
+            </button>
         </form>
+
     </div>
 </div>
 

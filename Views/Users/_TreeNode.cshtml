@@ -8,7 +8,7 @@
 <div class="tree-node org-branch">
 
     <!-- ================= SUB MANAGER NODE ================= -->
-    <div class="org-box manager org-node submanager"
+    <div class="org-box manager org-node"
          data-id="@Model.Id"
          data-parent-id="@Model.ParentUserId"
          data-role="SubManager"
@@ -16,6 +16,9 @@
          ondragstart="drag(event)"
          ondragover="allowDrop(event)"
          ondrop="drop(event,'@Model.Id')">
+
+
+
 
 
 
@@ -73,6 +76,7 @@
                          data-role="User"
                          draggable="true"
                          ondragstart="drag(event)">
+
 
 
                         <!-- USER ACTION ICONS -->

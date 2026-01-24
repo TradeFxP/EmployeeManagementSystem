@@ -450,10 +450,10 @@ namespace UserRoles.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken] // ✅ IMPORTANT
         public async Task<IActionResult> InlineUpdate(
-    int id,
-    string task,
-    string note,
-    string reviewerComment)
+        int id,
+        string task,
+        string note,
+        string reviewerComment)
         {
             // 🔹 Basic server-side validation
             if (string.IsNullOrWhiteSpace(task) || string.IsNullOrWhiteSpace(note))
@@ -501,13 +501,14 @@ namespace UserRoles.Controllers
 
             // ✅ Always return JSON for inline/AJAX calls
             return RedirectToAction(
-                "OrgChart",
-                "Users",
-                new { userId = report.ApplicationUserId }
-            );
+            "OrgChart",
+            "Users",
+            new { userId = report.ApplicationUserId }
+        );
 
 
         }
+
 
 
 

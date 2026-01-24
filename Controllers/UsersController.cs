@@ -916,35 +916,37 @@ Please change your password after login.
             return Ok();            
         }
 
-        // ================= REASSIGN USER =================
-        [Authorize(Roles = "Admin")]
-        [HttpPost]
-        public async Task<IActionResult> Reassign(string userId, string managerId)
-        {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-                return BadRequest("User not found");
+        //// ================= REASSIGN USER =================
+        //[Authorize(Roles = "Admin")]
+        //[HttpPost]
+        //public async Task<IActionResult> Reassign(string userId, string managerId)
+        //{
+        //    var user = await _context.Users.FindAsync(userId);
+        //    if (user == null)
+        //        return BadRequest("User not found");
 
-            // 🔥 ADMIN DROP (manager → admin)
-            if (managerId == "ADMIN")
-            {
-                user.ParentUserId = null;
-                user.ManagerId = null;
-                await _context.SaveChangesAsync();
-                return Ok(new { success = true });
-            }
+        //    // 🔥 ADMIN DROP (manager → admin)
+        //    if (managerId == "ADMIN")
+        //    {
+        //        user.ParentUserId = null;
+        //        user.ManagerId = null;
+        //        await _context.SaveChangesAsync();
+        //        return Ok(new { success = true });
+        //    }
 
-            // 🔽 Manager drop
-            var manager = await _context.Users.FindAsync(managerId);
-            if (manager == null)
-                return BadRequest("Target manager not found");
+        //    // 🔽 Manager drop
+        //    var manager = await _context.Users.FindAsync(managerId);
+        //    if (manager == null)
+        //        return BadRequest("Target manager not found");
 
-            user.ParentUserId = manager.Id;
-            user.ManagerId = manager.Id;
+        //    user.ParentUserId = manager.Id;
+        //    user.ManagerId = manager.Id;
 
-            await _context.SaveChangesAsync();
-            return Ok(new { success = true });
-        }
+        //    await _context.SaveChangesAsync();
+        //    return Ok(new { success = true });
+        //}
+
+
 
 
 
@@ -977,38 +979,38 @@ Please change your password after login.
         [HttpPost]
         public async Task<IActionResult> MoveOrgNode([FromBody] MoveOrgNodeRequest model)
         {
-            if (model == null || string.IsNullOrWhiteSpace(model.UserId))
-                return BadRequest("Invalid request");
+            if (string.IsNullOrEmpty(model.UserId))
+                return BadRequest("Invalid user");
 
             var user = await _context.Users.FindAsync(model.UserId);
             if (user == null)
                 return NotFound("User not found");
 
-            // ===============================
-            // 🔴 MANAGER ➜ ADMIN (THIS WAS MISSING)
-            // ===============================
+            // ================= ADMIN DROP =================
             if (model.NewParentId == "ADMIN")
             {
-                user.ParentUserId = null;
-                user.ManagerId = null;
+                user.ParentUserId = null;   // 🔥 Admin owns the user
+                user.ManagerId = null;      // optional (safe reset)
 
                 await _context.SaveChangesAsync();
-                return Ok(new { success = true, movedTo = "ADMIN" });
+                return Ok(new { success = true });
             }
 
-            // ===============================
-            // 🟢 ADMIN / MANAGER ➜ MANAGER
-            // ===============================
-            var manager = await _context.Users.FindAsync(model.NewParentId);
-            if (manager == null)
-                return NotFound("Manager not found");
+            // ================= MANAGER / SUBMANAGER DROP =================
+            var parent = await _context.Users.FindAsync(model.NewParentId);
+            if (parent == null)
+                return BadRequest("Target parent not found");
 
-            user.ParentUserId = manager.Id;
-            user.ManagerId = manager.Id;
+            user.ParentUserId = parent.Id;
+            user.ManagerId = parent.Id; // works for Manager + SubManager
 
             await _context.SaveChangesAsync();
-            return Ok(new { success = true, movedTo = "MANAGER" });
+            return Ok(new { success = true });
         }
+
+
+
+
 
 
 
