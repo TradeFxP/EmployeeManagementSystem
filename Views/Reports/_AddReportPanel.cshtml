@@ -47,13 +47,21 @@
         </div>
 
         <!-- ================= REPORTED TO ================= -->
+        <!-- Update the REPORTED TO section in _AddReportPanel.cshtml: -->
+        <!-- ================= REPORTED TO ================= -->
         <div class="mb-3">
             <label class="form-label">Reported To</label><br />
+
+            <!-- ✅ ADDED: Error message -->
+            <div class="text-danger small mb-1 d-none" id="addReportPanelError">
+                Please select Admin or Manager.
+            </div>
+
             <label>
-                <input type="checkbox" name="reportedTo" value="Admin" checked /> Admin
+                <input type="checkbox" name="reportedTo" value="Admin" class="add-panel-checkbox" checked /> Admin
             </label>
             <label class="ms-3">
-                <input type="checkbox" name="reportedTo" value="Manager" /> Manager
+                <input type="checkbox" name="reportedTo" value="Manager" class="add-panel-checkbox" /> Manager
             </label>
         </div>
 

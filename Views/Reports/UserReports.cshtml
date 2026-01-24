@@ -224,69 +224,75 @@ else
 
         <tbody>
             <!-- USER / MANAGER TODAY SUBMIT -->
+            <!-- Find the TODAY SUBMIT section in UserReports.cshtml and update it: -->
             @if (showTodaySubmit)
             {
                 <tr class="table-success report-row">
-                    <form asp-action="CreateInline" method="post">
+                    <form asp-action="CreateInline" method="post" id="todayReportForm" onsubmit="return validateTodayReportForm()">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="targetUserId" value="@currentUserId" />
                         <input type="hidden" name="date" value="@today.ToString("dd-MM-yyyy")" />
 
-                        <td>@today.ToString("dd-MM-yyyy")</td>
+                    <td>@today.ToString("dd-MM-yyyy")</td>
 
-                        <td>
-                            <textarea name="task"
-                                  rows="2"
-                                  maxlength="100"
-                                  class="form-control form-control-sm fixed-textarea char-limit"
-                                  data-counter="taskToday"
-                                  required></textarea>
-                            <small id="taskToday" class="text-muted">100 characters remaining</small>
-                        </td>
+                    <td>
+                        <textarea name="task"
+                              rows="2"
+                              maxlength="100"
+                              class="form-control form-control-sm fixed-textarea char-limit"
+                              data-counter="taskToday"
+                              required></textarea>
+                        <small id="taskToday" class="text-muted">100 characters remaining</small>
+                    </td>
 
-                        <td>
-                            <textarea name="note"
-                                  rows="2"
-                                  maxlength="100"
-                                  class="form-control form-control-sm fixed-textarea char-limit"
-                                  data-counter="noteToday"
-                                  required></textarea>
-                            <small id="noteToday" class="text-muted">100 characters remaining</small>
-                        </td>
+                    <td>
+                        <textarea name="note"
+                              rows="2"
+                              maxlength="100"
+                              class="form-control form-control-sm fixed-textarea char-limit"
+                              data-counter="noteToday"
+                              required></textarea>
+                        <small id="noteToday" class="text-muted">100 characters remaining</small>
+                    </td>
 
-                        <td class="text-muted">—</td>
+                    <td class="text-muted">—</td>
 
-                        <td>
-                            @if (isUser)
-                            {
-                                <div class="form-check">
-                                    <input class="form-check-input"
-                                           type="checkbox"
-                                           name="reportedTo"
-                                           value="Manager"
-                                           checked />
-                                    <label class="form-check-label">Manager</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input"
-                                           type="checkbox"
-                                           name="reportedTo"
-                                           value="Admin" />
-                                    <label class="form-check-label">Admin</label>
-                                </div>
-                            }
-                            else if (isManager)
-                            {
-                                <div class="form-check">
-                                    <input class="form-check-input"
-                                           type="checkbox"
-                                           name="reportedTo"
-                                           value="Admin"
-                                           checked />
-                                    <label class="form-check-label">Admin</label>
-                                </div>
-                            }
-                        </td>
+                    <td>
+                        <!-- ✅ ADDED: Error message -->
+                        <div class="text-danger small mb-1 d-none" id="todayReportedToError">
+                            select Admin or Manager.
+                        </div>
+
+                        @if (isUser)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input today-checkbox"
+                                       type="checkbox"
+                                       name="reportedTo"
+                                       value="Manager"
+                                       checked />
+                                <label class="form-check-label">Manager</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input today-checkbox"
+                                       type="checkbox"
+                                       name="reportedTo"
+                                       value="Admin" />
+                                <label class="form-check-label">Admin</label>
+                            </div>
+                        }
+                        else if (isManager)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input today-checkbox"
+                                       type="checkbox"
+                                       name="reportedTo"
+                                       value="Admin"
+                                       checked />
+                                <label class="form-check-label">Admin</label>
+                            </div>
+                        }
+                    </td>
 
                     <!-- Submitted By (TEXT ONLY) -->
                     <td class="text-center">
@@ -295,12 +301,8 @@ else
 
                     <!-- Action column -->
                     <td class="text-center">
-                        <button class="btn btn-success btn-sm">Submit</button>
-                        @* <a asp-action="UserReports"
-                           asp-route-userId="@targetUserId"
-                           class="btn btn-secondary btn-sm ms-1">Cancel</a> *@
+                        <button type="submit" class="btn btn-success btn-sm">Submit</button>
                     </td>
-
                     </form>
                 </tr>
             }
@@ -466,6 +468,7 @@ else
 
 @section Scripts {
     <script>
+        // Existing function - keep it
         function validateReportedTo(form) {
             const checked = form.querySelectorAll(
                 'input[name="reportedTo"]:checked'
@@ -481,6 +484,59 @@ else
             error.classList.add("d-none");
             return true; // ✅ allow submit
         }
+
+        // ================= NEW FUNCTIONS =================
+        function validateTodayReportForm() {
+            const checkboxes = document.querySelectorAll('.today-checkbox:checked');
+            const errorDiv = document.getElementById('todayReportedToError');
+
+            if (checkboxes.length === 0) {
+                if (errorDiv) errorDiv.classList.remove("d-none");
+                return false;
+            }
+
+            if (errorDiv) errorDiv.classList.add("d-none");
+            return true;
+        }
+
+        function validateAddReportPanel() {
+            const container = document.getElementById("addReportFormContainer");
+            if (!container) return false;
+
+            const checkboxes = container.querySelectorAll('.add-panel-checkbox:checked');
+            const errorDiv = document.getElementById('addReportPanelError');
+
+            if (checkboxes.length === 0) {
+                if (errorDiv) errorDiv.classList.remove("d-none");
+                return false;
+            }
+
+            if (errorDiv) errorDiv.classList.add("d-none");
+            return true;
+        }
+
+        // ================= SETUP EVENT LISTENERS =================
+        document.addEventListener("DOMContentLoaded", function() {
+            // Today's report checkboxes
+            document.querySelectorAll('.today-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const errorDiv = document.getElementById('todayReportedToError');
+                    if (errorDiv && this.checked) {
+                        errorDiv.classList.add("d-none");
+                    }
+                });
+            });
+
+            // Add panel checkboxes (will be added dynamically)
+            document.addEventListener('click', function(e) {
+                if (e.target && e.target.classList.contains('add-panel-checkbox')) {
+                    const errorDiv = document.getElementById('addReportPanelError');
+                    if (errorDiv && e.target.checked) {
+                        errorDiv.classList.add("d-none");
+                    }
+                }
+            });
+        });
 
         // ================= CHARACTER COUNTER =================
         document.addEventListener("input", function (e) {
