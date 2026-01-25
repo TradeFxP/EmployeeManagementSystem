@@ -31,7 +31,8 @@
             </div>
         }
 
-        <form id="editReportForm">
+        <form id="editReportForm" method="post">
+
             @Html.AntiForgeryToken()
 
             <input type="hidden" id="editReportId" value="@Model.Id" />

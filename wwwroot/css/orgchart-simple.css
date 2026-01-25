@@ -439,3 +439,17 @@
     font-size: 14px;
     line-height: 1;
 }
+
+
+/*FIX TABLE TEXT WRAPPING (CSS)
+📍 Add this CSS (global or in this view) userreportpanel.cshtml tasknot*/
+
+
+.report-task,
+.report-note,
+.report-reviewer {
+    max-width: 250px;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}

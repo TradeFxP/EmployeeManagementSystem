@@ -4,29 +4,29 @@ function viewReport(reportId) {
 }
 
 // ================= EDIT =================
-function editReportInline(reportId) {
+//function editReportInline(reportId) {
 
-    const panel = document.getElementById("detailsPanel");
-    if (!panel) {
-        alert("Details panel not found");
-        return;
-    }
+//    const panel = document.getElementById("detailsPanel");
+//    if (!panel) {
+//        alert("Details panel not found");
+//        return;
+//    }
 
-    panel.innerHTML = "<div class='p-3 text-muted'>Loading...</div>";
+//    panel.innerHTML = "<div class='p-3 text-muted'>Loading...</div>";
 
-    fetch(`/Reports/EditInlinePanel?id=${reportId}`)
-        .then(res => {
-            if (!res.ok) throw new Error();
-            return res.text();
-        })
-        .then(html => {
-            panel.innerHTML = html;
-        })
-        .catch(() => {
-            panel.innerHTML =
-                "<div class='p-3 text-danger'>Failed to load edit form</div>";
-        });
-}
+//    fetch(`/Reports/EditInlinePanel?id=${reportId}`)
+//        .then(res => {
+//            if (!res.ok) throw new Error();
+//            return res.text();
+//        })
+//        .then(html => {
+//            panel.innerHTML = html;
+//        })
+//        .catch(() => {
+//            panel.innerHTML =
+//                "<div class='p-3 text-danger'>Failed to load edit form</div>";
+//        });
+//}
 
 // ================= DELETE =================
 function deleteReport(reportId) {

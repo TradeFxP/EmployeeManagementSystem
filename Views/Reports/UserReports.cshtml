@@ -114,7 +114,8 @@ else
             @if (showTodaySubmit)
             {
                 <tr class="table-success report-row">
-                    <form asp-action="CreateInline" method="post" id="todayReportForm" onsubmit="return validateTodayReportForm()">
+                    <form id="todayReportForm" onsubmit="return false;">
+
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="targetUserId" value="@currentUserId" />
                         <input type="hidden" name="date" value="@today.ToString("dd-MM-yyyy")" />
@@ -187,7 +188,11 @@ else
 
                     <!-- Action column -->
                     <td class="text-center">
-                        <button type="submit" class="btn btn-success btn-sm">Submit</button>
+                        <button type="button" class="btn btn-success" id="todaySubmitBtn">
+                            Submit
+                        </button>
+
+
                     </td>
                     </form>
                 </tr>
@@ -519,4 +524,40 @@ else
             }
         }
     </script>
+
+    <script>
+        document.getElementById("todaySubmitBtn")?.addEventListener("click", async function () {
+
+            const form = document.getElementById("todayReportForm");
+            if (!form) return;
+
+            // validation
+            if (!validateTodayReportForm()) return;
+
+            const formData = new FormData(form);
+
+            try {
+                const res = await fetch("/Reports/CreateInline", {
+                    method: "POST",
+                    body: formData,
+                    credentials: "same-origin"
+                });
+
+                const text = await res.text();
+
+                if (!res.ok) {
+                    alert(text);
+                    return;
+                }
+
+                // SUCCESS → reload reports list
+                location.reload();
+
+            } catch (err) {
+                console.error(err);
+                alert("Failed to submit report");
+            }
+        });
+    </script>
+
 }

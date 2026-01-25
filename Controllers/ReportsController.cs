@@ -321,13 +321,17 @@ namespace UserRoles.Controllers
         // Antiforgery token was previously used, to avoid silent failures caused by
         // missing tokens when called from JS we ignore antiforgery here (consistent
         // with other AJAX endpoints in the project).
+
+
+
+
         [IgnoreAntiforgeryToken]
         [Authorize(Roles = "User,Manager,Admin")]
         [HttpPost]
         public async Task<IActionResult> CreateInline(
      string task,
      string note,
-     List<string> reportedTo,
+     string[] reportedTo,
      string date,
      string targetUserId)
         {
@@ -337,38 +341,21 @@ namespace UserRoles.Controllers
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
                 out DateTime parsedDate))
-            {
                 return BadRequest("Invalid date format.");
-            }
 
             if (parsedDate.Date > DateTime.Today)
                 return BadRequest("Future dates are not allowed.");
 
             var currentUserId = _userManager.GetUserId(User)!;
 
-            if (User.IsInRole("User") && targetUserId != currentUserId)
-                return Forbid();
-
-            if (User.IsInRole("Manager") &&
-                targetUserId == currentUserId &&
-                parsedDate.Date != DateTime.Today)
-                return BadRequest("Managers can submit only today's report.");
-
             if (User.IsInRole("Admin") && targetUserId == currentUserId)
-                return BadRequest("Admin cannot submit own report.");
-
-            bool exists = await _context.DailyReports.AnyAsync(r =>
-                r.ApplicationUserId == targetUserId &&
-                r.Date.Date == parsedDate.Date);
-
-            if (exists)
-                return Conflict("Report already exists for selected date.");
+                return BadRequest("Admin cannot submit a report for themselves.");
 
             if (string.IsNullOrWhiteSpace(task) || string.IsNullOrWhiteSpace(note))
                 return BadRequest("Task and Note are required.");
 
-            //if (reportedTo == null || !reportedTo.Any())
-            //    return BadRequest("Please select Admin or Manager.");
+            if (reportedTo == null || reportedTo.Length == 0)
+                return BadRequest("Please select Admin or Manager.");
 
             var report = new DailyReport
             {
@@ -383,24 +370,31 @@ namespace UserRoles.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
-            _context.DailyReports.Add(report);
-            // AFTER saving report
-            await _context.SaveChangesAsync();
-
-            // 🔁 REDIRECT BASED ON ROLE
-            if (User.IsInRole("User"))
+            try
             {
-                // User stays in Reports/UserReports
-                return RedirectToAction("UserReports", new { userId = targetUserId });
+                _context.DailyReports.Add(report);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                if (ex.InnerException?.Message.Contains("23505") == true)
+                {
+                    return Conflict("Report already exists for selected date.");
+                }
+                throw;
             }
 
-            // Admin / Manager coming from OrgChart → stay there
-            return RedirectToAction(
-                "OrgChart",
-                "Users"
-            );
+            // NORMAL FORM SUBMIT → stay on same page
+            if (Request.Headers["Accept"].ToString().Contains("text/html"))
+            {
+                return RedirectToAction(nameof(UserReports), new { userId = targetUserId });
+            }
 
+            // AJAX
+            return Ok(new { success = true, userId = targetUserId });
         }
+
+
 
         /* ================= DETAILS ================= */
         [Authorize(Roles = "User,Manager,Admin")]
@@ -500,10 +494,13 @@ namespace UserRoles.Controllers
             await _context.SaveChangesAsync();
 
             // ✅ Always return JSON for inline/AJAX calls
-            return RedirectToAction(
-            "UserReports",
-            new { userId = report.ApplicationUserId }
-        );
+            // ✅ CORRECT for AJAX inline edit
+            return Json(new
+            {
+                success = true,
+                message = "Report updated successfully"
+            });
+
 
         }
 
@@ -571,6 +568,48 @@ namespace UserRoles.Controllers
 
             return PartialView("_EditReportPanel", vm);
         }
+
+        /* ================= EDIT REPORT PANEL (INLINE) ================= */
+        [Authorize(Roles = "Admin,Manager")]
+        [HttpGet]
+        public async Task<IActionResult> EditReportPanel(int reportId, string userId)
+        {
+            // 1. Load report
+            var report = await _context.DailyReports
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == reportId);
+
+            if (report == null)
+                return NotFound("Report not found");
+
+            // 2. Authorization (extra safety)
+            if (User.IsInRole("Manager") &&
+                !string.Equals(report.SubmittedByRole, "User", StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
+            }
+
+            // 3. Build ViewModel
+            var vm = new ReportViewModel
+            {
+                Id = report.Id,
+                ApplicationUserId = report.ApplicationUserId,
+                Task = report.Task ?? "",
+                Note = report.Note ?? "",
+                ReviewerComment = report.ReviewerComment ?? "",
+                SubmittedByRole = report.SubmittedByRole,
+                Date = report.Date
+            };
+
+            // 4. Needed for Cancel → reload reports
+            ViewBag.TargetUserId = string.IsNullOrEmpty(userId)
+                ? report.ApplicationUserId
+                : userId;
+
+            // 5. Return PARTIAL ONLY
+            return PartialView("_EditReportPanel", vm);
+        }
+
 
 
         //pdf download

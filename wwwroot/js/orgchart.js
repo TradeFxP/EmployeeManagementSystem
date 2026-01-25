@@ -515,3 +515,75 @@ window.drop = function (event, newParentId) {
     });
 
 })();
+
+
+
+// ===============================
+// ADD REPORT SUBMIT (DELEGATED)
+// ===============================
+// ===============================
+// ADD REPORT SUBMIT (DELEGATED - FINAL)
+// ===============================
+document.addEventListener("click", async function (e) {
+
+    const btn = e.target.closest("#submitReportBtn");
+    if (!btn) return;
+
+    const container = btn.closest("#addReportFormContainer");
+    if (!container) {
+        console.error("❌ AddReportFormContainer not found");
+        return;
+    }
+
+    const targetUserId = container.querySelector('input[name="targetUserId"]')?.value;
+    const date = container.querySelector('input[name="date"]')?.value;
+    const task = container.querySelector('textarea[name="task"]')?.value.trim();
+    const note = container.querySelector('textarea[name="note"]')?.value.trim();
+
+    const reportedTo = Array.from(
+        container.querySelectorAll('input[name="reportedTo"]:checked')
+    ).map(x => x.value);
+
+    if (!targetUserId || !date || !task || !note || reportedTo.length === 0) {
+        alert("Please fill all fields and select Reported To");
+        return;
+    }
+
+    console.log("✅ Submitting report:", {
+        targetUserId, date, task, note, reportedTo
+    });
+
+    const formData = new FormData();
+    formData.append("targetUserId", targetUserId);
+    formData.append("date", date);
+    formData.append("task", task);
+    formData.append("note", note);
+    reportedTo.forEach(r => formData.append("reportedTo", r));
+
+    try {
+        const res = await fetch("/Reports/CreateInline", {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+            console.error("❌ CreateInline failed:", text);
+            alert(text);
+            return;
+        }
+
+        const result = JSON.parse(text);
+
+        if (result.success) {
+            console.log("✅ Report created");
+            loadReports(result.userId);
+        }
+    }
+    catch (err) {
+        console.error("❌ Submit error:", err);
+        alert("Unexpected error submitting report");
+    }
+});
