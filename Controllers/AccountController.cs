@@ -12,18 +12,22 @@ namespace UserRoles.Controllers
         private readonly UserManager<Users> userManager;
         private readonly RoleManager<IdentityRole> roleManager;
         private readonly IEmailService emailService;
+        private readonly ILogger<AccountController> logger;
 
         public AccountController(
-            SignInManager<Users> signInManager,
-            UserManager<Users> userManager,
-            RoleManager<IdentityRole> roleManager,
-            IEmailService emailService)
+         SignInManager<Users> signInManager,
+         UserManager<Users> userManager,
+         RoleManager<IdentityRole> roleManager,
+         IEmailService emailService,
+         ILogger<AccountController> logger)
         {
             this.signInManager = signInManager;
             this.userManager = userManager;
             this.roleManager = roleManager;
             this.emailService = emailService;
+            this.logger = logger;
         }
+
 
         /* ===================== LOGIN ===================== */
 
@@ -181,11 +185,20 @@ namespace UserRoles.Controllers
                 Request.Scheme
             );
 
-            await emailService.SendEmailAsync(
-                user.Email!,
-                "Reset your password",
-                $"Click the link below to reset your password:\n\n{resetLink}"
-            );
+            try
+            {
+                await emailService.SendEmailAsync(
+                    user.Email!,
+                    "Reset your password",
+                    $"Click the link below to reset your password:\n\n{resetLink}"
+                );
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "SMTP FAILED while sending password reset email to {Email}", user.Email);
+                throw; // 🔥 THIS MAKES RENDER SHOW THE REAL ERROR
+            }
+
 
             user.PasswordResetCount += 1;
             await userManager.UpdateAsync(user);

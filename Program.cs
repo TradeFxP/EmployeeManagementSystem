@@ -11,6 +11,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 QuestPDF.Settings.License = LicenseType.Community;
 
+
+
+System.Net.ServicePointManager.SecurityProtocol =
+    System.Net.SecurityProtocolType.Tls12;
+
+
 // ================= MVC =================
 builder.Services.AddControllersWithViews();
 
