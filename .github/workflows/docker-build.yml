@@ -31,3 +31,8 @@ jobs:
         tags: |
           registry.nafabarter.com/employeemgmt-1:${{ github.sha }}
           registry.nafabarter.com/employeemgmt-1:latest
+
+    - name: Redeploy Stack in Portainer
+      run: | 
+        curl -X POST -k https://89.116.20.215:9443/api/stacks/webhooks/a7220d78-4fc2-47ce-b04a-6f4390824a97
+    
