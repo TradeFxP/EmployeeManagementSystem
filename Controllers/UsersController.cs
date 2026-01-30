@@ -814,7 +814,8 @@ Please change your password after login.
             await _emailService.SendEmailAsync(
                 email,
                 "Account Created",
-                $"Login Email: {email}\nPassword: {password}"
+                $"Hii {name}   " +
+                $"  Using these credential you can login  \n Login Email: {email}\nPassword: {password}"
             );
 
             TempData["Success"] = "User added successfully.";

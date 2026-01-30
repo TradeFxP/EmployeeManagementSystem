@@ -216,6 +216,11 @@
 </div>
 
 
+<script>
+    window.__isAdmin = @User.IsInRole("Admin").ToString().ToLower();
+    window.__isManager = @User.IsInRole("Manager").ToString().ToLower();
+    window.__isSubManager = @User.IsInRole("SubManager").ToString().ToLower();
+</script>
 
 
     <script>
@@ -355,21 +360,33 @@
         };
 
         // ================= RESTORE ACTION ICONS =================
-                 function restoreRowActions(row, reportId) {
+                function restoreRowActions(row, reportId) {
 
-        row.querySelector(".actions-cell").innerHTML = `
+        let actionsHtml = `
             <a title="View"
                href="javascript:void(0)"
                onclick="window.viewReport(${reportId})">👁</a>
-
-            <a title="Edit"
-               href="javascript:void(0)"
-               onclick="window.startInlineEdit(${reportId})">✏️</a>
-
-            <a title="Delete"
-               href="javascript:void(0)"
-               onclick="window.deleteReport(${reportId})">🗑</a>
         `;
+
+        // ✅ Edit allowed for Admin, Manager, SubManager
+        if (window.__isAdmin || window.__isManager || window.__isSubManager) {
+            actionsHtml += `
+                <a title="Edit"
+                   href="javascript:void(0)"
+                   onclick="window.startInlineEdit(${reportId})">✏️</a>
+            `;
+        }
+
+        // ✅ Delete ONLY for Admin
+        if (window.__isAdmin) {
+            actionsHtml += `
+                <a title="Delete"
+                   href="javascript:void(0)"
+                   onclick="window.deleteReport(${reportId})">🗑</a>
+            `;
+        }
+
+        row.querySelector(".actions-cell").innerHTML = actionsHtml;
     }
 
 

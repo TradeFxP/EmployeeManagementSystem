@@ -1,25 +1,50 @@
-﻿@using UserRoles.ViewModels;
-@model VerifyEmailViewModel;
+﻿@using UserRoles.ViewModels
+@model VerifyEmailViewModel
 
 @{
     ViewData["Title"] = "Verify Email";
     Layout = "~/Views/Shared/_AccountLayout.cshtml";
 }
 
-<div class="account-container">
-    <div class="account-box">
-        <h2 class="text-center mb-4">Verify Email</h2>
-        <form asp-action="VerifyEmail" method="post">
+<div class="account-wrapper">
+    <div class="account-card">
+        <h2 class="account-title">ResetPassword</h2>
+        <p class="account-subtitle">
+            Enter your registered email address to verify your account
+        </p>
+
+        <form asp-action="VerifyEmail" method="post" novalidate>
             @Html.AntiForgeryToken()
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="mb-3">
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="form-group mb-3">
                 <label asp-for="Email" class="form-label"></label>
-                <input asp-for="Email" class="form-control" />
+                <input asp-for="Email" class="form-control form-control-lg"
+                       placeholder="Enter your email address" />
                 <span asp-validation-for="Email" class="text-danger"></span>
             </div>
-            <input type="submit" value="Verify" class="btn btn-success w-100 p-2" />
-            <div class="text-center mt-2">
-                <a asp-controller="Account" asp-action="Login" class="text-decoration-none mt-3">Back</a>
+
+            <button type="submit" class="btn btn-success btn-lg w-100 mt-2">
+                Verify Email
+            </button>
+
+            <div>
+
+
+
+
+            </div>
+
+            <div class="text-center mt-3">
+                <a asp-controller="Account"
+                   asp-action="Login"
+                   class="back-link">
+                   <div>
+
+                   </div>
+                    ← Back to Login
+                </a>
             </div>
         </form>
     </div>
@@ -27,6 +52,99 @@
 
 @section Scripts {
     @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial.cshtml");
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
 }
+
+
+            <style>
+    /* Page Background */
+    .account-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+        padding: 20px;
+    }
+
+    /* Card Container */
+    .account-card {
+        width: 100%;
+        max-width: 400px;
+        min-height: 350px;
+        background: #ffffff;
+        padding: 35px 30px;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        animation: fadeIn 0.4s ease-in-out;
+    }
+
+    /* Title */
+    .account-title {
+        text-align: center;
+        font-weight: 400;
+        margin-bottom: 10px;
+        color: #333;
+    }
+
+    /* Subtitle */
+    .account-subtitle {
+        text-align: center;
+        font-size: 14px;
+        color: #6c757d;
+        margin-bottom: 25px;
+    }
+
+    /* Form Labels */
+    .form-label {
+        font-weight: 500;
+        color: #444;
+    }
+
+    /* Inputs */
+    .form-control {
+        border-radius: 8px;
+    }
+
+        .form-control:focus {
+            border-color: #198754;
+            box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.25);
+        }
+
+    /* Button */
+    .btn-success {
+        border-radius: 8px;
+        font-weight: 400;
+        transition: all 0.3s ease;
+    }
+
+        .btn-success:hover {
+            background-color: #157347;
+        }
+
+    /* Back link */
+    .back-link {
+        color: #198754;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+    /* Fade animation */
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+            </style>

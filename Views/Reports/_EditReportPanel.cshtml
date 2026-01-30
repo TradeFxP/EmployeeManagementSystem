@@ -151,19 +151,22 @@
         updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating...';
 
         try {
-            const response = await fetch("/Reports/InlineUpdate", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                body: new URLSearchParams({
-                    id: id,
-                    task: task,
-                    note: note,
-                    reviewerComment: reviewerComment,
-                    __RequestVerificationToken: token
-                })
-            });
+               const response = await fetch("/Reports/InlineUpdate", {
+        method: "POST",
+        credentials: "same-origin", // ✅ THIS IS THE FIX
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json"
+        },
+        body: new URLSearchParams({
+            id: id,
+            task: task,
+            note: note,
+            reviewerComment: reviewerComment,
+            __RequestVerificationToken: token
+        })
+    });
+
 
             if (response.ok) {
                 const data = await response.json();

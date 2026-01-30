@@ -27,6 +27,16 @@
             font-weight: 600;
             color: rgba(0,0,0,.85);
         }
+
+        header nav.navbar {
+            background-color: #0d6efd !important; /* Bootstrap primary blue */
+        }
+
+            header nav.navbar * {
+                color: #ffffff !important;
+            }
+
+
     </style>
 </head>
 
@@ -35,7 +45,7 @@
         <nav class="navbar navbar-expand-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
 
-                <span class="navbar-brand">UserRoles</span>
+                <span class="navbar-brand">EmployeeManagementSystem</span>
 
                 <button class="navbar-toggler" type="button"
                         data-bs-toggle="collapse"
@@ -80,14 +90,14 @@
                             </li>
                         } 
 
-                        @* @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                        @*  @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                         {
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Tasks" asp-action="Create">
                                     Assign Tasks
                                 </a>
                             </li>
-                        } *@
+                        }  *@
 
                         
 

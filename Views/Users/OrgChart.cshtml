@@ -141,7 +141,7 @@
 
                         @* ACTION ICONS: allow Admin and Manager to edit (delete Admin-only); reports available to both *@
                         <div class="node-actions-top above-name">
-                            @if (currentRole == "Admin" || currentRole == "Manager")
+                            @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
                             {
                                 <a onclick="openEditModal('@manager.Id','@manager.Name','@manager.Email','Manager')">✏️</a>
                             }
@@ -150,7 +150,7 @@
                                 <a onclick="openDeleteModal('@manager.Id','@manager.Name','Manager')">🗑</a>
                             }
 
-                            @if (currentRole == "Admin" || currentRole == "Manager")
+                            @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
                             {
                                 <a href="javascript:void(0)"
                                    onclick="loadReports('@manager.Id')">📊</a>
@@ -193,7 +193,7 @@
 
                                     <!-- NODE ACTIONS: Admin + Manager can edit; delete still Admin only -->
                                     <div class="node-actions-top above-name">
-                                        @if (currentRole == "Admin" || currentRole == "Manager")
+                                        @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
                                         {
                                             <a onclick="openEditModal('@user.Id','@user.Name','@user.Email','User')">✏️</a>
                                         }
@@ -203,7 +203,7 @@
                                             <a onclick="openDeleteModal('@user.Id','@user.Name','User')">🗑</a>
                                         }
 
-                                        @if (currentRole == "Admin" || currentRole == "Manager")
+                                        @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
                                         {
                                             <a href="javascript:void(0)"
                                                onclick="loadReports('@user.Id')">📊</a>

@@ -440,73 +440,70 @@ namespace UserRoles.Controllers
 
 
         /* ================= INLINE UPDATE ================= */
-        [Authorize(Roles = "Admin,Manager")]
+        /* ================= INLINE UPDATE ================= */
+        /* ================= INLINE UPDATE ================= */
+        [Authorize(Roles = "Admin,Manager,SubManager")]
         [HttpPost]
-        [ValidateAntiForgeryToken] // ✅ IMPORTANT
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> InlineUpdate(
-        int id,
-        string task,
-        string note,
-        string reviewerComment)
+            int id,
+            string task,
+            string note,
+            string reviewerComment)
         {
-            // 🔹 Basic server-side validation
             if (string.IsNullOrWhiteSpace(task) || string.IsNullOrWhiteSpace(note))
             {
                 return BadRequest(new { message = "Task and Note are required." });
             }
 
-            // 🔹 Fetch the existing report (tracked entity)
-            var report = await _context.DailyReports
-                .FirstOrDefaultAsync(r => r.Id == id);
+            var report = await _context.DailyReports.FirstOrDefaultAsync(r => r.Id == id);
 
             if (report == null)
             {
                 return NotFound(new { message = "Report not found." });
             }
 
-            // 🔹 Authorization rules
+            // ================= ROLE RULES =================
+
+            // ✅ Admin → can edit everything
+            // 🔹 Authorization rules (FINAL)
             if (User.IsInRole("Admin"))
             {
-                // Admin can update any report
+                // Admin can edit anything
             }
-            else if (User.IsInRole("Manager"))
+            else if (User.IsInRole("Manager") || User.IsInRole("SubManager"))
             {
-                // Manager can update ONLY User-submitted reports
-                if (!string.Equals(report.SubmittedByRole, "User",
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    return Forbid();
-                }
+                // Manager / SubManager can edit ONLY User-owned reports
+                var reportOwner = await _userManager.FindByIdAsync(report.ApplicationUserId);
+                if (reportOwner == null)
+                    return NotFound();
+
+                var ownerRoles = await _userManager.GetRolesAsync(reportOwner);
+
+                if (!ownerRoles.Contains("User"))
+                    return Forbid(); // ❌ cannot edit Admin/Manager/SubManager reports
             }
             else
             {
                 return Forbid();
             }
 
-            // 🔹 Update fields
+
+            // ================= UPDATE =================
             report.Task = task.Trim();
             report.Note = note.Trim();
             report.ReviewerComment = string.IsNullOrWhiteSpace(reviewerComment)
                 ? null
                 : reviewerComment.Trim();
 
-            // 🔹 Persist changes
             await _context.SaveChangesAsync();
 
-            // ✅ Always return JSON for inline/AJAX calls
-            // ✅ CORRECT for AJAX inline edit
             return Json(new
             {
                 success = true,
                 message = "Report updated successfully"
             });
-
-
         }
-
-
-
-
 
         [Authorize(Roles = "Admin")]
         [HttpPost]

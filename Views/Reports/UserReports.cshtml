@@ -532,9 +532,17 @@ else
             if (!form) return;
 
             // validation
-            if (!validateTodayReportForm()) return;
+                    // 🔴 STEP 1: Trigger browser validation UI
+        if (!form.checkValidity()) {
+            form.reportValidity(); // shows "Please fill out this field" on task/note
+            return;
+        }
 
-            const formData = new FormData(form);
+        // 🔴 STEP 2: Keep your existing reportedTo validation
+        if (!validateTodayReportForm()) return;
+
+        const formData = new FormData(form);
+
 
             try {
                 const res = await fetch("/Reports/CreateInline", {

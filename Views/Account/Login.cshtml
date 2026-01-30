@@ -5,76 +5,72 @@
     Layout = "~/Views/Shared/_AccountLayout.cshtml";
 }
 
-<div class="account-container">
-    <div class="account-box">
-        <h2 class="text-center mb-4">Login</h2>
-        <div class="login-page">
+<div class="login-bg">
+    <div class="login-glow"></div>
 
-            <div class="login-card">
-                        <form asp-action="Login" method="post" autocomplete="on">
-                            @Html.AntiForgeryToken()
+    <div class="account-container">
+        <div class="account-box">
 
-                            <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+            <h2 class="text-center mb-1 fw-bold">
+                Welcome  👋
+            </h2>
+            <p class="text-center text-muted mb-4">
+                Login to Employee Management System
+            </p>
 
-                            <!-- EMAIL -->
-                            <div class="mb-3">
-                                <label asp-for="Email" class="form-label"></label>
-                                <input asp-for="Email"
-                                       class="form-control"
-                                       autocomplete="username"
-                                       inputmode="email" />
-                                <span asp-validation-for="Email" class="text-danger"></span>
-                            </div>
+            <form asp-action="Login" method="post" autocomplete="on">
+                @Html.AntiForgeryToken()
 
-                            <!-- PASSWORD -->
-                            <div class="mb-3 position-relative">
-                                <label asp-for="Password" class="form-label"></label>
+                <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
 
-                                <input asp-for="Password"
-                                       type="password"
-                                       class="form-control"
-                                       id="passwordInput"
-                                       autocomplete="current-password" />
-
-                                <span id="togglePassword"
-                                      class="password-toggle"
-                                      onclick="togglePassword()">🙈</span>
-
-                                <span asp-validation-for="Password" class="text-danger"></span>
-                            </div>
-
-                            <!-- REMEMBER ME -->
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div class="form-check">
-                                    <input asp-for="RememberMe" class="form-check-input" />
-                                    <label asp-for="RememberMe" class="form-check-label">
-                                        Remember me
-                                    </label>
-                                </div>
-
-                                <a asp-action="VerifyEmail"
-                                   asp-controller="Account"
-                                   class="text-decoration-none">
-                                    Forgot password?
-                                </a>
-                            </div>
-
-                            <button type="submit" class="btn btn-success w-100">
-                                Login
-                            </button>
-                        </form>
-
-                <div class="text-center mt-3">
-                    <a asp-controller="Home" asp-action="Index">Back</a>
+                <!-- EMAIL -->
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label"></label>
+                    <input asp-for="Email"
+                           class="form-control"
+                           autocomplete="username"
+                           inputmode="email" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
 
+                <!-- PASSWORD -->
+                <div class="mb-3 position-relative">
+                    <label asp-for="Password" class="form-label"></label>
 
-            </div>
+                    <input asp-for="Password"
+                           type="password"
+                           class="form-control"
+                           id="passwordInput"
+                           autocomplete="current-password" />
 
+                    <span id="togglePassword"
+                          class="password-toggle"
+                          onclick="togglePassword()">🙈</span>
 
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                <!-- REMEMBER + FORGOT -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="form-check">
+                        <input asp-for="RememberMe" class="form-check-input" />
+                        <label asp-for="RememberMe" class="form-check-label">
+                            Remember me
+                        </label>
+                    </div>
+
+                    <a asp-action="VerifyEmail"
+                       asp-controller="Account"
+                       class="forgot-link">
+                        Forgot password?
+                    </a>
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 login-btn">
+                    Login
+                </button>
+            </form>
         </div>
-
-       
     </div>
 </div>
 
@@ -98,6 +94,91 @@
 }
 
 <style>
+    /* ===== BACKGROUND ===== */
+    .login-bg {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #eef2f7, #dce3ec);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .login-glow {
+        position: absolute;
+        width: 450px;
+        height: 450px;
+        background: radial-gradient(circle, rgba(46,139,87,0.25), transparent 70%);
+        animation: floatGlow 8s ease-in-out infinite;
+    }
+
+    /* 🔴 Razor-safe animation */
+    @@keyframes floatGlow {
+        0% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-30px);
+        }
+
+        100% {
+            transform: translateY(0);
+        }
+    }
+
+    /* ===== CARD ===== */
+    .account-container {
+        z-index: 2;
+    }
+
+    .account-box {
+        background: #ffffff;
+        padding: 2.5rem;
+        border-radius: 14px;
+        width: 380px;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.12);
+        animation: fadeUp 0.6s ease;
+    }
+
+    @@keyframes fadeUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* ===== INPUTS ===== */
+    .form-control {
+        border-radius: 10px;
+        padding: 10px 12px;
+    }
+
+        .form-control:focus {
+            box-shadow: 0 0 0 0.2rem rgba(46,139,87,0.25);
+            border-color: #2e8b57;
+        }
+
+    /* ===== BUTTON ===== */
+    .login-btn {
+        border-radius: 10px;
+        padding: 10px;
+        font-weight: 600;
+        transition: all 0.25s ease;
+    }
+
+        .login-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(46,139,87,0.3);
+        }
+
+    /* ===== PASSWORD TOGGLE ===== */
     .password-toggle {
         position: absolute;
         top: 38px;
@@ -111,4 +192,22 @@
         .password-toggle:hover {
             color: #000;
         }
+
+    /* ===== LINKS ===== */
+    .forgot-link {
+        font-size: 14px;
+        text-decoration: none;
+    }
+
+        .forgot-link:hover {
+            text-decoration: underline;
+        }
+
+    /* ===== MOBILE ===== */
+    @@media (max-width: 480px) {
+        .account-box {
+            width: 92%;
+            padding: 2rem;
+        }
+    }
 </style>
