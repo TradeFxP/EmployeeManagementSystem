@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using UserRoles.Models;
-using UserRoles.ViewModels;
-using UserRoles.Services;
 using System.Security.Cryptography;
+using UserRoles.Models;
+using UserRoles.Services;
+using UserRoles.ViewModels;
 
 
 namespace UserRoles.Controllers
@@ -80,46 +81,62 @@ namespace UserRoles.Controllers
             if (user == null)
                 return RedirectToAction("Login", "Account");
 
-            // ✅ Always update normal fields
+            // ✅ Update common fields
             user.Name = model.FirstName.Trim();
             user.MobileNumber = model.MobileNumber.Trim();
 
-            // 🔐 ADMIN EMAIL CHANGE (PENDING – SAFE)
-            if (User.IsInRole("Admin") && user.Email != model.Email)
+            // ================= ADMIN EMAIL CHANGE =================
+            if (User.IsInRole("Admin") && !string.Equals(user.Email, model.Email, StringComparison.OrdinalIgnoreCase))
             {
-                var code = System.Security.Cryptography.RandomNumberGenerator
-                    .GetInt32(100000, 999999)
-                    .ToString();
+                var newEmail = model.Email.Trim();
 
-                user.PendingEmail = model.Email.Trim();
-                user.EmailChangeLoginCode = code;
-                user.EmailChangeCodeExpiry = DateTime.UtcNow.AddMinutes(10);
+                // 1️⃣ Update email immediately
+                user.Email = newEmail;
+                user.UserName = newEmail;
 
+                // 2️⃣ Kill all old logins (VERY IMPORTANT)
+                await _userManager.UpdateSecurityStampAsync(user);
                 await _userManager.UpdateAsync(user);
 
-                await _emailService.SendEmailAsync(
-                    user.PendingEmail,
-                    "Confirm your new admin email",
-                    $@"
-            <p>You requested to change your admin email.</p>
-            <p><strong>Login Code:</strong> {code}</p>
-            <p>This code expires in 10 minutes.</p>
-            "
+                // 3️⃣ Generate password reset token
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var encodedToken = Uri.EscapeDataString(token);
+
+                var resetLink = Url.Action(
+                    "ChangePassword",
+                    "Account",
+                    new { email = newEmail, token = encodedToken },
+                    Request.Scheme
                 );
 
-                TempData["Success"] =
-                    "A login code has been sent to the new email. " +
-                    "Your current login remains active until confirmed.";
+                // 4️⃣ Send reset link to NEW email only
+                await _emailService.SendEmailAsync(
+                    newEmail,
+                    "Set your new admin password",
+                    $@"
+<p>Your admin email has been updated successfully.</p>
+<p>For security reasons, please set a new password using the link below:</p>
+<p><a href='{resetLink}'>Set New Password</a></p>
+<p>This will permanently disable access from your old email.</p>
+"
+                );
 
-                return RedirectToAction(nameof(Index)); // ✅ RETURN HERE
+                // 5️⃣ Force logout immediately
+                await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+
+                TempData["Success"] =
+                    "Email updated successfully. Please set a new password from the email sent to you.";
+
+                return RedirectToAction("Login", "Account");
             }
 
-            // ✅ Non-admin OR admin without email change
+            // ================= NORMAL PROFILE UPDATE =================
             await _userManager.UpdateAsync(user);
 
             TempData["Success"] = "Profile updated successfully.";
-            return RedirectToAction(nameof(Index)); // ✅ FINAL RETURN (FIX)
+            return RedirectToAction(nameof(Index));
         }
+
 
 
     }

@@ -43,13 +43,17 @@ namespace UserRoles.Controllers
         public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             if (!ModelState.IsValid)
+                return View(model);
+
+            var user = await userManager.FindByEmailAsync(model.Email);
+            if (user == null)
             {
-                ViewData["ReturnUrl"] = returnUrl;
+                ModelState.AddModelError("", "Invalid login attempt.");
                 return View(model);
             }
 
-               var result = await signInManager.PasswordSignInAsync(
-                model.Email,
+            var result = await signInManager.PasswordSignInAsync(
+                user,
                 model.Password,
                 model.RememberMe,
                 lockoutOnFailure: false
@@ -58,39 +62,20 @@ namespace UserRoles.Controllers
             if (!result.Succeeded)
             {
                 ModelState.AddModelError("", "Invalid login attempt.");
-                ViewData["ReturnUrl"] = returnUrl;
                 return View(model);
             }
 
-            // Redirect to originally requested URL
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 return Redirect(returnUrl);
 
-            var user = await userManager.FindByEmailAsync(model.Email);
-            if (user == null)
-            {
-                await signInManager.SignOutAsync();
-                return RedirectToAction("Login");
-            }
-
             var roles = await userManager.GetRolesAsync(user);
 
-            // Admin -> OrgChart (full view)
-            if (roles.Contains("Admin"))
+            if (roles.Contains("Admin") || roles.Contains("Manager"))
                 return RedirectToAction("OrgChart", "Users");
 
-            // Manager (and sub-manager) -> OrgChart (scoped to their subtree)
-            if (roles.Contains("Manager"))
-                return RedirectToAction("OrgChart", "Users");
-
-            // Regular User -> Reports (submit today's report)
-            if (roles.Contains("User"))
-                return RedirectToAction("Index", "Reports");
-
-            // SHOULD NEVER HIT THIS
-            await signInManager.SignOutAsync();
-            return RedirectToAction("Login");
+            return RedirectToAction("Index", "Reports");
         }
+
 
         /* ===================== PASSWORD RESET ===================== */
 
