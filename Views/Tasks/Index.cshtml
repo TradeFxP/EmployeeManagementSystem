@@ -1,31 +1,110 @@
-﻿@model IEnumerable<UserRoles.Models.AssignedTask>
+﻿@{
+    ViewData["Title"] = "Tasks";
+}
 
-<h3>Assigned Tasks</h3>
 
-<table class="table table-bordered align-middle">
-    <thead>
-        <tr>
-            <th>Task</th>
-            <th>Priority</th>
-            <th>Assigned By</th>
-            <th>Created At</th>
-            <th>Status</th>
 
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var task in Model)
-        {
-            <tr>
-                <td>@task.Title</td>
-                <td>
-                    <span class="badge bg-@(task.Priority == "High" ? "danger" : task.Priority == "Medium" ? "warning" : "secondary")">
-                        @task.Priority
-                    </span>
-                </td>
-                <td>@task.AssignedBy?.Name</td>
-                <td>@task.CreatedAt.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</td>
-            </tr>
-        }
-    </tbody>
-</table>
+
+<div class="row" style="min-height:85vh;">
+
+    <!-- LEFT PANEL -->
+    <div class="col-md-2 bg-dark text-white p-3">
+
+
+        <h5 class="mb-4">Boards</h5>
+
+        <div class="list-group list-group-flush">
+
+            <!-- BOARDS (NOT FOR ADMIN) -->
+            @if (!User.IsInRole("Admin"))
+            {
+                <button type="button"
+                        class="list-group-item list-group-item-action bg-dark text-white task-link"
+                        data-url="/Tasks/Boards">
+                    My Tasks
+                </button>
+            }
+
+            <!-- TEAM TASKS -->
+            @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager"))
+            {
+                <button type="button"
+                        class="list-group-item list-group-item-action bg-dark text-white task-link mt-2"
+                        data-url="/Tasks/TeamTasks">
+                    Team Tasks
+                </button>
+            }
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="col-md-9 p-4">
+        <div id="taskBoardContainer"></div>
+    </div>
+
+</div>
+
+
+<!-- ================= ADD TASK MODAL (GLOBAL – ONLY ONCE) ================= -->
+<div class="modal fade" id="addTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <form id="addTaskForm">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Task</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- TITLE -->
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text"
+                               class="form-control"
+                               name="title"
+                               id="taskTitle"
+                               maxlength="50"
+                               required />
+
+                        <small class="text-muted">
+                            <span id="titleCount">50</span> characters remaining
+                        </small>
+                    </div>
+
+                    <!-- DESCRIPTION -->
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control"
+                                  name="description"
+                                  id="taskDescription"
+                                  maxlength="200"
+                                  required />
+                        </textarea>
+
+                        <small class="text-muted">
+                            <span id="descCount">200</span> characters remaining
+                        </small>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Create
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+

@@ -12,6 +12,9 @@ namespace UserRoles.Data
         public DbSet<DailyReport> DailyReports => Set<DailyReport>();
         public DbSet<AssignedTask> AssignedTasks { get; set; }
 
+        public DbSet<TaskItem> TaskItems { get; set; }
+
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

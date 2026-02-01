@@ -1,0 +1,174 @@
+﻿@model List<TaskItem>
+
+@{
+    var statuses = (UserRoles.Models.Enums.TaskStatus[])
+        Enum.GetValues(typeof(UserRoles.Models.Enums.TaskStatus));
+}
+
+
+<div class="row">
+
+    @foreach (var status in statuses)
+    {
+        <div class="col-md-3 kanban-column"
+             data-status="@status">
+
+
+            <!-- COLUMN HEADER -->
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-bold">@status</h6>
+
+                <!-- ➕ ADD TASK (ONLY IN TODO) -->
+                @if (status == UserRoles.Models.Enums.TaskStatus.ToDo)
+                {
+                    <button class="btn btn-sm btn-outline-primary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#addTaskModal">
+                        +
+                    </button>
+                }
+            </div>
+
+            @{
+                var tasksInColumn = Model.Where(t => t.Status == status).ToList();
+            }
+
+            @if (!tasksInColumn.Any())
+            {
+                <div class="text-muted small">No tasks</div>
+            }
+            else
+            {
+                foreach (var task in tasksInColumn)
+                {
+                    <div class="card mb-2 task-card"
+                         draggable="true"
+                         data-task-id="@task.Id"
+                         data-current-status="@task.Status">
+
+
+                        <div class="card-body p-2">
+
+                            <!-- CLICKABLE TITLE -->
+                            <div class="task-title"
+                                 data-task-id="@task.Id">
+                                @task.Title
+                            </div>
+
+                            <!-- EXPANDED DETAILS -->
+                            <div class="task-details d-none" id="task-details-@task.Id">
+
+                                <hr class="my-2" />
+
+                                <div class="mb-2">
+                                    <strong>Description:</strong>
+                                    <div class="text-muted small">
+                                        @task.Description
+                                    </div>
+                                </div>
+
+                                <div class="small text-muted">
+                                    <strong>Created At:</strong>
+                                    @task.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                </div>
+
+                                <div class="small text-muted mb-2">
+                                    <strong>Created By:</strong>
+                                    @(task.CreatedByUser?.UserName ?? "Unknown")
+                                </div>
+
+                                <!-- ADMIN ACTIONS -->
+                                @if (User.IsInRole("Admin"))
+                                {
+                                    <div class="border-top pt-2 mt-2">
+
+                                        <!-- ASSIGN TO -->
+                                        <div class="mb-2">
+                                            <label class="small fw-bold">Assign To</label>
+                                            <select class="form-select form-select-sm assign-task"
+                                                    data-id="@task.Id">
+                                                <option value="">-- Select User --</option>
+                                                @foreach (var u in ViewBag.Users as List<Users>)
+                                                {
+                                                    <option value="@u.Id"
+                                                            selected="@(u.Id == task.AssignedToUserId)">
+                                                        @u.UserName
+                                                    </option>
+                                                }
+                                            </select>
+                                        </div>
+
+                                        <!-- ACTION BUTTONS -->
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-sm btn-outline-primary edit-task"
+                                                    data-id="@task.Id">
+                                                Edit
+                                            </button>
+
+                                            <button class="btn btn-sm btn-outline-danger delete-task"
+                                                    data-id="@task.Id">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+
+                            </div>
+                        </div>
+                    </div>
+
+
+                }
+            }
+        </div>
+    }
+
+</div>
+
+<!-- ADD TASK MODAL -->
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <form id="addTaskForm">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text"
+                               class="form-control"
+                               name="Title"
+                               maxlength="50"
+                               id="taskTitle"
+                               required />
+                        <small class="text-muted">
+                            <span id="titleCount">50</span> characters remaining
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control"
+                                  name="Description"
+                                  maxlength="200"
+                                  id="taskDescription"></textarea>
+                        <small class="text-muted">
+                            <span id="descCount">200</span> characters remaining
+                        </small>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>

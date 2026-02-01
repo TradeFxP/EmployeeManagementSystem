@@ -1,0 +1,45 @@
+﻿@model List<TaskItem>
+
+<div class="row kanban-board">
+
+    <!-- TO DO -->
+    <div class="col-md-3">
+        <h6 class="kanban-title">To Do</h6>
+        @foreach (var task in Model.Where(t =>
+                t.Status == UserRoles.Models.Enums.TaskStatus.ToDo))
+        {
+            <div class="task-card">@task.Title</div>
+        }
+    </div>
+
+    <!-- DOING -->
+    <div class="col-md-3">
+        <h6 class="kanban-title">Doing</h6>
+        @foreach (var task in Model.Where(t =>
+                t.Status == UserRoles.Models.Enums.TaskStatus.Doing))
+        {
+            <div class="task-card">@task.Title</div>
+        }
+    </div>
+
+    <!-- REVIEW -->
+    <div class="col-md-3">
+        <h6 class="kanban-title">Review</h6>
+        @foreach (var task in Model.Where(t =>
+                t.Status == UserRoles.Models.Enums.TaskStatus.Review))
+        {
+            <div class="task-card">@task.Title</div>
+        }
+    </div>
+
+    <!-- COMPLETE -->
+    <div class="col-md-3">
+        <h6 class="kanban-title">Complete</h6>
+        @foreach (var task in Model.Where(t =>
+                t.Status == UserRoles.Models.Enums.TaskStatus.Complete))
+        {
+            <div class="task-card">@task.Title</div>
+        }
+    </div>
+
+</div>
