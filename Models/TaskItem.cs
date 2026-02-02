@@ -15,6 +15,14 @@
         public Users CreatedByUser { get; set; }   // ✅ ADD THIS
 
         public DateTime CreatedAt { get; set; }
+
+
+        // Team info
+        public string TeamName { get; set; }
+
+        // Column (FK)
+        public int ColumnId { get; set; }
+        public TeamColumn Column { get; set; }
     }
 
 }

@@ -26,14 +26,43 @@
             }
 
             <!-- TEAM TASKS -->
-            @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager"))
+            <!-- TEAM TASKS (ADMIN ONLY) -->
+            @if (User.IsInRole("Admin"))
             {
+                <!-- Parent button -->
                 <button type="button"
-                        class="list-group-item list-group-item-action bg-dark text-white task-link mt-2"
-                        data-url="/Tasks/TeamTasks">
-                    Team Tasks
+                        class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
+                        onclick="toggleTeamTasks()">
+                    <span>
+                        <i class="bi bi-people-fill me-2"></i> Team Tasks
+                    </span>
+                    <span id="teamArrow">▼</span>
                 </button>
+
+                <div id="teamTasksDropdown" style="display:none;">
+
+                    <button type="button"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4"
+                            onclick="loadTeamBoard('Development')">
+                        <i class="bi bi-code-slash me-2"></i> Development Team
+                    </button>
+
+                    <button type="button"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4"
+                            onclick="loadTeamBoard('Testing')">
+                        <i class="bi bi-bug-fill me-2"></i> Testing Team
+                    </button>
+
+                    <button type="button"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4"
+                            onclick="loadTeamBoard('Sales')">
+                        <i class="bi bi-briefcase-fill me-2"></i> Sales Team
+                    </button>
+
+                </div>
+
             }
+
         </div>
     </div>
 
@@ -42,9 +71,43 @@
         <div id="taskBoardContainer"></div>
     </div>
 
+
+    <!-- ADD COLUMN MODAL -->
+    <div class="modal fade" id="addColumnModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Column</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="addColumnTeam" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Column Name</label>
+                        <input type="text"
+                               id="newColumnName"
+                               class="form-control"
+                               placeholder="e.g. QA Review"
+                               required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="saveNewColumn()">Add</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
 </div>
 
-
+@* 
 <!-- ================= ADD TASK MODAL (GLOBAL – ONLY ONCE) ================= -->
 <div class="modal fade" id="addTaskModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
@@ -106,5 +169,243 @@
 
         </div>
     </div>
-</div>
+</div> *@
 
+<style>
+    .list-group-item {
+        border: none;
+    }
+</style>
+
+
+
+    <script>
+        function toggleTeamTasks() {
+            const dropdown = document.getElementById("teamTasksDropdown");
+            const arrow = document.getElementById("teamArrow");
+
+            if (dropdown.style.display === "none") {
+                dropdown.style.display = "block";
+                arrow.innerText = "▲";
+            } else {
+                dropdown.style.display = "none";
+                arrow.innerText = "▼";
+            }
+        }
+    </script>
+
+
+ 
+
+ <script>
+    // Open Add Column Modal
+    function openAddColumnModal(teamName) {
+        document.getElementById("addColumnTeam").value = teamName;
+        document.getElementById("newColumnName").value = "";
+
+        const modal = new bootstrap.Modal(
+            document.getElementById("addColumnModal")
+        );
+        modal.show();
+    }
+
+    // Save New Column
+    function saveNewColumn() {
+        const team = document.getElementById("addColumnTeam").value;
+        const columnName = document.getElementById("newColumnName").value.trim();
+
+        if (!columnName) {
+            alert("Column name is required");
+            return;
+        }
+
+        fetch("/Tasks/AddColumn", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                team: team,
+                columnName: columnName
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Failed");
+            return res.text();
+        })
+        .then(() => {
+            bootstrap.Modal.getInstance(
+                document.getElementById("addColumnModal")
+            ).hide();
+
+            // Reload current board
+            document.querySelector(
+                `.team-link[data-url*='${team}']`
+            ).click();
+        })
+        .catch(() => {
+            alert("Failed to add column");
+        });
+    }
+</script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <script>
+        function enableColumnDrag() {
+
+            const board = document.querySelector(".kanban-board");
+            if (!board) {
+                console.warn("Kanban board not found");
+                return;
+            }
+
+            // 🔥 Destroy old instance if exists (AJAX-safe)
+            if (board._sortable) {
+                board._sortable.destroy();
+            }
+
+            board._sortable = new Sortable(board, {
+                animation: 150,
+                direction: "horizontal",
+                draggable: ".kanban-column",
+
+                onEnd: function () {
+
+                    const columnIds = Array.from(
+                        board.querySelectorAll(".kanban-column")
+                    ).map(col => parseInt(col.dataset.columnId));
+
+                    fetch("/Tasks/ReorderColumns", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(columnIds)
+                    }).catch(err => {
+                        console.error("Failed to save column order", err);
+                    });
+                }
+            });
+        }
+    </script>
+
+
+    <script>
+    function startRename(columnId) {
+        document.getElementById(`column-title-${columnId}`).style.display = "none";
+        document.getElementById(`column-rename-${columnId}`).style.display = "flex";
+    }
+
+    function cancelRename(columnId) {
+        document.getElementById(`column-rename-${columnId}`).style.display = "none";
+        document.getElementById(`column-title-${columnId}`).style.display = "block";
+    }
+
+    function saveColumnName(columnId) {
+        const input = document.getElementById(`column-input-${columnId}`);
+        const newName = input.value.trim();
+
+        if (!newName) {
+            alert("Column name required");
+            return;
+        }
+
+        fetch("/Tasks/RenameColumn", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                columnId: columnId,
+                name: newName
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error();
+            document.getElementById(`column-title-${columnId}`).innerText = newName;
+            cancelRename(columnId);
+        })
+        .catch(() => alert("Rename failed"));
+    }
+
+    function confirmDeleteColumn(columnId) {
+        if (!confirm("Delete this column?")) return;
+
+        fetch("/Tasks/DeleteColumn", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ columnId })
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t); });
+            document.querySelector(`[data-column-id='${columnId}']`).remove();
+        })
+        .catch(err => alert(err.message));
+    }
+</script>
+
+
+    <script>
+            function loadTeamBoard(team) {
+        const container = document.getElementById("taskBoardContainer");
+
+        fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
+            .then(res => res.text())
+            .then(html => {
+                container.innerHTML = html;
+
+                // ✅ ENABLE COLUMN DRAG AFTER LOAD
+                enableColumnDrag(team);
+            })
+            .catch(() => {
+                container.innerHTML = "Error loading board";
+            });
+    }
+
+    </script>
+
+    <script>
+        function focusColumn(columnId) {
+
+            const board = document.getElementById("kanbanBoard");
+            const backBtn = document.getElementById("backToBoardBtn");
+
+            if (!board) return;
+
+            // Enable single column mode
+            board.classList.add("single-column-view");
+
+            const columns = board.querySelectorAll(".kanban-column");
+
+            columns.forEach(col => {
+                const id = parseInt(col.dataset.columnId);
+
+                if (id === columnId) {
+                    col.classList.add("focused-column");
+                    col.classList.remove("hidden-column");
+                } else {
+                    col.classList.remove("focused-column");
+                    col.classList.add("hidden-column");
+                }
+            });
+
+            // Show back button
+            if (backBtn) backBtn.style.display = "inline-block";
+        }
+    </script>
+    
+
+    <script>
+        function resetBoardView() {
+
+            const board = document.getElementById("kanbanBoard");
+            const backBtn = document.getElementById("backToBoardBtn");
+
+            if (!board) return;
+
+            board.classList.remove("single-column-view");
+
+            board.querySelectorAll(".kanban-column").forEach(col => {
+                col.classList.remove("focused-column");
+                col.classList.remove("hidden-column");
+            });
+
+            if (backBtn) backBtn.style.display = "none";
+        }
+    </script>

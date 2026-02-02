@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UserRoles.Data;
 using UserRoles.Models;
+using UserRoles.ViewModels;
 
 //[Authorize]
 //public class TasksController : Controller
@@ -346,6 +347,118 @@ public class TasksController : Controller
 
         task.Status = newStatus;
         await _context.SaveChangesAsync();
+
+        return Ok();
+    }
+
+    public IActionResult TeamBoard(string team)
+    {
+        // 1️⃣ Load columns for the selected team (ordered)
+        var columns = _context.TeamColumns
+            .Where(c => c.TeamName == team)
+            .OrderBy(c => c.Order)
+            .ToList();
+
+        // 2️⃣ Load tasks that belong to this team
+        var tasks = _context.TaskItems
+            .Where(t => t.TeamName == team)
+            .ToList();
+
+        // 3️⃣ Pass both columns + tasks to the view
+        var vm = new TeamBoardViewModel
+        {
+            TeamName = team,
+            Columns = columns,
+            Tasks = tasks
+        };
+
+        return PartialView("_TeamBoard", vm);
+    }
+
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public IActionResult AddColumn([FromBody] AddColumnRequest model)
+    {
+        // Validate input
+        if (string.IsNullOrWhiteSpace(model.ColumnName))
+            return BadRequest("Column name is required");
+
+        // Get next column order for the team
+        var maxOrder = _context.TeamColumns
+            .Where(c => c.TeamName == model.Team)
+            .Max(c => (int?)c.Order) ?? 0;
+
+        // Create new column
+        var column = new TeamColumn
+        {
+            TeamName = model.Team,
+            ColumnName = model.ColumnName,
+            Order = maxOrder + 1
+        };
+
+        _context.TeamColumns.Add(column);
+        _context.SaveChanges();
+
+        return Ok();
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public IActionResult ReorderColumns([FromBody] List<int> columnIds)
+    {
+        for (int i = 0; i < columnIds.Count; i++)
+        {
+            var col = _context.TeamColumns.Find(columnIds[i]);
+            if (col != null)
+                col.Order = i + 1;
+        }
+
+        _context.SaveChanges();
+        return Ok();
+    }
+
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public IActionResult RenameColumn([FromBody] RenameColumnRequest model)
+    {
+        if (model == null || model.ColumnId <= 0 || string.IsNullOrWhiteSpace(model.Name))
+            return BadRequest("Invalid request");
+
+        var col = _context.TeamColumns.Find(model.ColumnId);
+
+        if (col == null)
+            return NotFound("Column not found");
+
+        col.ColumnName = model.Name.Trim();
+        _context.SaveChanges();
+
+        return Ok();
+    }
+
+    public class DeleteColumnRequest
+    {
+        public int ColumnId { get; set; }
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public IActionResult DeleteColumn([FromBody] DeleteColumnRequest model)
+    {
+        if (model == null || model.ColumnId <= 0)
+            return BadRequest("Invalid request");
+
+        var hasTasks = _context.TaskItems.Any(t => t.ColumnId == model.ColumnId);
+        if (hasTasks)
+            return BadRequest("Move tasks before deleting column");
+
+        var col = _context.TeamColumns.Find(model.ColumnId);
+        if (col == null)
+            return NotFound();
+
+        _context.TeamColumns.Remove(col);
+        _context.SaveChanges();
 
         return Ok();
     }

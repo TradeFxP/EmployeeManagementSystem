@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260202111435_AddTaskBoard")]
+    partial class AddTaskBoard
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -254,9 +257,6 @@ namespace UserRoles.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("ColumnId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -271,10 +271,6 @@ namespace UserRoles.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<string>("TeamName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -283,35 +279,9 @@ namespace UserRoles.Migrations
 
                     b.HasIndex("AssignedToUserId");
 
-                    b.HasIndex("ColumnId");
-
                     b.HasIndex("CreatedByUserId");
 
                     b.ToTable("TaskItems");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TeamColumn", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ColumnName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TeamName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("TeamColumns");
                 });
 
             modelBuilder.Entity("UserRoles.Models.Users", b =>
@@ -485,12 +455,6 @@ namespace UserRoles.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("UserRoles.Models.TeamColumn", "Column")
-                        .WithMany()
-                        .HasForeignKey("ColumnId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("UserRoles.Models.Users", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
@@ -498,8 +462,6 @@ namespace UserRoles.Migrations
                         .IsRequired();
 
                     b.Navigation("AssignedToUser");
-
-                    b.Navigation("Column");
 
                     b.Navigation("CreatedByUser");
                 });

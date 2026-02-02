@@ -34,12 +34,23 @@ namespace UserRoles.Migrations
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_TaskItems_AspNetUsers_CreatedByUserId",
+                        column: x => x.CreatedByUserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
                 name: "IX_TaskItems_AssignedToUserId",
                 table: "TaskItems",
                 column: "AssignedToUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TaskItems_CreatedByUserId",
+                table: "TaskItems",
+                column: "CreatedByUserId");
         }
 
         /// <inheritdoc />

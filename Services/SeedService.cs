@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using UserRoles.Data;
 using UserRoles.Models;
 
@@ -25,6 +26,45 @@ namespace UserRoles.Services
                 await AddRoleAsync(roleManager, "Admin");
                 await AddRoleAsync(roleManager, "User");
                 await AddRoleAsync(roleManager, "Manager");
+
+
+
+                // -----------------------------
+                // Seed Team Columns
+                // -----------------------------
+                logger.LogInformation("Seeding team columns.");
+
+                if (!await context.TeamColumns.AnyAsync())
+                {
+                    context.TeamColumns.AddRange(
+
+                        // Development Team
+                        new TeamColumn { TeamName = "Development", ColumnName = "ToDo", Order = 1 },
+                        new TeamColumn { TeamName = "Development", ColumnName = "Doing", Order = 2 },
+                        new TeamColumn { TeamName = "Development", ColumnName = "Review", Order = 3 },
+                        new TeamColumn { TeamName = "Development", ColumnName = "Complete", Order = 4 },
+
+                        // Testing Team
+                        new TeamColumn { TeamName = "Testing", ColumnName = "To Test", Order = 1 },
+                        new TeamColumn { TeamName = "Testing", ColumnName = "Testing", Order = 2 },
+                        new TeamColumn { TeamName = "Testing", ColumnName = "Bug Found", Order = 3 },
+                        new TeamColumn { TeamName = "Testing", ColumnName = "Verified", Order = 4 },
+
+                        // Sales Team
+                        new TeamColumn { TeamName = "Sales", ColumnName = "Leads", Order = 1 },
+                        new TeamColumn { TeamName = "Sales", ColumnName = "Follow Up", Order = 2 },
+                        new TeamColumn { TeamName = "Sales", ColumnName = "Negotiation", Order = 3 },
+                        new TeamColumn { TeamName = "Sales", ColumnName = "Closed", Order = 4 }
+                    );
+
+                    await context.SaveChangesAsync();
+                    logger.LogInformation("Team columns seeded successfully.");
+                }
+                else
+                {
+                    logger.LogInformation("Team columns already exist. Skipping seeding.");
+                }
+
 
                 // Add admin user
                 logger.LogInformation("Seeding admin user.");

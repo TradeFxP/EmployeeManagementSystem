@@ -1,0 +1,257 @@
+﻿@using UserRoles.ViewModels
+@model TeamBoardViewModel
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+
+    <div class="d-flex align-items-center gap-3">
+        <!-- 🔙 BACK TO BOARD (HIDDEN BY DEFAULT) -->
+        <button id="backToBoardBtn"
+                class="btn btn-sm btn-outline-secondary"
+                style="display:none;"
+                onclick="resetBoardView()">
+            ← Back to Board
+        </button>
+
+        <h4 class="mb-0">@Model.TeamName Board</h4>
+    </div>
+
+    @if (User.IsInRole("Admin"))
+    {
+        <button class="btn btn-sm btn-primary"
+                onclick="openAddColumnModal('@Model.TeamName')">
+            + Add Column
+        </button>
+    }
+</div>
+
+
+<!-- KANBAN BOARD -->
+<div class="kanban-board" id="kanbanBoard">
+
+
+    @foreach (var column in Model.Columns)
+    {
+        <div class="kanban-column" data-column-id="@column.Id">
+
+            <!-- COLUMN HEADER -->
+            <div class="kanban-column-header d-flex align-items-center justify-content-between"
+                 onclick="focusColumn(@column.Id)">
+
+
+
+                <!-- COLUMN TITLE -->
+                <div class="column-title-wrapper">
+
+                    <span class="column-title"
+                          id="column-title-@column.Id">
+                        @column.ColumnName
+                    </span>
+
+                    <div class="column-rename" id="column-rename-@column.Id" style="display:none;">
+                        <input type="text"
+                               class="column-title-input"
+                               id="column-input-@column.Id"
+                               value="@column.ColumnName" />
+
+                        <button class="icon-btn save-btn"
+                                onclick="saveColumnName(@column.Id)">
+                            ✔
+                        </button>
+
+                        <button class="icon-btn cancel-btn"
+                                onclick="cancelRename(@column.Id)">
+                            ✖
+                        </button>
+                    </div>
+                </div>
+
+
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <div class="column-actions" onclick="event.stopPropagation();">
+                        <button class="icon-btn"
+                                title="Edit"
+                                onclick="startRename(@column.Id)">
+                            ✏️
+                        </button>
+
+                        <button class="icon-btn delete-btn"
+                                title="Delete"
+                                onclick="confirmDeleteColumn(@column.Id)">
+                            🗑️
+                        </button>
+                    </div>
+                }
+
+
+
+
+            </div>
+
+
+            <!-- TASK CONTAINER (later drag tasks here) -->
+            <div class="kanban-column-body">
+                <!-- TASKS WILL GO HERE -->
+                <div class="kanban-tasks">
+                    <p class="text-muted">Drop tasks here</p>
+                </div>
+            </div>
+
+
+        </div>
+    }
+</div>
+
+
+    <style>
+        /* ===== BOARD LAYOUT ===== */
+        .kanban-board {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            height: calc(100vh - 200px); /* FULL BOARD HEIGHT */
+        }
+
+        /* ===== COLUMN ===== */
+        .kanban-column {
+            background: #f8f9fa;
+            min-width: 340px; /* ⬅️ INCREASE WIDTH */
+            max-width: 340px;
+            height: 100%; /* ⬅️ FULL HEIGHT */
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== COLUMN HEADER ===== */
+        .kanban-column-header {
+            padding: 12px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+            background: #ffffff;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+        }
+
+        /* ===== COLUMN BODY ===== */
+        .kanban-column-body {
+            flex: 1; /* ⬅️ TAKE REMAINING HEIGHT */
+            padding: 10px;
+            background: #ffffff;
+            overflow: hidden; /* IMPORTANT */
+        }
+
+        /* ===== TASK LIST (SCROLLS) ===== */
+        .kanban-tasks {
+            height: 100%;
+            overflow-y: auto; /* ⬅️ VERTICAL SCROLL */
+            padding-right: 4px;
+        }
+
+        /* ===== TASK CARD (FOR FUTURE) ===== */
+        .task-card {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        /* ===== SINGLE COLUMN VIEW ===== */
+        .single-column-view {
+            overflow-x: hidden;
+        }
+
+    .focused-column {
+        min-width: 100% !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+
+        .hidden-column {
+            display: none !important;
+        }
+
+
+
+    /* ===== COLUMN ACTION ICONS ===== */
+    .column-actions {
+        display: flex;
+        gap: 6px;
+    }
+
+    .icon-btn {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 2px;
+        opacity: 0.7;
+    }
+
+        .icon-btn:hover {
+            opacity: 1;
+        }
+
+    .delete-btn:hover {
+        color: red;
+    }
+
+    /* ===== FIX DROPDOWN VISIBILITY IN FOCUSED VIEW ===== */
+
+    /* Allow dropdown to escape column bounds */
+    .kanban-column {
+        overflow: visible !important;
+    }
+
+    /* Prevent title from stealing space */
+    .column-title {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Keep action menu visible */
+    .column-actions {
+        flex-shrink: 0;
+        z-index: 20;
+    }
+
+    /* Ensure dropdown menu is above everything */
+    .dropdown-menu {
+        z-index: 1050;
+    }
+
+    .column-title-input {
+        width: 100%;
+        font-size: 15px;
+        padding: 4px 6px;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+    }
+
+
+    .column-rename {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .save-btn {
+        color: green;
+    }
+
+    .cancel-btn {
+        color: red;
+    }
+
+    </style>
+

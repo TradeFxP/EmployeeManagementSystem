@@ -14,6 +14,8 @@ namespace UserRoles.Data
 
         public DbSet<TaskItem> TaskItems { get; set; }
 
+       
+        public DbSet<TeamColumn> TeamColumns { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

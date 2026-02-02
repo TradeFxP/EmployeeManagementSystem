@@ -12,8 +12,8 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260201123652_AddTaskBoard")]
-    partial class AddTaskBoard
+    [Migration("20260202112343_InitialTeamColumns")]
+    partial class InitialTeamColumns
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -257,6 +257,9 @@ namespace UserRoles.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("ColumnId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -271,6 +274,10 @@ namespace UserRoles.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<string>("TeamName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
@@ -279,7 +286,35 @@ namespace UserRoles.Migrations
 
                     b.HasIndex("AssignedToUserId");
 
+                    b.HasIndex("ColumnId");
+
+                    b.HasIndex("CreatedByUserId");
+
                     b.ToTable("TaskItems");
+                });
+
+            modelBuilder.Entity("UserRoles.Models.TeamColumn", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ColumnName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TeamName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TeamColumns");
                 });
 
             modelBuilder.Entity("UserRoles.Models.Users", b =>
@@ -453,7 +488,23 @@ namespace UserRoles.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("UserRoles.Models.TeamColumn", "Column")
+                        .WithMany()
+                        .HasForeignKey("ColumnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UserRoles.Models.Users", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("AssignedToUser");
+
+                    b.Navigation("Column");
+
+                    b.Navigation("CreatedByUser");
                 });
 
             modelBuilder.Entity("UserRoles.Models.Users", b =>
