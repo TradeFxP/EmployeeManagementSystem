@@ -5,11 +5,16 @@ namespace UserRoles.ViewModels
 {
     public class TeamBoardViewModel
     {
-        public string TeamName { get; set; }
+        // ✅ Teams visible to the logged-in user
+        public List<string> AvailableTeams { get; set; } = new();
 
-        public List<TeamColumn> Columns { get; set; }
+        // ✅ Columns shown on the board
+        public List<TeamColumn> Columns { get; set; } = new();
 
-        // All tasks belonging to the team
-        public List<TaskItem> Tasks { get; set; }
+        // ✅ Tasks inside columns (THIS FIXES YOUR ERROR)
+        public List<TaskItem> Tasks { get; set; } = new();
+
+        // ✅ Optional (already used in some views)
+        public string? TeamName { get; set; }
     }
 }

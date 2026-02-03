@@ -1,35 +1,26 @@
-﻿@{
+﻿@using UserRoles.ViewModels
+
+
+
+
+@{
     ViewData["Title"] = "Tasks";
+    var userTeams = ViewBag.UserTeams as List<string> ?? new List<string>();
+    var isAdmin = User.IsInRole("Admin");
 }
-
-
-
 
 <div class="row" style="min-height:85vh;">
 
     <!-- LEFT PANEL -->
     <div class="col-md-2 bg-dark text-white p-3">
 
-
         <h5 class="mb-4">Boards</h5>
 
         <div class="list-group list-group-flush">
 
-            <!-- BOARDS (NOT FOR ADMIN) -->
-            @if (!User.IsInRole("Admin"))
+            @if (isAdmin)
             {
-                <button type="button"
-                        class="list-group-item list-group-item-action bg-dark text-white task-link"
-                        data-url="/Tasks/Boards">
-                    My Tasks
-                </button>
-            }
-
-            <!-- TEAM TASKS -->
-            <!-- TEAM TASKS (ADMIN ONLY) -->
-            @if (User.IsInRole("Admin"))
-            {
-                <!-- Parent button -->
+                <!-- ================= ADMIN: TEAM TASKS ================= -->
                 <button type="button"
                         class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
                         onclick="toggleTeamTasks()">
@@ -39,32 +30,74 @@
                     <span id="teamArrow">▼</span>
                 </button>
 
+                <!-- Team Tasks Dropdown -->
                 <div id="teamTasksDropdown" style="display:none;">
-
                     <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
+                            data-team="Development"
                             onclick="loadTeamBoard('Development')">
                         <i class="bi bi-code-slash me-2"></i> Development Team
                     </button>
 
                     <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
+                            data-team="Testing"
                             onclick="loadTeamBoard('Testing')">
                         <i class="bi bi-bug-fill me-2"></i> Testing Team
                     </button>
 
                     <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
+                            data-team="Sales"
                             onclick="loadTeamBoard('Sales')">
                         <i class="bi bi-briefcase-fill me-2"></i> Sales Team
                     </button>
-
                 </div>
+            }
+            else
+            {
+                <!-- ================= USER/MANAGER: MY TEAM ================= -->
+                <button type="button"
+                        class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
+                        onclick="toggleMyTasks()">
+                    <span>
+                        <i class="bi bi-kanban-fill me-2"></i> My Team
+                    </span>
+                    <span id="myTasksArrow">▼</span>
+                </button>
 
+                <!-- My Team Dropdown - Only shows teams assigned by Admin -->
+                <div id="myTasksDropdown" style="display:none;">
+                    @if (userTeams.Any())
+                    {
+                        @foreach (var team in userTeams)
+                        {
+                            var icon = team switch {
+                                "Development" => "bi-code-slash",
+                                "Testing" => "bi-bug-fill",
+                                "Sales" => "bi-briefcase-fill",
+                                _ => "bi-arrow-right-circle"
+                            };
+                            <button type="button"
+                                    class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
+                                    data-team="@team"
+                                    onclick="loadTeamBoard('@team')">
+                                <i class="bi @icon me-2"></i> @team Team
+                            </button>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-muted ps-4 py-2">
+                            No teams assigned
+                        </div>
+                    }
+                </div>
             }
 
         </div>
     </div>
+
 
     <!-- RIGHT PANEL -->
     <div class="col-md-9 p-4">
@@ -97,7 +130,7 @@
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" onclick="saveNewColumn()">Add</button>
+                    <button class="btn btn-primary" id="addColumnSubmit">Add</button>
                 </div>
 
             </div>
@@ -107,305 +140,221 @@
 
 </div>
 
-@* 
-<!-- ================= ADD TASK MODAL (GLOBAL – ONLY ONCE) ================= -->
-<div class="modal fade" id="addTaskModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
 
-            <form id="addTaskForm">
-
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Task</h5>
-                    <button type="button"
-                            class="btn-close"
-                            data-bs-dismiss="modal"
-                            aria-label="Close">
-                    </button>
-                </div>
-
-                <div class="modal-body">
-
-                    <!-- TITLE -->
-                    <div class="mb-3">
-                        <label class="form-label">Title</label>
-                        <input type="text"
-                               class="form-control"
-                               name="title"
-                               id="taskTitle"
-                               maxlength="50"
-                               required />
-
-                        <small class="text-muted">
-                            <span id="titleCount">50</span> characters remaining
-                        </small>
-                    </div>
-
-                    <!-- DESCRIPTION -->
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control"
-                                  name="description"
-                                  id="taskDescription"
-                                  maxlength="200"
-                                  required />
-                        </textarea>
-
-                        <small class="text-muted">
-                            <span id="descCount">200</span> characters remaining
-                        </small>
-                    </div>
-
-                </div>
-
-                <div class="modal-footer">
-                    <button type="submit"
-                            class="btn btn-primary">
-                        Create
-                    </button>
-                </div>
-
-            </form>
-
-        </div>
-    </div>
-</div> *@
 
 <style>
     .list-group-item {
         border: none;
     }
+
+    .team-btn.active {
+        background-color: #0d6efd;
+        color: #fff;
+    }
 </style>
 
 
+<script>
+    function toggleTeamTasks() {
+        const dropdown = document.getElementById("teamTasksDropdown");
+        const arrow = document.getElementById("teamArrow");
 
-    <script>
-        function toggleTeamTasks() {
-            const dropdown = document.getElementById("teamTasksDropdown");
-            const arrow = document.getElementById("teamArrow");
-
-            if (dropdown.style.display === "none") {
-                dropdown.style.display = "block";
-                arrow.innerText = "▲";
-            } else {
-                dropdown.style.display = "none";
-                arrow.innerText = "▼";
-            }
+        if (dropdown.style.display === "none") {
+            dropdown.style.display = "block";
+            arrow.innerText = "▲";
+        } else {
+            dropdown.style.display = "none";
+            arrow.innerText = "▼";
         }
-    </script>
+    }
 
 
- 
+    function toggleMyTasks() {
+        const dropdown = document.getElementById("myTasksDropdown");
+        const arrow = document.getElementById("myTasksArrow");
 
- <script>
-    // Open Add Column Modal
+        if (!dropdown) return;
+
+        const isOpen = dropdown.style.display === "block";
+        dropdown.style.display = isOpen ? "none" : "block";
+        arrow.innerText = isOpen ? "▼" : "▲";
+    }
+</script>
+
+<script>
+    // expose admin flag to JS as boolean
+    const __isTasksAdmin = @((isAdmin).ToString().ToLower());
+
+    // open add column modal (admin only)
     function openAddColumnModal(teamName) {
+        if (!__isTasksAdmin) return;
         document.getElementById("addColumnTeam").value = teamName;
         document.getElementById("newColumnName").value = "";
 
-        const modal = new bootstrap.Modal(
-            document.getElementById("addColumnModal")
-        );
+        const modal = new bootstrap.Modal(document.getElementById("addColumnModal"));
         modal.show();
     }
 
-    // Save New Column
-    function saveNewColumn() {
-        const team = document.getElementById("addColumnTeam").value;
-        const columnName = document.getElementById("newColumnName").value.trim();
+    // save new column (admin only)
+    document.getElementById('addColumnSubmit')?.addEventListener('click', function () {
+        if (!__isTasksAdmin) return;
+        const team = document.getElementById('addColumnTeam').value;
+        const columnName = document.getElementById('newColumnName').value.trim();
+        if (!columnName) { alert('Column name is required'); return; }
 
-        if (!columnName) {
-            alert("Column name is required");
-            return;
-        }
-
-        fetch("/Tasks/AddColumn", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                team: team,
-                columnName: columnName
+        fetch('/Tasks/AddColumn', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ team: team, columnName: columnName })
+        })
+            .then(res => { if (!res.ok) throw new Error('Failed'); return res.text(); })
+            .then(() => {
+                bootstrap.Modal.getInstance(document.getElementById('addColumnModal'))?.hide();
+                // reload the board for the team
+                loadTeamBoard(team);
             })
-        })
-        .then(res => {
-            if (!res.ok) throw new Error("Failed");
-            return res.text();
-        })
-        .then(() => {
-            bootstrap.Modal.getInstance(
-                document.getElementById("addColumnModal")
-            ).hide();
-
-            // Reload current board
-            document.querySelector(
-                `.team-link[data-url*='${team}']`
-            ).click();
-        })
-        .catch(() => {
-            alert("Failed to add column");
-        });
-    }
+            .catch(() => alert('Failed to add column'));
+    });
 </script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <script>
         function enableColumnDrag() {
+            if (!__isTasksAdmin) return; // only Admin can reorder columns
 
-            const board = document.querySelector(".kanban-board");
-            if (!board) {
-                console.warn("Kanban board not found");
-                return;
-            }
+            const board = document.querySelector('.kanban-board');
+            if (!board) return;
 
-            // 🔥 Destroy old instance if exists (AJAX-safe)
-            if (board._sortable) {
-                board._sortable.destroy();
-            }
+            if (board._sortable) board._sortable.destroy();
 
             board._sortable = new Sortable(board, {
                 animation: 150,
-                direction: "horizontal",
-                draggable: ".kanban-column",
-
+                direction: 'horizontal',
+                draggable: '.kanban-column',
                 onEnd: function () {
-
-                    const columnIds = Array.from(
-                        board.querySelectorAll(".kanban-column")
-                    ).map(col => parseInt(col.dataset.columnId));
-
-                    fetch("/Tasks/ReorderColumns", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(columnIds)
-                    }).catch(err => {
-                        console.error("Failed to save column order", err);
-                    });
+                    const columnIds = Array.from(board.querySelectorAll('.kanban-column')).map(c => parseInt(c.dataset.columnId));
+                    fetch('/Tasks/ReorderColumns', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(columnIds)
+                    }).catch(err => console.error('Failed to save column order', err));
                 }
             });
         }
-    </script>
 
-
-    <script>
-    function startRename(columnId) {
-        document.getElementById(`column-title-${columnId}`).style.display = "none";
-        document.getElementById(`column-rename-${columnId}`).style.display = "flex";
-    }
-
-    function cancelRename(columnId) {
-        document.getElementById(`column-rename-${columnId}`).style.display = "none";
-        document.getElementById(`column-title-${columnId}`).style.display = "block";
-    }
-
-    function saveColumnName(columnId) {
-        const input = document.getElementById(`column-input-${columnId}`);
-        const newName = input.value.trim();
-
-        if (!newName) {
-            alert("Column name required");
-            return;
+        function startRename(columnId) {
+            if (!__isTasksAdmin) return;
+            document.getElementById(`column-title-${columnId}`).style.display = 'none';
+            document.getElementById(`column-rename-${columnId}`).style.display = 'flex';
         }
 
-        fetch("/Tasks/RenameColumn", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                columnId: columnId,
-                name: newName
+        function cancelRename(columnId) {
+            document.getElementById(`column-rename-${columnId}`).style.display = 'none';
+            document.getElementById(`column-title-${columnId}`).style.display = 'block';
+        }
+
+        function saveColumnName(columnId) {
+            if (!__isTasksAdmin) return;
+            const input = document.getElementById(`column-input-${columnId}`);
+            const newName = input?.value?.trim();
+            if (!newName) { alert('Column name required'); return; }
+
+            fetch('/Tasks/RenameColumn', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId: columnId, name: newName })
             })
-        })
-        .then(res => {
-            if (!res.ok) throw new Error();
-            document.getElementById(`column-title-${columnId}`).innerText = newName;
-            cancelRename(columnId);
-        })
-        .catch(() => alert("Rename failed"));
+                .then(res => { if (!res.ok) throw new Error(); return res.text(); })
+                .then(() => {
+                    document.getElementById(`column-title-${columnId}`).innerText = newName;
+                    cancelRename(columnId);
+                })
+                .catch(() => alert('Rename failed'));
+        }
+
+        function confirmDeleteColumn(columnId) {
+            if (!__isTasksAdmin) return;
+            if (!confirm('Delete this column?')) return;
+            fetch('/Tasks/DeleteColumn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId }) })
+                .then(res => { if (!res.ok) return res.text().then(t => { throw new Error(t); }); return res.text(); })
+                .then(() => document.querySelector(`[data-column-id='${columnId}']`)?.remove())
+                .catch(err => alert(err.message));
+        }
+    </script>
+
+        <script>
+            function loadTeamBoard(team) {
+                const container = document.getElementById('taskBoardContainer');
+                container.innerHTML = "<div class='text-muted p-3'>Loading...</div>";
+
+                fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
+                    .then(res => res.text())
+                    .then(html => {
+                        container.innerHTML = html;
+
+                        // highlight active team button in left panel
+                        document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll(`.team-btn[data-team]`).forEach(b => {
+                            if (b.dataset.team && b.dataset.team.toLowerCase() === team.toLowerCase()) b.classList.add('active');
+                        });
+
+                        // enable admin-only features
+                        if (__isTasksAdmin) enableColumnDrag();
+                    })
+                    .catch(() => { container.innerHTML = 'Error loading board'; });
+            }
+        </script>
+
+<script>
+    function focusColumn(columnId) {
+        const board = document.getElementById('kanbanBoard');
+        const backBtn = document.getElementById('backToBoardBtn');
+        if (!board) return;
+
+        board.classList.add('single-column-view');
+        board.querySelectorAll('.kanban-column').forEach(col => {
+            const id = parseInt(col.dataset.columnId);
+            if (id === columnId) { col.classList.add('focused-column'); col.classList.remove('hidden-column'); }
+            else { col.classList.remove('focused-column'); col.classList.add('hidden-column'); }
+        });
+        if (backBtn) backBtn.style.display = 'inline-block';
     }
 
-    function confirmDeleteColumn(columnId) {
-        if (!confirm("Delete this column?")) return;
-
-        fetch("/Tasks/DeleteColumn", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ columnId })
-        })
-        .then(res => {
-            if (!res.ok) return res.text().then(t => { throw new Error(t); });
-            document.querySelector(`[data-column-id='${columnId}']`).remove();
-        })
-        .catch(err => alert(err.message));
+    function resetBoardView() {
+        const board = document.getElementById('kanbanBoard');
+        const backBtn = document.getElementById('backToBoardBtn');
+        if (!board) return;
+        board.classList.remove('single-column-view');
+        board.querySelectorAll('.kanban-column').forEach(col => { col.classList.remove('focused-column'); col.classList.remove('hidden-column'); });
+        if (backBtn) backBtn.style.display = 'none';
     }
 </script>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        @if (isAdmin)
+        {
+            <text>
+                // Admin: Auto-expand Team Tasks and load Development board
+                const teamDropdown = document.getElementById('teamTasksDropdown');
+                const teamArrow = document.getElementById('teamArrow');
+                if (teamDropdown) teamDropdown.style.display = 'block';
+                if (teamArrow) teamArrow.innerText = '▲';
 
-    <script>
-            function loadTeamBoard(team) {
-        const container = document.getElementById("taskBoardContainer");
-
-        fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
-            .then(res => res.text())
-            .then(html => {
-                container.innerHTML = html;
-
-                // ✅ ENABLE COLUMN DRAG AFTER LOAD
-                enableColumnDrag(team);
-            })
-            .catch(() => {
-                container.innerHTML = "Error loading board";
-            });
-    }
-
-    </script>
-
-    <script>
-        function focusColumn(columnId) {
-
-            const board = document.getElementById("kanbanBoard");
-            const backBtn = document.getElementById("backToBoardBtn");
-
-            if (!board) return;
-
-            // Enable single column mode
-            board.classList.add("single-column-view");
-
-            const columns = board.querySelectorAll(".kanban-column");
-
-            columns.forEach(col => {
-                const id = parseInt(col.dataset.columnId);
-
-                if (id === columnId) {
-                    col.classList.add("focused-column");
-                    col.classList.remove("hidden-column");
-                } else {
-                    col.classList.remove("focused-column");
-                    col.classList.add("hidden-column");
-                }
-            });
-
-            // Show back button
-            if (backBtn) backBtn.style.display = "inline-block";
+                // load first team (Development)
+                loadTeamBoard('Development');
+            </text>
         }
-    </script>
-    
+        else if (userTeams.Any())
+        {
+            var firstTeam = userTeams.First();
+            <text>
+                // User: Auto-expand My Team and load first assigned team
+                const myDropdown = document.getElementById('myTasksDropdown');
+                const myArrow = document.getElementById('myTasksArrow');
+                if (myDropdown) myDropdown.style.display = 'block';
+                if (myArrow) myArrow.innerText = '▲';
 
-    <script>
-        function resetBoardView() {
-
-            const board = document.getElementById("kanbanBoard");
-            const backBtn = document.getElementById("backToBoardBtn");
-
-            if (!board) return;
-
-            board.classList.remove("single-column-view");
-
-            board.querySelectorAll(".kanban-column").forEach(col => {
-                col.classList.remove("focused-column");
-                col.classList.remove("hidden-column");
-            });
-
-            if (backBtn) backBtn.style.display = "none";
+                // load first team
+                loadTeamBoard('@firstTeam');
+            </text>
         }
-    </script>
+    });
+</script>

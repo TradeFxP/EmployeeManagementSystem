@@ -41,6 +41,48 @@
                                 <label class="form-check-label" id="addSecondLabel" for="addSecondType">Sub Manager</label>
                             </div>
                         </div>
+
+                        <hr />
+
+                        <!-- TEAM ACCESS (ADMIN ONLY) -->
+                        <div id="teamSelectionSection">
+                            <label class="form-label fw-bold">Assign Teams</label>
+
+                            <div class="form-check">
+                                <input class="form-check-input team-checkbox"
+                                       type="checkbox"
+                                       name="teams"
+                                       value="Development"
+                                       id="teamDevelopment" />
+
+                                <label class="form-check-label" for="teamDevelopment">
+                                    Development Team
+                                </label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input team-checkbox"
+                                       type="checkbox"
+                                       name="teams"
+                                       value="Testing"
+                                       id="teamTesting" />
+                                <label class="form-check-label" for="teamTesting">
+                                    Testing Team
+                                </label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input team-checkbox"
+                                       type="checkbox"
+                                       name="teams"
+                                       value="Sales"
+                                       id="teamSales" />
+                                <label class="form-check-label" for="teamSales">
+                                    Sales Team
+                                </label>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -122,3 +164,16 @@
         </div>
     </div>
 </div>
+
+
+<script>
+    function getSelectedTeams() {
+        return Array.from(
+            document.querySelectorAll(".team-checkbox:checked")
+        ).map(cb => cb.value);
+    }
+
+
+  
+
+</script>

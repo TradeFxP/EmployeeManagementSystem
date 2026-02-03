@@ -17,6 +17,9 @@ namespace UserRoles.Data
        
         public DbSet<TeamColumn> TeamColumns { get; set; }
 
+        public DbSet<UserTeam> UserTeams { get; set; }
+
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

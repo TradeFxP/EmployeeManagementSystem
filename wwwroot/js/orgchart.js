@@ -307,6 +307,11 @@ window.drop = function (event, newParentId) {
 
             // Reset form first (clears previous values), then set hidden inputs
             if (addUserForm) addUserForm.reset();
+            // 🔴 FIX #2: Explicitly clear team checkboxes
+            document.querySelectorAll('.team-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+
 
             if (roleInput) roleInput.value = role ?? '';
             if (managerInput) managerInput.value = managerId ?? '';
@@ -412,7 +417,29 @@ window.drop = function (event, newParentId) {
                 const email = document.getElementById('emailInput')?.value?.trim() ?? '';
                 const role = document.getElementById('role')?.value ?? '';
                 const managerId = document.getElementById('managerId')?.value ?? '';
+
                 const addType = document.querySelector('input[name="addType"]:checked')?.value ?? 'User';
+
+                // 🔹 STEP 1: Collect selected teams (Development / Testing / Sales)
+                const selectedTeams = Array.from(
+                    document.querySelectorAll('.team-checkbox:checked')
+                ).map(cb => cb.value);
+
+
+
+                console.log("🚨 SUBMIT STARTED");
+                console.log("📦 Selected teams:", selectedTeams);
+
+
+                // ❗ REQUIRED: Ensure at least one team is selected
+                if (selectedTeams.length === 0) {
+                    alert("Please assign at least one team.");
+                    return;
+                }
+
+
+              
+
 
                 if (!name || !email) { alert('Name and Email required'); return; }
 
@@ -422,6 +449,9 @@ window.drop = function (event, newParentId) {
                 fd.append('role', role);
                 fd.append('managerId', managerId);
                 fd.append('addType', addType);
+                selectedTeams.forEach(team => {
+                    fd.append('teams', team);
+                });
 
                 const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
                 if (tokenEl) fd.append('__RequestVerificationToken', tokenEl.value);

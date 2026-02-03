@@ -172,10 +172,34 @@ public class TasksController : Controller
     }
 
     // Loads page
-    public IActionResult Index()
+    [Authorize]
+    public async Task<IActionResult> Index()
     {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return RedirectToAction("Login", "Account");
+
+        // ================= ADMIN =================
+        if (User.IsInRole("Admin"))
+        {
+            // Admin always sees board chooser
+            return View();
+        }
+
+        // ================= USER / MANAGER =================
+        var userTeams = await _context.UserTeams
+            .Where(t => t.UserId == user.Id)
+            .Select(t => t.TeamName)
+            .Distinct()
+            .ToListAsync();
+        ViewBag.UserTeams = userTeams; // 🔥 REQUIRED
+
+        // Always show the index view with left panel
+        // Users see their assigned teams, can select to load board
         return View();
     }
+
+
 
     // ================= BOARDS =================
     // Admin → Team tasks
@@ -351,20 +375,37 @@ public class TasksController : Controller
         return Ok();
     }
 
-    public IActionResult TeamBoard(string team)
+    [Authorize]
+    public async Task<IActionResult> TeamBoard(string team)
     {
-        // 1️⃣ Load columns for the selected team (ordered)
-        var columns = _context.TeamColumns
+        if (string.IsNullOrWhiteSpace(team))
+            return BadRequest("Team is required");
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized();
+
+        // 🔐 SECURITY CHECK
+        if (!User.IsInRole("Admin"))
+        {
+            bool hasAccess = await _context.UserTeams
+                .AnyAsync(t => t.UserId == user.Id && t.TeamName == team);
+
+            if (!hasAccess)
+                return Forbid();
+        }
+
+        // ✅ LOAD REAL ENTITIES (NOT anonymous)
+        var columns = await _context.TeamColumns
             .Where(c => c.TeamName == team)
-            .OrderBy(c => c.Order)
-            .ToList();
+            .OrderBy(c => c.Id)
+            .ToListAsync();
 
-        // 2️⃣ Load tasks that belong to this team
-        var tasks = _context.TaskItems
+        var tasks = await _context.TaskItems
             .Where(t => t.TeamName == team)
-            .ToList();
+            .ToListAsync();
 
-        // 3️⃣ Pass both columns + tasks to the view
+        // ✅ STRONG VIEWMODEL ONLY
         var vm = new TeamBoardViewModel
         {
             TeamName = team,
@@ -374,6 +415,7 @@ public class TasksController : Controller
 
         return PartialView("_TeamBoard", vm);
     }
+
 
 
     [HttpPost]
