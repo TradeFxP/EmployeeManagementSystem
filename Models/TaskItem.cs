@@ -11,12 +11,18 @@
         public string AssignedToUserId { get; set; }
         public Users AssignedToUser { get; set; }
 
+        public string? AssignedByUserId { get; set; }
+        public Users? AssignedByUser { get; set; }
+
+        public DateTime? AssignedAt { get; set; }
+
+
         public string CreatedByUserId { get; set; }
         public Users CreatedByUser { get; set; }   // ✅ ADD THIS
 
         public DateTime CreatedAt { get; set; }
 
-
+        public DateTime? UpdatedAt { get; set; }
         // Team info
         public string TeamName { get; set; }
 

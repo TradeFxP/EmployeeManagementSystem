@@ -1,5 +1,6 @@
 ﻿@using UserRoles.ViewModels
 
+@model UserRoles.ViewModels.TeamBoardViewModel
 
 
 
@@ -9,7 +10,7 @@
     var isAdmin = User.IsInRole("Admin");
 }
 
-<div class="row" style="min-height:85vh;">
+<div class="row" style="min-height:85vh;">   
 
     <!-- LEFT PANEL -->
     <div class="col-md-2 bg-dark text-white p-3">
@@ -138,6 +139,86 @@
     </div>
 
 
+    <div class="modal fade" id="createTaskModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Task</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="taskColumnId" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text" id="taskTitle" class="form-control" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea id="taskDescription" class="form-control"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitCreateTask()">Create</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    // assign button
+    <div class="modal fade" id="assignTaskModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Assign Task</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="assignTaskId" />
+
+                    <label class="form-label">Assign to</label>
+                    <select id="assignUserSelect" class="form-select">
+                        <option value="">-- Select User --</option>
+
+                        @if (Model != null && Model.AssignableUsers != null && Model.AssignableUsers.Any())
+                        {
+                            foreach (var u in Model.AssignableUsers)
+                            {
+                                <option value="@u.Id">@u.UserName</option>
+                            }
+                        }
+                        else
+                        {
+                            <option disabled>No users available</option>
+                        }
+
+
+
+                    </select>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" onclick="assignTask()">
+                        Assign
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
 </div>
 
 
@@ -151,6 +232,21 @@
         background-color: #0d6efd;
         color: #fff;
     }
+
+
+        .assign-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #198754;
+            color: white;
+            padding: 14px 18px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,.25);
+            z-index: 9999;
+            font-size: 14px;
+        }
+
 </style>
 
 
@@ -220,26 +316,40 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <script>
-        function enableColumnDrag() {
-            if (!__isTasksAdmin) return; // only Admin can reorder columns
+           function enableColumnDrag() {
+        if (!__isTasksAdmin) return;
 
-            const board = document.querySelector('.kanban-board');
-            if (!board) return;
-
-            if (board._sortable) board._sortable.destroy();
-
-            board._sortable = new Sortable(board, {
-                animation: 150,
-                direction: 'horizontal',
-                draggable: '.kanban-column',
-                onEnd: function () {
-                    const columnIds = Array.from(board.querySelectorAll('.kanban-column')).map(c => parseInt(c.dataset.columnId));
-                    fetch('/Tasks/ReorderColumns', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(columnIds)
-                    }).catch(err => console.error('Failed to save column order', err));
-                }
-            });
+        const board = document.querySelector('#kanbanBoard');
+        if (!board) {
+            console.warn('Kanban board not found');
+            return;
         }
+
+        // 🔥 SAFETY: remove old sortable safely
+        if (board._sortableInstance) {
+            board._sortableInstance.destroy();
+            board._sortableInstance = null;
+        }
+
+        board._sortableInstance = new Sortable(board, {
+            animation: 150,
+            direction: 'horizontal',
+            draggable: '.kanban-column',
+
+            onEnd: function () {
+                const columnIds = Array.from(
+                    board.querySelectorAll('.kanban-column')
+                ).map(c => parseInt(c.dataset.columnId));
+
+                fetch('/Tasks/ReorderColumns', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(columnIds)
+                }).catch(err => console.error('Failed to save column order', err));
+            }
+        });
+    }
+
 
         function startRename(columnId) {
             if (!__isTasksAdmin) return;
@@ -280,26 +390,38 @@
     </script>
 
         <script>
-            function loadTeamBoard(team) {
-                const container = document.getElementById('taskBoardContainer');
-                container.innerHTML = "<div class='text-muted p-3'>Loading...</div>";
+                  function loadTeamBoard(team) {
+        // ✅ SAVE CURRENT TEAM
+        currentTeamName = team;
 
-                fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
-                    .then(res => res.text())
-                    .then(html => {
-                        container.innerHTML = html;
+        const container = document.getElementById('taskBoardContainer');
+        container.innerHTML = "<div class='text-muted p-3'>Loading...</div>";
 
-                        // highlight active team button in left panel
-                        document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
-                        document.querySelectorAll(`.team-btn[data-team]`).forEach(b => {
-                            if (b.dataset.team && b.dataset.team.toLowerCase() === team.toLowerCase()) b.classList.add('active');
-                        });
+        fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load board");
+                return res.text();
+            })
+            .then(html => {
+                container.innerHTML = html;
 
-                        // enable admin-only features
-                        if (__isTasksAdmin) enableColumnDrag();
-                    })
-                    .catch(() => { container.innerHTML = 'Error loading board'; });
-            }
+                // highlight active team button
+                document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll(`.team-btn[data-team]`).forEach(b => {
+                    if (b.dataset.team === team) b.classList.add('active');
+                });
+
+                if (typeof enableColumnDrag === "function") {
+                    enableColumnDrag();
+                }
+            })
+            .catch(err => {
+                container.innerHTML = "<div class='text-danger'>Error loading board</div>";
+                console.error(err);
+            });
+    }
+ 
+
         </script>
 
 <script>
@@ -317,14 +439,104 @@
         if (backBtn) backBtn.style.display = 'inline-block';
     }
 
-    function resetBoardView() {
+
+            function focusTask(taskId) {
+        taskId = parseInt(taskId);
+
+        const board = document.getElementById('kanbanBoard');
+        const backBtn = document.getElementById('backToBoardBtn');
+
+        if (!board || isNaN(taskId)) return;
+
+        // ✅ Enter focus mode
+        board.classList.add('task-focused-view');
+
+
+
+            window.__focusedTaskId = taskId;
+
+    // show inputs
+    document.querySelector(`.task-title-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
+    document.querySelector(`.task-desc-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
+
+    // hide static text
+    document.querySelector(`.task-title-text`)?.classList.add('d-none');
+    document.querySelector(`.task-desc-text`)?.classList.add('d-none');
+
+
+
+        // ✅ Loop through all task cards
+        board.querySelectorAll('.task-card').forEach(task => {
+            const id = parseInt(task.dataset.taskId);
+
+            if (id === taskId) {
+                task.classList.add('focused-task');
+                task.style.display = 'block';
+            } else {
+                task.style.display = 'none';
+                task.classList.remove('focused-task');
+            }
+        });
+
+        // ✅ Keep columns visible (layout preserved)
+        board.querySelectorAll('.kanban-column').forEach(col => {
+            col.style.display = 'block';
+            col.classList.add('column-muted');
+        });
+
+        // ✅ Show back button
+        if (backBtn) backBtn.style.display = 'inline-block';
+    }
+
+
+        function exitTaskFocus() {
+        const board = document.getElementById('kanbanBoard');
+        const backBtn = document.getElementById('backToBoardBtn');
+
+        if (!board) return;
+
+        // Remove focus mode
+        board.classList.remove('task-focused-view');
+
+        // Restore all tasks
+        board.querySelectorAll('.task-card').forEach(task => {
+            task.style.display = 'block';
+            task.classList.remove('focused-task');
+        });
+
+        // Restore columns
+        board.querySelectorAll('.kanban-column').forEach(col => {
+            col.classList.remove('column-muted');
+        });
+
+        if (backBtn) backBtn.style.display = 'none';
+    }
+
+
+
+        function resetBoardView() {
         const board = document.getElementById('kanbanBoard');
         const backBtn = document.getElementById('backToBoardBtn');
         if (!board) return;
+
+        // reset column focus
         board.classList.remove('single-column-view');
-        board.querySelectorAll('.kanban-column').forEach(col => { col.classList.remove('focused-column'); col.classList.remove('hidden-column'); });
+        board.querySelectorAll('.kanban-column').forEach(col => {
+            col.classList.remove('focused-column');
+            col.classList.remove('hidden-column');
+            col.style.display = 'flex';
+        });
+
+        // reset task focus
+        board.classList.remove('task-focused-view');
+        board.querySelectorAll('.task-card').forEach(task => {
+            task.classList.remove('focused-task');
+            task.style.display = 'block';
+        });
+
         if (backBtn) backBtn.style.display = 'none';
     }
+
 </script>
 
 <script>
@@ -357,4 +569,142 @@
             </text>
         }
     });
+</script>
+
+<script>
+    function openCreateTaskModal(columnId) {
+        document.getElementById('taskColumnId').value = columnId;
+        document.getElementById('taskTitle').value = '';
+        document.getElementById('taskDescription').value = '';
+
+        new bootstrap.Modal(document.getElementById('createTaskModal')).show();
+    }
+
+    function submitCreateTask() {
+        const data = {
+            columnId: parseInt(document.getElementById('taskColumnId').value),
+            title: document.getElementById('taskTitle').value.trim(),
+            description: document.getElementById('taskDescription').value.trim()
+        };
+
+        fetch('/Tasks/CreateTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) {
+                return res.text().then(t => {
+                    throw new Error(t || 'Failed to create task');
+                });
+            }
+
+            // ✅ SUCCESS (no JSON expected)
+            const modalEl = document.getElementById('createTaskModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            // reload board
+            loadTeamBoard(currentTeamName);
+        })
+        .catch(err => {
+            alert(err.message || 'Failed to create task');
+        });
+    }
+</script>
+
+<script>
+    function saveFocusedTask() {
+        const taskId = window.__focusedTaskId;
+        if (!taskId) return;
+
+        const title = document.querySelector(`.task-title-input[data-task-id='${taskId}']`).value;
+        const desc = document.querySelector(`.task-desc-input[data-task-id='${taskId}']`).value;
+        const assignedTo = document.querySelector(`.task-assign-select[data-task-id='${taskId}']`).value;
+
+        fetch('/Tasks/UpdateTask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                taskId: taskId,
+                title: title,
+                description: desc,
+                assignedToUserId: assignedTo
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error();
+            loadTeamBoard(currentTeamName);
+        })
+        .catch(() => alert('Failed to update task'));
+    }
+</script>
+
+
+<script>
+    function deleteTask(taskId) {
+        if (!confirm('Delete this task?')) return;
+
+            fetch('/Tasks/DeleteTask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskId)
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Failed to delete');
+        loadTeamBoard(currentTeamName);
+    })
+    .catch(err => alert(err.message));
+
+
+    }
+</script>
+
+
+<script>
+    function assignTask(taskId, userId) {
+        if (!userId) return;
+
+        fetch('/Tasks/AssignTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `taskId=${taskId}&userId=${userId}`
+        })
+        .then(res => res.json())
+        .then(result => {
+            showAssignToast(
+                userId,
+                result.assignedBy,
+                result.assignedAt
+            );
+
+            loadTeamBoard(currentTeamName);
+        })
+        .catch(() => alert('Failed to assign task'));
+    }
+</script>
+
+
+
+<script>
+    function showAssignToast(userId, assignedBy, assignedAt) {
+        fetch(`/Users/GetUserInfo?userId=${userId}`)
+            .then(res => res.json())
+            .then(u => {
+                const toast = document.createElement('div');
+                toast.className = 'assign-toast';
+                toast.innerHTML = `
+                    Task assigned to <b>${u.userName}</b> (${u.role})<br/>
+                    By ${assignedBy} at ${assignedAt}
+                `;
+
+                document.body.appendChild(toast);
+
+                setTimeout(() => toast.remove(), 5000);
+            });
+    }
 </script>

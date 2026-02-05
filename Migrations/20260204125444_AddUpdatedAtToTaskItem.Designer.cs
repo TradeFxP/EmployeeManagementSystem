@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260204125444_AddUpdatedAtToTaskItem")]
+    partial class AddUpdatedAtToTaskItem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -250,12 +253,6 @@ namespace UserRoles.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime?>("AssignedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("AssignedByUserId")
-                        .HasColumnType("text");
-
                     b.Property<string>("AssignedToUserId")
                         .IsRequired()
                         .HasColumnType("text");
@@ -289,8 +286,6 @@ namespace UserRoles.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AssignedByUserId");
 
                     b.HasIndex("AssignedToUserId");
 
@@ -513,10 +508,6 @@ namespace UserRoles.Migrations
 
             modelBuilder.Entity("UserRoles.Models.TaskItem", b =>
                 {
-                    b.HasOne("UserRoles.Models.Users", "AssignedByUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedByUserId");
-
                     b.HasOne("UserRoles.Models.Users", "AssignedToUser")
                         .WithMany()
                         .HasForeignKey("AssignedToUserId")
@@ -534,8 +525,6 @@ namespace UserRoles.Migrations
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("AssignedByUser");
 
                     b.Navigation("AssignedToUser");
 

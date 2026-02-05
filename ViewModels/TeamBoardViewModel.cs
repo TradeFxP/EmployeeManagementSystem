@@ -16,5 +16,8 @@ namespace UserRoles.ViewModels
 
         // ✅ Optional (already used in some views)
         public string? TeamName { get; set; }
+
+        // ✅ ADD THIS
+        public List<Users> AssignableUsers { get; set; } = new();
     }
 }

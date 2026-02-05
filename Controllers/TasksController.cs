@@ -2,163 +2,15 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using UserRoles.Data;
 using UserRoles.Models;
 using UserRoles.ViewModels;
+using UserRoles.Models.Enums;
 
-//[Authorize]
-//public class TasksController : Controller
-//{
-//    private readonly AppDbContext _context;
-//    private readonly UserManager<Users> _userManager;
-
-//    public TasksController(AppDbContext context, UserManager<Users> userManager)
-//    {
-//        _context = context;
-//        _userManager = userManager;
-//    }
-
-//    // GET: Assign Task
-//    [Authorize(Roles = "Admin,Manager,SubManager")]
-//    public async Task<IActionResult> Create()
-//    {
-//        var currentUser = await _userManager.GetUserAsync(User);
-//        var allUsers = await _userManager.Users.ToListAsync();
-
-//        var allowedUsers = new List<Users>();
-
-//        foreach (var u in allUsers)
-//        {
-//            if (u.Id == currentUser.Id)
-//                continue;
-
-//            // ADMIN
-//            if (User.IsInRole("Admin"))
-//            {
-//                allowedUsers.Add(u);
-//            }
-//            // MANAGER
-//            else if (User.IsInRole("Manager"))
-//            {
-//                if (u.ParentUserId == currentUser.Id &&
-//                    !await _userManager.IsInRoleAsync(u, "Admin"))
-//                {
-//                    allowedUsers.Add(u);
-//                }
-//            }
-//            // SUB MANAGER
-//            else if (User.IsInRole("SubManager"))
-//            {
-//                if (u.ParentUserId == currentUser.Id &&
-//                    await _userManager.IsInRoleAsync(u, "User"))
-//                {
-//                    allowedUsers.Add(u);
-//                }
-//            }
-//        }
-
-//        ViewBag.Users = allowedUsers;
-
-//        // 🔽 FETCH TASKS ASSIGNED BY CURRENT USER
-//        var assignedTasks = await _context.AssignedTasks
-//            .Include(t => t.AssignedTo)
-//            .Where(t => t.AssignedById == currentUser.Id)
-//            .OrderByDescending(t => t.CreatedAt)
-//            .ToListAsync();
-
-//        ViewBag.AssignedTasks = assignedTasks;
-
-//        return View();
-
-//        return View();
-//    }
+using TaskStatusEnum = UserRoles.Models.Enums.TaskStatus;
 
 
-
-//    // POST: Assign Task
-//    [HttpPost]
-//    [ValidateAntiForgeryToken]
-//    [Authorize(Roles = "Admin,Manager,SubManager")]
-//    public async Task<IActionResult> Create(string title, string priority, string assignedToId)
-//    {
-//        var assignedBy = await _userManager.GetUserAsync(User);
-
-//        if (assignedBy.Id == assignedToId)
-//            return Forbid();
-
-//        var targetUser = await _userManager.FindByIdAsync(assignedToId);
-//        if (targetUser == null)
-//            return NotFound();
-
-//        // 🔒 ROLE ENFORCEMENT
-//        if (User.IsInRole("Manager"))
-//        {
-//            if (targetUser.ParentUserId != assignedBy.Id)
-//                return Forbid();
-
-//            if (await _userManager.IsInRoleAsync(targetUser, "Admin"))
-//                return Forbid();
-//        }
-
-//        if (User.IsInRole("SubManager"))
-//        {
-//            if (targetUser.ParentUserId != assignedBy.Id)
-//                return Forbid();
-
-//            if (!await _userManager.IsInRoleAsync(targetUser, "User"))
-//                return Forbid();
-//        }
-
-//        var task = new AssignedTask
-//        {
-//            Title = title,
-//            Priority = priority,
-//            AssignedById = assignedBy.Id,
-//            AssignedToId = assignedToId
-//        };
-
-//        _context.AssignedTasks.Add(task);
-//        await _context.SaveChangesAsync();
-
-//        TempData["Success"] = "Task assigned successfully";
-//        return RedirectToAction("Create");
-//    }
-
-
-
-//    [Authorize(Roles = "User")]
-//    public async Task<IActionResult> AssignedToMe()
-//    {
-//        var user = await _userManager.GetUserAsync(User);
-
-//        var tasks = await _context.AssignedTasks
-//            .Include(t => t.AssignedBy)
-//            .Where(t => t.AssignedToId == user.Id)
-//            .OrderByDescending(t => t.CreatedAt)
-//            .ToListAsync();
-
-//        return View(tasks);
-//    }
-
-//    // ✅ VIEW TASKS – ALL LOGGED-IN USERS
-//    public async Task<IActionResult> Index()
-//    {
-//        var currentUser = await _userManager.GetUserAsync(User);
-
-//        var tasks = await _context.AssignedTasks
-//            .Include(t => t.AssignedBy)
-//            .Where(t => t.AssignedToId == currentUser.Id)
-//            .OrderByDescending(t => t.CreatedAt)
-//            .ToListAsync();
-
-//        return View(tasks);
-//    }
-
-
-
-
-
-//}
 [Authorize]
 public class TasksController : Controller
 {
@@ -201,191 +53,181 @@ public class TasksController : Controller
 
 
 
-    // ================= BOARDS =================
-    // Admin → Team tasks
-    // Others → Self tasks
-    [HttpGet]
-    public async Task<IActionResult> Boards()
-    {
-        var user = await _userManager.GetUserAsync(User);
-
-        if (User.IsInRole("Admin"))
-        {
-            // 🔴 IMPORTANT: NO FILTER HERE
-            var teamTasks = _context.TaskItems
-            .Include(t => t.CreatedByUser)
-            .Include(t => t.AssignedToUser)
-            .OrderBy(t => t.Status)
-            .ToList();
-
-
-            return PartialView("_TaskBoard", teamTasks);
-        }
-
-        var selfTasks = _context.TaskItems
-             .Include(t => t.CreatedByUser)
-             .Include(t => t.AssignedToUser)
-             .Where(t => t.AssignedToUserId == user.Id)
-             .OrderBy(t => t.Status)
-             .ToList();
-
-
-        return PartialView("_TaskBoard", selfTasks);
-    }
-
-
-    // ================= TEAM TASKS =================
-    // Admin / Manager / Sub-Manager
-    [Authorize(Roles = "Admin,Manager,Sub-Manager")]
-    [HttpGet]
-    public IActionResult TeamTasks()
-    {
-        // IMPORTANT: No filtering by user
-        var tasks = _context.TaskItems
-          .Include(t => t.CreatedByUser)
-          .Include(t => t.AssignedToUser)
-          .OrderBy(t => t.Status)
-          .ToList();
-        ViewBag.Users = _userManager.Users.ToList();
-
-        return PartialView("_TaskBoard", tasks);
-    }
 
     [HttpPost]
     [Authorize]
-    public async Task<IActionResult> CreateTask(string title, string description)
+    public async Task<IActionResult> CreateTask([FromBody] CreateTaskViewModel model)
     {
-        // 🔒 Validate FIRST
-        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(description))
-            return BadRequest("Title and Description are required.");
+        if (model == null)
+            return BadRequest("Invalid payload");
 
-        var user = await _userManager.GetUserAsync(User);
+        if (model.ColumnId <= 0)
+            return BadRequest("ColumnId is required");
 
-        var task = new TaskItem
-        {
-            Title = title,
-            Description = description,
-
-            // Always start in ToDo
-            Status = UserRoles.Models.Enums.TaskStatus.ToDo,
-
-            // Assigned to creator by default
-            AssignedToUserId = user.Id,
-
-            // Audit fields
-            CreatedByUserId = user.Id,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _context.TaskItems.Add(task);
-        await _context.SaveChangesAsync();
-
-        return Ok();
-    }
-
-
-    [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> DeleteTask(int id)
-    {
-        var task = await _context.TaskItems.FindAsync(id);
-
-        if (task == null)
-            return NotFound();
-
-        // Safety: allow delete only for ToDo
-        if (task.Status != UserRoles.Models.Enums.TaskStatus.ToDo)
-            return BadRequest();
-
-        _context.TaskItems.Remove(task);
-        await _context.SaveChangesAsync();
-
-        return Ok();
-    }
-
-
-    [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> AssignTask(int taskId, string userId)
-    {
-        var task = await _context.TaskItems.FindAsync(taskId);
-        if (task == null) return NotFound();
-
-        task.AssignedToUserId = userId;
-        await _context.SaveChangesAsync();
-
-        return Ok();
-    }
-
-
-    //edittask
-    [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> EditTask(int id, string title, string description)
-    {
-        var task = await _context.TaskItems.FindAsync(id);
-        if (task == null) return NotFound();
-
-        task.Title = title;
-        task.Description = description;
-
-        await _context.SaveChangesAsync();
-        return Ok();
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> UpdateStatus(int taskId, UserRoles.Models.Enums.TaskStatus newStatus)
-    {
-        var task = await _context.TaskItems.FindAsync(taskId);
-        if (task == null)
-            return NotFound();
-
-        // 🔐 ROLE-BASED SECURITY CHECK
-        var isAdmin = User.IsInRole("Admin");
-        var isManager = User.IsInRole("Manager") || User.IsInRole("Sub-Manager");
-
-        // USER RULES
-        if (!isAdmin && !isManager)
-        {
-            if (
-                (task.Status == UserRoles.Models.Enums.TaskStatus.ToDo && newStatus != UserRoles.Models.Enums.TaskStatus.Doing) ||
-                (task.Status == UserRoles.Models.Enums.TaskStatus.Doing && newStatus != UserRoles.Models.Enums.TaskStatus.Review)
-            )
-            {
-                return Forbid();
-            }
-        }
-
-        // MANAGER / ADMIN RULES
-        if (isManager || isAdmin)
-        {
-            bool valid =
-                (task.Status == UserRoles.Models.Enums.TaskStatus.ToDo && newStatus == UserRoles.Models.Enums.TaskStatus.Doing) ||
-                (task.Status == UserRoles.Models.Enums.TaskStatus.Doing && newStatus == UserRoles.Models.Enums.TaskStatus.Review) ||
-                (task.Status == UserRoles.Models.Enums.TaskStatus.Review && newStatus == UserRoles.Models.Enums.TaskStatus.Complete);
-
-            if (!valid)
-                return Forbid();
-        }
-
-        task.Status = newStatus;
-        await _context.SaveChangesAsync();
-
-        return Ok();
-    }
-
-    [Authorize]
-    public async Task<IActionResult> TeamBoard(string team)
-    {
-        if (string.IsNullOrWhiteSpace(team))
-            return BadRequest("Team is required");
+        if (string.IsNullOrWhiteSpace(model.Title))
+            return BadRequest("Title is required");
 
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
             return Unauthorized();
 
-        // 🔐 SECURITY CHECK
+        // 🔑 LOAD COLUMN (THIS WAS MISSING)
+        var column = await _context.TeamColumns
+            .FirstOrDefaultAsync(c => c.Id == model.ColumnId);
+
+        if (column == null)
+            return BadRequest("Column not found");
+
+        var task = new TaskItem
+        {
+            Title = model.Title.Trim(),
+            Description = model.Description?.Trim(),
+
+            ColumnId = column.Id,
+            TeamName = column.TeamName,
+
+            Status = TaskStatusEnum.ToDo,
+
+            CreatedByUserId = user.Id,
+            AssignedToUserId = user.Id,      // creator owns initially
+            AssignedByUserId = user.Id,      // 🔥 IMPORTANT
+            AssignedAt = DateTime.UtcNow,    // 🔥 IMPORTANT
+            CreatedAt = DateTime.UtcNow
+        };
+
+
+        _context.TaskItems.Add(task);
+        await _context.SaveChangesAsync();
+
+
+        return Ok(new
+        {
+            success = true,
+            message = "Task created successfully"
+        });
+
+    }
+
+
+
+
+
+
+    [HttpPost]
+    [Authorize(Roles = "Admin,Manager,Sub-Manager")]
+    public async Task<IActionResult> AssignTask(int taskId, string userId)
+    {
+        if (string.IsNullOrEmpty(userId))
+            return BadRequest("UserId is required");
+
+        var task = await _context.TaskItems.FindAsync(taskId);
+        if (task == null)
+            return NotFound();
+
+        var assignToUser = await _userManager.FindByIdAsync(userId);
+        if (assignToUser == null)
+            return BadRequest("Invalid user");
+
+        var currentUser = await _userManager.GetUserAsync(User);
+        if (currentUser == null)
+            return Unauthorized();
+
+        task.AssignedToUserId = assignToUser.Id;
+        task.AssignedByUserId = currentUser.Id;
+        task.AssignedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            assignedTo = assignToUser.UserName,
+            assignedBy = currentUser.UserName,
+            assignedAt = task.AssignedAt.Value.ToString("dd MMM yyyy, hh:mm tt")
+        });
+    }
+
+
+
+    ////edittask
+    //[HttpPost]
+    //[Authorize(Roles = "Admin")]
+    //public async Task<IActionResult> EditTask(int id, string title, string description)
+    //{
+    //    var task = await _context.TaskItems.FindAsync(id);
+    //    if (task == null) return NotFound();
+
+    //    task.Title = title;
+    //    task.Description = description;
+
+    //    await _context.SaveChangesAsync();
+    //    return Ok();
+    //}
+
+
+
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> UpdateTask([FromBody] UpdateTaskRequest model)
+    {
+        if (model == null || model.TaskId <= 0)
+            return BadRequest();
+
+        var task = await _context.TaskItems.FindAsync(model.TaskId);
+        if (task == null)
+            return NotFound();
+
+        task.Title = model.Title?.Trim();
+        task.Description = model.Description?.Trim();
+        task.UpdatedAt = DateTime.UtcNow;
+
+        if (!string.IsNullOrEmpty(model.AssignedToUserId))
+        {
+            if (User.IsInRole("Admin") ||
+                User.IsInRole("Manager") ||
+                User.IsInRole("SubManager"))
+            {
+                task.AssignedToUserId = model.AssignedToUserId;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+
+
+
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteTask([FromBody] int taskId)
+
+    {
+        var task = await _context.TaskItems.FindAsync(taskId);
+        if (task == null)
+            return NotFound();
+
+        _context.TaskItems.Remove(task);
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+
+
+
+    [Authorize]
+    public async Task<IActionResult> TeamBoard(string team)
+    {
+        if (string.IsNullOrWhiteSpace(team))
+            return BadRequest();
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized();
+
+        // Security: team access
         if (!User.IsInRole("Admin"))
         {
             bool hasAccess = await _context.UserTeams
@@ -395,25 +237,55 @@ public class TasksController : Controller
                 return Forbid();
         }
 
-        // ✅ LOAD REAL ENTITIES (NOT anonymous)
+        // Load columns
         var columns = await _context.TeamColumns
             .Where(c => c.TeamName == team)
-            .OrderBy(c => c.Id)
+            .OrderBy(c => c.Order)
             .ToListAsync();
 
-        var tasks = await _context.TaskItems
-            .Where(t => t.TeamName == team)
+        // Load all tasks for team (with users)
+        var allTasks = await _context.TaskItems
+     .Where(t => t.TeamName == team)
+     .Include(t => t.CreatedByUser)
+     .Include(t => t.AssignedToUser)
+     .Include(t => t.AssignedByUser)   // ✅ REQUIRED
+     .ToListAsync();
+
+
+        // 🔥 FILTER TASKS BASED ON ROLE RULES
+        var visibleTasks = new List<TaskItem>();
+
+        foreach (var task in allTasks)
+        {
+            if (await CanUserSeeTask(task, user))
+                visibleTasks.Add(task);
+        }
+
+        // Attach filtered tasks to columns
+        foreach (var col in columns)
+        {
+            col.Tasks = visibleTasks
+                .Where(t => t.ColumnId == col.Id)
+                .ToList();
+        }
+
+        // ✅ 1. Load assignable users FIRST
+        var assignableUsers = await _userManager.Users
+            .OrderBy(u => u.UserName)
             .ToListAsync();
 
-        // ✅ STRONG VIEWMODEL ONLY
+        // ✅ 2. Build ViewModel AFTER data exists
         var vm = new TeamBoardViewModel
         {
             TeamName = team,
             Columns = columns,
-            Tasks = tasks
+            AssignableUsers = assignableUsers
         };
 
+        // ✅ 3. Return partial view
         return PartialView("_TeamBoard", vm);
+
+
     }
 
 
@@ -444,16 +316,27 @@ public class TasksController : Controller
 
         return Ok();
     }
-
     [HttpPost]
     [Authorize(Roles = "Admin")]
     public IActionResult ReorderColumns([FromBody] List<int> columnIds)
     {
+        // 🔒 Safety check
+        if (columnIds == null || columnIds.Count == 0)
+            return BadRequest("No columns received");
+
+        // Load only affected columns
+        var columns = _context.TeamColumns
+            .Where(c => columnIds.Contains(c.Id))
+            .ToList();
+
+        // Save order exactly as UI order
         for (int i = 0; i < columnIds.Count; i++)
         {
-            var col = _context.TeamColumns.Find(columnIds[i]);
-            if (col != null)
-                col.Order = i + 1;
+            var column = columns.FirstOrDefault(c => c.Id == columnIds[i]);
+            if (column != null)
+            {
+                column.Order = i + 1; // 1-based order
+            }
         }
 
         _context.SaveChanges();
@@ -504,6 +387,72 @@ public class TasksController : Controller
 
         return Ok();
     }
+
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> MoveTask([FromBody] MoveTaskRequest model)
+    {
+        var task = await _context.TaskItems
+            .Include(t => t.Column)
+            .FirstOrDefaultAsync(t => t.Id == model.TaskId);
+
+        if (task == null)
+            return NotFound();
+
+        var user = await _userManager.GetUserAsync(User);
+
+        // 🔐 ROLE RULES
+        var isAdmin = User.IsInRole("Admin");
+        var isManager = User.IsInRole("Manager") || User.IsInRole("SubManager");
+
+        if (!isAdmin && !isManager)
+        {
+            // normal user can only move own tasks
+            if (task.AssignedToUserId != user.Id)
+                return Forbid();
+        }
+
+        // Update column
+        task.ColumnId = model.ColumnId;
+
+        await _context.SaveChangesAsync();
+        return Ok();
+    }
+
+
+    private async Task<bool> CanUserSeeTask(TaskItem task, Users currentUser)
+    {
+        // Assigned user always sees
+        if (task.AssignedToUserId == currentUser.Id)
+            return true;
+
+        var viewerRoles = await _userManager.GetRolesAsync(currentUser);
+
+        if (viewerRoles.Contains("Admin"))
+            return true;
+
+        var creator = await _userManager.FindByIdAsync(task.CreatedByUserId);
+        if (creator == null)
+            return false;
+
+        var creatorRoles = await _userManager.GetRolesAsync(creator);
+
+        bool isManager = viewerRoles.Contains("Manager");
+        bool isSubManager = viewerRoles.Contains("Sub-Manager");
+
+        if (creatorRoles.Contains("User"))
+            return isSubManager || isManager;
+
+        if (creatorRoles.Contains("Sub-Manager"))
+            return isManager;
+
+        if (creatorRoles.Contains("Manager"))
+            return isManager;
+
+        return false;
+    }
+
 
 
 

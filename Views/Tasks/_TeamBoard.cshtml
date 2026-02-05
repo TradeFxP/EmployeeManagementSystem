@@ -29,6 +29,52 @@
 <div class="kanban-board" id="kanbanBoard">
 
 
+    <!-- ================= FOCUSED TASK PANEL ================= -->
+    <div id="focusedTaskPanel" class="focused-task-panel d-none">
+        <input type="hidden" id="focusedTaskId" />
+
+        <div class="card p-4 shadow-sm">
+            <h5>Task Details</h5>
+
+            <!-- TITLE -->
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input id="editTaskTitle" class="form-control" />
+            </div>
+
+            <!-- DESCRIPTION -->
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea id="editTaskDescription" class="form-control" rows="4"></textarea>
+            </div>
+
+            <!-- ASSIGN USER -->
+            <div class="mb-3">
+                <label class="form-label">Assign to</label>
+                <select id="assignUserSelect" class="form-select"></select>
+            </div>
+
+            <!-- CREATED INFO -->
+            <div class="text-muted small mb-3">
+                <div id="taskCreatedInfo"></div>
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" onclick="saveFocusedTask()">Save</button>
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <button class="btn btn-danger" onclick="deleteFocusedTask()">Delete</button>
+                }
+
+                <button class="btn btn-secondary" onclick="exitTaskFocus()">Back</button>
+            </div>
+        </div>
+    </div>
+
+
+
     @foreach (var column in Model.Columns)
     {
         <div class="kanban-column" data-column-id="@column.Id">
@@ -65,6 +111,14 @@
                     </div>
                 </div>
 
+                @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
+                {
+                    <button class="icon-btn"
+                            title="Add task"
+                            onclick="openCreateTaskModal(@column.Id)">
+                        ➕
+                    </button>
+                }
 
 
                 @if (User.IsInRole("Admin"))
@@ -93,9 +147,95 @@
             <!-- TASK CONTAINER (later drag tasks here) -->
             <div class="kanban-column-body">
                 <!-- TASKS WILL GO HERE -->
-                <div class="kanban-tasks">
-                    <p class="text-muted">Drop tasks here</p>
+                <div class="kanban-tasks"
+                     data-column-id="@column.Id">
+                    @foreach (var task in column.Tasks)
+                    {
+                        <div class="task-card"
+                             draggable="true"
+                             data-task-id="@task.Id"
+                             data-column-id="@column.Id"
+                             onclick="focusTask(@task.Id)">
+
+                            <!-- ✏️ Editable Title -->
+                            <input class="form-control task-title-input d-none"
+                                   value="@task.Title"
+                                   data-task-id="@task.Id" />
+
+                            <strong class="task-title-text">@task.Title</strong>
+
+                            <!-- 🕒 Created -->
+                            <div class="small text-muted mt-1">
+                                Created by: @task.CreatedByUser?.UserName
+                            </div>
+
+                            <div class="small text-muted">
+                                Created at: @task.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                            </div>
+
+                            @if (task.UpdatedAt != null)
+                            {
+                                <div class="small text-muted">
+                                    Updated at: @task.UpdatedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                </div>
+                            }
+
+                            @if (task.AssignedByUser != null && task.AssignedAt != null)
+                            {
+                                <div class="small text-muted mt-1">
+                                    Assigned by: <strong>@task.AssignedByUser.UserName</strong>
+                                </div>
+                                <div class="small text-muted">
+                                    Assigned at: @task.AssignedAt.Value.ToLocalTime()
+                                    .ToString("dd MMM yyyy, hh:mm tt")
+                                </div>
+                            }
+
+
+
+                            <!-- ✏️ Editable Description -->
+                            <textarea class="form-control mt-2 task-desc-input d-none"
+                              data-task-id="@task.Id">@task.Description</textarea>
+
+                            <div class="task-desc-text mt-2">
+                                @task.Description
+                            </div>
+
+                            <!-- 🧑 Assign -->
+                            <select class="form-select mt-2 task-assign-select"
+                                    data-task-id="@task.Id">
+                                <option value="">Unassigned</option>
+                                @foreach (var u in Model.AssignableUsers)
+                                {
+                                    <option value="@u.Id">
+                                        @u.UserName
+                                    </option>
+                                }
+
+                            </select>
+
+                            <!-- 🗑 ADMIN DELETE -->
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <button class="btn btn-sm btn-danger mt-3"
+                                        onclick="deleteTask(@task.Id); event.stopPropagation();">
+                                    Delete
+                                </button>
+                            }
+                            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                            {
+                                <button class="btn btn-sm btn-outline-primary mt-2 me-2"
+                                        onclick="openAssignTaskModal(@task.Id)">
+                                    Assign
+                                </button>
+                            }
+
+                        </div>
+
+                    }
                 </div>
+
+
             </div>
 
 
@@ -251,6 +391,71 @@
 
     .cancel-btn {
         color: red;
+    }
+
+    /* ===== TASK FOCUS MODE ===== */
+
+    .task-focused-view .kanban-column {
+        display: none;
+    }
+
+    .task-focused-view .task-card {
+        display: none;
+    }
+
+        .task-focused-view .task-card.focused-task {
+            display: block;
+            max-width: 1000px;
+            margin: 0 auto;
+            font-size: 16px;
+            padding: 24px;
+        }
+
+    /* make task look like a full page */
+    .focused-task {
+        box-shadow: 0 0 0 1px #ddd, 0 10px 40px rgba(0,0,0,0.15);
+        border-radius: 12px;
+        background: #fff;
+        /* 🔥 HEIGHT & LAYOUT */
+        min-height: 60vh; /* ⬅️ MAIN CHANGE */
+        max-height: 70vh;
+        padding: 32px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        overflow-y: auto; /* scroll if content grows */
+    }
+
+
+        /* spacing inside expanded task */
+        .focused-task strong {
+            font-size: 20px;
+        }
+
+
+
+        .focused-task strong {
+            font-size: 22px;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .focused-task .small {
+            font-size: 15px;
+        }
+
+        .focused-task .text-muted {
+            margin-bottom: 16px;
+        }
+
+    .focused-task-panel {
+        max-width: 700px;
+        margin: 20px auto;
+    }
+
+    .task-focused-view .kanban-column,
+    .task-focused-view .task-card {
+        display: none;
     }
 
     </style>
