@@ -74,7 +74,7 @@
 
                                 <div class="small text-muted mb-2">
                                     <strong>Created By:</strong>
-                                    @(task.CreatedByUser?.UserName ?? "Unknown")
+                                    @(task.CreatedByUser?.Name ?? "Unknown")
                                 </div>
 
                                 <!-- ADMIN ACTIONS -->
@@ -92,7 +92,7 @@
                                                 {
                                                     <option value="@u.Id"
                                                             selected="@(u.Id == task.AssignedToUserId)">
-                                                        @u.UserName
+                                                        @u.Name
                                                     </option>
                                                 }
                                             </select>

@@ -19,9 +19,14 @@
 
         <div class="list-group list-group-flush">
 
+            
+
+            
             @if (isAdmin)
             {
                 <!-- ================= ADMIN: TEAM TASKS ================= -->
+
+
                 <button type="button"
                         class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
                         onclick="toggleTeamTasks()">
@@ -30,6 +35,8 @@
                     </span>
                     <span id="teamArrow">▼</span>
                 </button>
+
+                        
 
                 <!-- Team Tasks Dropdown -->
                 <div id="teamTasksDropdown" style="display:none;">
@@ -224,6 +231,8 @@
 
 
 <style>
+
+
     .list-group-item {
         border: none;
     }
@@ -331,23 +340,27 @@
             board._sortableInstance = null;
         }
 
-        board._sortableInstance = new Sortable(board, {
-            animation: 150,
-            direction: 'horizontal',
-            draggable: '.kanban-column',
+           board._sortableInstance = new Sortable(board, {
+        animation: 150,
+        direction: 'horizontal',
+        draggable: '.kanban-column',
 
-            onEnd: function () {
-                const columnIds = Array.from(
-                    board.querySelectorAll('.kanban-column')
-                ).map(c => parseInt(c.dataset.columnId));
+        // 🔥 THIS IS THE FIX
+        handle: '.column-drag-handle',
 
-                fetch('/Tasks/ReorderColumns', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(columnIds)
-                }).catch(err => console.error('Failed to save column order', err));
-            }
-        });
+        onEnd: function () {
+            const columnIds = Array.from(
+                board.querySelectorAll('.kanban-column')
+            ).map(c => parseInt(c.dataset.columnId));
+
+            fetch('/Tasks/ReorderColumns', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(columnIds)
+            });
+        }
+    });
+
     }
 
 
@@ -413,6 +426,7 @@
 
                 if (typeof enableColumnDrag === "function") {
                     enableColumnDrag();
+                    enableTaskDragDrop();
                 }
             })
             .catch(err => {
@@ -456,12 +470,12 @@
             window.__focusedTaskId = taskId;
 
     // show inputs
-    document.querySelector(`.task-title-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
-    document.querySelector(`.task-desc-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
+    // document.querySelector(`.task-title-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
+    // document.querySelector(`.task-desc-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
 
     // hide static text
-    document.querySelector(`.task-title-text`)?.classList.add('d-none');
-    document.querySelector(`.task-desc-text`)?.classList.add('d-none');
+    // document.querySelector(`.task-title-text`)?.classList.add('d-none');
+    // document.querySelector(`.task-desc-text`)?.classList.add('d-none');
 
 
 
@@ -707,4 +721,225 @@
                 setTimeout(() => toast.remove(), 5000);
             });
     }
+
+
+
+        function enableTaskEdit(taskId) {
+
+        // Close any other open edits (very important)
+        document.querySelectorAll('.task-card.editing').forEach(card => {
+            cancelTaskEdit(card.dataset.taskId);
+        });
+
+        const card = document.querySelector(`[data-task-id='${taskId}']`).closest('.task-card');
+        card.classList.add('editing');
+
+        // Toggle title
+        card.querySelector('.task-title-text').classList.add('d-none');
+        card.querySelector('.task-title-input').classList.remove('d-none');
+
+        // Toggle description
+        card.querySelector('.task-desc-text').classList.add('d-none');
+        card.querySelector('.task-desc-input').classList.remove('d-none');
+
+        // Toggle buttons
+        card.querySelector('.edit-task-btn').classList.add('d-none');
+        card.querySelector('.save-task-btn').classList.remove('d-none');
+        card.querySelector('.cancel-task-btn').classList.remove('d-none');
+    }
+
+
+        function cancelTaskEdit(taskId) {
+        const card = document.querySelector(`[data-task-id='${taskId}']`).closest('.task-card');
+        card.classList.remove('editing');
+
+        // Restore values from text
+        const titleText = card.querySelector('.task-title-text').innerText;
+        const descText = card.querySelector('.task-desc-text').innerText;
+
+        card.querySelector('.task-title-input').value = titleText;
+        card.querySelector('.task-desc-input').value = descText;
+
+        // Toggle back
+        card.querySelector('.task-title-text').classList.remove('d-none');
+        card.querySelector('.task-title-input').classList.add('d-none');
+
+        card.querySelector('.task-desc-text').classList.remove('d-none');
+        card.querySelector('.task-desc-input').classList.add('d-none');
+
+        card.querySelector('.edit-task-btn').classList.remove('d-none');
+        card.querySelector('.save-task-btn').classList.add('d-none');
+        card.querySelector('.cancel-task-btn').classList.add('d-none');
+    }
+
+        function saveTaskEdit(taskId) {
+
+        const card = document
+            .querySelector(`[data-task-id='${taskId}']`)
+            ?.closest('.task-card');
+
+        if (!card) return;
+
+        const titleInput = card.querySelector('.task-title-input');
+        const descInput = card.querySelector('.task-desc-input');
+
+        const title = titleInput.value.trim();
+        const description = descInput.value.trim();
+
+        if (!title) {
+            alert("Title cannot be empty");
+            titleInput.focus();
+            return;
+        }
+
+        fetch('/Tasks/UpdateTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                taskId: taskId,
+                title: title,
+                description: description
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Save failed');
+            return res.json();   // ✅ now valid
+        })
+        .then(() => {
+
+            // ✅ Update UI immediately
+            card.querySelector('.task-title-text').innerText = title;
+            card.querySelector('.task-desc-text').innerText = description;
+
+            cancelTaskEdit(taskId);
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Failed to save task");
+        });
+    }
+
+
+        function showAssignDropdown(taskId) {
+
+        // Hide all other assign containers
+        document.querySelectorAll('.task-assign-container').forEach(c => {
+            c.classList.add('d-none');
+        });
+
+        // Show current task assign UI
+        const container = document.querySelector(
+            `.task-assign-container[data-task-id='${taskId}']`
+        );
+
+        if (container) {
+            container.classList.remove('d-none');
+        }
+    }
+
+        function cancelAssignTask(taskId) {
+        const container = document.querySelector(
+            `.task-assign-container[data-task-id='${taskId}']`
+        );
+
+        if (container) {
+            container.classList.add('d-none');
+        }
+    }
+
+
+        function confirmAssignTask(taskId) {
+
+        const select = document.querySelector(
+            `.task-assign-select[data-task-id='${taskId}']`
+        );
+
+        if (!select || !select.value) {
+            alert("Please select a user");
+            return;
+        }
+
+        const userId = select.value;
+
+        fetch('/Tasks/AssignTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `taskId=${taskId}&userId=${userId}`
+        })
+        .then(res => {
+            if (!res.ok) throw new Error();
+            return res.json();
+        })
+        .then(result => {
+
+            // Optional toast (you already have this)
+            showAssignToast(userId, result.assignedBy, result.assignedAt);
+
+            // Hide assign UI
+            cancelAssignTask(taskId);
+
+            // Reload board to reflect assignment
+            loadTeamBoard(currentTeamName);
+        })
+        .catch(() => alert("Failed to assign task"));
+    }
+
+
+                function enableTaskDragDrop() {
+
+        document.querySelectorAll('.kanban-tasks').forEach(container => {
+
+            if (container._taskSortable) {
+                container._taskSortable.destroy();
+            }
+
+            container._taskSortable = new Sortable(container, {
+                group: 'tasks',
+                animation: 150,
+                draggable: '.task-card',
+                ghostClass: 'task-ghost',
+                chosenClass: 'task-chosen',
+
+                onEnd: function (evt) {
+                    const taskId = parseInt(evt.item.dataset.taskId);
+                    const newColumnId = parseInt(evt.to.dataset.columnId);
+
+                    if (!taskId || !newColumnId) return;
+
+                    updateTaskColumn(taskId, newColumnId);
+                }
+            });
+        });
+    }
+
+
+
+        function updateTaskColumn(taskId, columnId) {
+
+        fetch('/Tasks/MoveTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                taskId: taskId,
+                columnId: columnId
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to move task');
+        })
+        .catch(err => {
+            alert(err.message);
+            // reload board to recover UI
+            loadTeamBoard(currentTeamName);
+        });
+    }
+
 </script>
+
+

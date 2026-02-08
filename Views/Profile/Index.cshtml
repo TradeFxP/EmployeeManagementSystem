@@ -31,6 +31,10 @@
                         <dt class="col-sm-4">Email</dt>
                         <dd class="col-sm-8">@Model.Email</dd>
 
+                        <dt class="col-sm-4">Address</dt>
+                        <dd class="col-sm-8">@Model.Address</dd>
+
+
                         <dt class="col-sm-4">Mobile</dt>
                         <dd class="col-sm-8">@Model.MobileNumber</dd>
                     </dl>
@@ -54,6 +58,12 @@
                             <label asp-for="FirstName" class="form-label"></label>
                             <input asp-for="FirstName" class="form-control" />
                             <span asp-validation-for="FirstName" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Address" class="form-label"></label>
+                            <input asp-for="Address" class="form-control" />
+                            <span asp-validation-for="Address" class="text-danger"></span>
                         </div>
 
                         <div class="mb-3">

@@ -80,20 +80,31 @@
         <div class="kanban-column" data-column-id="@column.Id">
 
             <!-- COLUMN HEADER --> 
-            <div class="kanban-column-header d-flex align-items-center justify-content-between"
-                 onclick="focusColumn(@column.Id)">
+            <div class="kanban-column-header d-flex align-items-center justify-content-between">
 
+                <!-- 🔥 DRAG HANDLE (ONLY THIS MOVES COLUMN) -->
+                <div class="column-drag-handle d-flex align-items-center"
+                     title="Drag column"
+                     style="cursor: grab;"
+                     onclick="event.stopPropagation();">
+                    ⠿
+                </div>
 
-
-                <!-- COLUMN TITLE -->
-                <div class="column-title-wrapper">
+                <!-- COLUMN TITLE (CLICK TO FOCUS) -->
+                <div class="column-title-wrapper flex-grow-1 ms-2"
+                     onclick="focusColumn(@column.Id)">
 
                     <span class="column-title"
                           id="column-title-@column.Id">
                         @column.ColumnName
                     </span>
 
-                    <div class="column-rename" id="column-rename-@column.Id" style="display:none;">
+                    <!-- RENAME MODE -->
+                    <div class="column-rename"
+                         id="column-rename-@column.Id"
+                         style="display:none;"
+                         onclick="event.stopPropagation();">
+
                         <input type="text"
                                class="column-title-input"
                                id="column-input-@column.Id"
@@ -111,16 +122,17 @@
                     </div>
                 </div>
 
+                <!-- ADD TASK -->
                 @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                 {
                     <button class="icon-btn"
                             title="Add task"
-                            onclick="openCreateTaskModal(@column.Id)">
+                            onclick="openCreateTaskModal(@column.Id); event.stopPropagation();">
                         ➕
                     </button>
                 }
 
-
+                <!-- ADMIN ACTIONS -->
                 @if (User.IsInRole("Admin"))
                 {
                     <div class="column-actions" onclick="event.stopPropagation();">
@@ -137,11 +149,8 @@
                         </button>
                     </div>
                 }
-
-
-
-
             </div>
+
 
 
             <!-- TASK CONTAINER (later drag tasks here) -->
@@ -164,6 +173,15 @@
 
                             <strong class="task-title-text">@task.Title</strong>
 
+
+                            <!-- ✏️ Editable Description -->
+                            <textarea class="form-control mt-2 task-desc-input d-none"
+                              data-task-id="@task.Id">@task.Description</textarea>
+
+                            <div class="task-desc-text mt-2">
+                                @task.Description
+                            </div>
+
                             <!-- 🕒 Created -->
                             <div class="small text-muted mt-1">
                                 Created by: @task.CreatedByUser?.UserName
@@ -180,28 +198,50 @@
                                 </div>
                             }
 
-                            @if (task.AssignedByUser != null && task.AssignedAt != null)
+                            @if (task.AssignedToUser != null && task.AssignedAt != null)
+                            {
+                                <div class="small text-muted mt-1 assigned-info"
+                                     data-task-id="@task.Id">
+
+                                    <div>
+                                        Assigned to:
+                                        <strong class="assigned-to-name">
+                                            @task.AssignedToUser.UserName
+                                        </strong>
+                                    </div>
+
+                                    @if (task.AssignedByUser != null)
+                                    {
+                                        <div>
+                                            Assigned by:
+                                            <strong>
+                                                @task.AssignedByUser.Email
+                                            </strong>
+                                        </div>
+                                    }
+
+                                    <div>
+                                        Assigned at:
+                                        @task.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                    </div>
+                                </div>
+                            }
+
+
+                            @* @if (task.AssignedByUser != null && task.AssignedAt != null)
                             {
                                 <div class="small text-muted mt-1">
                                     Assigned by: <strong>@task.AssignedByUser.UserName</strong>
                                 </div>
                                 <div class="small text-muted">
-                                    Assigned at: @task.AssignedAt.Value.ToLocalTime()
-                                    .ToString("dd MMM yyyy, hh:mm tt")
+                                    Assigned at: @task.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
                                 </div>
-                            }
+                            } *@
 
 
 
-                            <!-- ✏️ Editable Description -->
-                            <textarea class="form-control mt-2 task-desc-input d-none"
-                              data-task-id="@task.Id">@task.Description</textarea>
 
-                            <div class="task-desc-text mt-2">
-                                @task.Description
-                            </div>
-
-                            <!-- 🧑 Assign -->
+                            @* <!-- 🧑 Assign -->
                             <select class="form-select mt-2 task-assign-select"
                                     data-task-id="@task.Id">
                                 <option value="">Unassigned</option>
@@ -212,7 +252,45 @@
                                     </option>
                                 }
 
-                            </select>
+                            </select> *@
+
+
+                            <!-- 🧑 Assign (HIDDEN BY DEFAULT) -->
+                            <div class="task-assign-container d-none"
+                                 data-task-id="@task.Id">
+
+                                <select class="form-select mt-2 task-assign-select"
+                                        data-task-id="@task.Id">
+                                    <option value="">Unassigned</option>
+                                    @foreach (var u in Model.AssignableUsers)
+                                    {
+                                        <option value="@u.Id">@u.UserName</option>
+                                    }
+                                </select>
+
+                                <div class="d-flex gap-2 mt-2">
+                                    <button class="btn btn-sm btn-success"
+                                            onclick="confirmAssignTask(@task.Id)">
+                                        Save
+                                    </button>
+
+                                    <button class="btn btn-sm btn-secondary"
+                                            onclick="cancelAssignTask(@task.Id)">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- ASSIGN BUTTON -->
+                            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                            {
+                                <button class="btn btn-sm btn-outline-primary mt-2 assign-btn"
+                                        data-task-id="@task.Id"
+                                        onclick="showAssignDropdown(@task.Id); event.stopPropagation();">
+                                    Assign
+                                </button>
+                            }
+
 
                             <!-- 🗑 ADMIN DELETE -->
                             @if (User.IsInRole("Admin"))
@@ -222,13 +300,29 @@
                                     Delete
                                 </button>
                             }
-                            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                            @* @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                             {
                                 <button class="btn btn-sm btn-outline-primary mt-2 me-2"
                                         onclick="openAssignTaskModal(@task.Id)">
                                     Assign
                                 </button>
-                            }
+                            } *@
+
+
+                            <div class="task-actions text-end">
+                                <!-- Edit -->
+                                <i class="bi bi-pencil-square text-warning edit-task-btn"
+                                   onclick="enableTaskEdit(@task.Id); event.stopPropagation();"></i>
+
+                                <!-- Save -->
+                                <i class="bi bi-check-lg text-success d-none save-task-btn"
+                                   onclick="saveTaskEdit(@task.Id); event.stopPropagation();"></i>
+
+                                <!-- Cancel -->
+                                <i class="bi bi-x-lg text-danger d-none cancel-task-btn"
+                                   onclick="cancelTaskEdit(@task.Id); event.stopPropagation();"></i>
+                            </div>
+
 
                         </div>
 
@@ -457,6 +551,33 @@
     .task-focused-view .task-card {
         display: none;
     }
+
+
+    .task-card.editing {
+        border: 2px solid #0d6efd;
+        background: #f8f9ff;
+    }
+
+    .task-actions i {
+        cursor: pointer;
+        margin-left: 8px;
+    }
+
+    .task-assign-container {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+    }
+
+    .column-drag-handle {
+        padding: 4px 6px;
+        font-size: 14px;
+        user-select: none;
+    }
+
+        .column-drag-handle:active {
+            cursor: grabbing;
+        }
 
     </style>
 

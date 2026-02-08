@@ -7,6 +7,7 @@ using UserRoles.Data;
 using UserRoles.Models;
 using UserRoles.ViewModels;
 using UserRoles.Models.Enums;
+using UserRoles.DTOs;
 
 using TaskStatusEnum = UserRoles.Models.Enums.TaskStatus;
 
@@ -193,7 +194,8 @@ public class TasksController : Controller
         }
 
         await _context.SaveChangesAsync();
-        return Ok();
+        // ✅ RETURN JSON (IMPORTANT)
+        return Json(new { success = true });
     }
 
 
@@ -389,37 +391,7 @@ public class TasksController : Controller
     }
 
 
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> MoveTask([FromBody] MoveTaskRequest model)
-    {
-        var task = await _context.TaskItems
-            .Include(t => t.Column)
-            .FirstOrDefaultAsync(t => t.Id == model.TaskId);
-
-        if (task == null)
-            return NotFound();
-
-        var user = await _userManager.GetUserAsync(User);
-
-        // 🔐 ROLE RULES
-        var isAdmin = User.IsInRole("Admin");
-        var isManager = User.IsInRole("Manager") || User.IsInRole("SubManager");
-
-        if (!isAdmin && !isManager)
-        {
-            // normal user can only move own tasks
-            if (task.AssignedToUserId != user.Id)
-                return Forbid();
-        }
-
-        // Update column
-        task.ColumnId = model.ColumnId;
-
-        await _context.SaveChangesAsync();
-        return Ok();
-    }
-
+   
 
     private async Task<bool> CanUserSeeTask(TaskItem task, Users currentUser)
     {
@@ -454,7 +426,45 @@ public class TasksController : Controller
     }
 
 
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> MoveTask([FromBody] MoveTaskDto model)
+    {
+        if (model == null)
+            return BadRequest("Invalid payload");
 
+        // 🔹 Get task
+        var task = await _context.TaskItems
+            .FirstOrDefaultAsync(t => t.Id == model.TaskId);
 
+        if (task == null)
+            return NotFound("Task not found");
+
+        // 🔹 Get target column
+        var targetColumn = await _context.TeamColumns
+            .FirstOrDefaultAsync(c => c.Id == model.ColumnId);
+
+        if (targetColumn == null)
+            return NotFound("Target column not found");
+
+        // ✅ Move task to new column
+        task.ColumnId = targetColumn.Id;
+
+        // ✅ Sync status with column name
+        task.Status = targetColumn.ColumnName switch
+        {
+            "ToDo" => TaskStatusEnum.ToDo,
+            "Doing" => TaskStatusEnum.Doing,
+            "Review" => TaskStatusEnum.Review,
+            //"Done" => TaskStatusEnum.Done,
+            _ => task.Status
+        };
+
+        task.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok();
+    }
 }
 
