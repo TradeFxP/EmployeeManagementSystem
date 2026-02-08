@@ -73,7 +73,8 @@ namespace UserRoles.Services
                 {
                     var adminUser = new Users
                     {
-                        Name = "Admin",
+                        FirstName = "Admin",
+                        LastName = "Admin",
                         UserName = adminEmail,
                         NormalizedUserName = adminEmail.ToUpper(),
                         Email = adminEmail,

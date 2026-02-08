@@ -10,7 +10,7 @@
 <table class="table table-bordered table-hover align-middle">
     <thead class="table-light">
         <tr>
-            <th>Name</th>
+            <th>FirstName</th>
             <th>Email</th>
             <th style="width:420px;" class="text-center">Actions</th>
         </tr>
@@ -31,7 +31,14 @@
 
                     <td>
                         <input name="name"
-                               value="@manager.Name"
+                               value="@manager.FirstName"
+                               class="form-control form-control-sm"
+                               required />
+                    </td>
+
+                    <td>
+                        <input name="name"
+                               value="@manager.LastName"
                                class="form-control form-control-sm"
                                required />
                     </td>
@@ -54,7 +61,8 @@
                 else
                 {
                     <!-- READ MODE -->
-                    <td>@manager.Name</td>
+                    <td>@manager.FirstName</td>
+                    <td>@manager.LastName</td>
                     <td>@manager.Email</td>
 
                     <td class="text-center">

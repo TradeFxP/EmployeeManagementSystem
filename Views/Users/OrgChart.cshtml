@@ -69,7 +69,7 @@
                     <div class="org-box admin">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <strong>@admin?.Name</strong>
+                                <strong>@admin?.FirstName</strong>
                                 <div class="role">Admin</div>
                             </div>
 
@@ -100,12 +100,12 @@
                                     <div class="node-actions-top above-name">
                                         @if (currentRole == "Admin" || currentRole == "Manager")
                                         {
-                                            <a onclick="openEditModal('@auser.Id','@auser.Name','@auser.Email','User')">✏️</a>
+                                            <a onclick="openEditModal('@auser.Id','@auser.FirstName','@auser.Email','User')">✏️</a>
                                         }
 
                                         @if (currentRole == "Admin")
                                         {
-                                            <a onclick="openDeleteModal('@auser.Id','@auser.Name','User')">🗑</a>
+                                            <a onclick="openDeleteModal('@auser.Id','@auser.FirstName','User')">🗑</a>
                                         }
 
                                         @if (currentRole == "Admin" || currentRole == "Manager")
@@ -115,7 +115,7 @@
                                         }
                                     </div>
 
-                                    <div class="node-title">@auser.Name</div>
+                                    <div class="node-title">@auser.FirstName</div>
                                 </div>
                             }
                         </div>
@@ -143,11 +143,11 @@
                         <div class="node-actions-top above-name">
                             @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
                             {
-                                <a onclick="openEditModal('@manager.Id','@manager.Name','@manager.Email','Manager')">✏️</a>
+                                <a onclick="openEditModal('@manager.Id','@manager.FirstName','@manager.Email','Manager')">✏️</a>
                             }
                             @if (currentRole == "Admin")
                             {
-                                <a onclick="openDeleteModal('@manager.Id','@manager.Name','Manager')">🗑</a>
+                                <a onclick="openDeleteModal('@manager.Id','@manager.FirstName','Manager')">🗑</a>
                             }
 
                             @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
@@ -160,7 +160,7 @@
 
                         <div class="manager-header">
                             <div>
-                                <div class="node-title">@manager.Name</div>
+                                <div class="node-title">@manager.FirstName</div>
                                 <div class="role">Manager</div>
                             </div>
 
@@ -195,12 +195,12 @@
                                     <div class="node-actions-top above-name">
                                         @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
                                         {
-                                            <a onclick="openEditModal('@user.Id','@user.Name','@user.Email','User')">✏️</a>
+                                            <a onclick="openEditModal('@user.Id','@user.FirstName','@user.Email','User')">✏️</a>
                                         }
 
                                         @if (currentRole == "Admin")
                                         {
-                                            <a onclick="openDeleteModal('@user.Id','@user.Name','User')">🗑</a>
+                                            <a onclick="openDeleteModal('@user.Id','@user.FirstName','User')">🗑</a>
                                         }
 
                                         @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
@@ -210,9 +210,10 @@
                                         }
                                     </div>
 
-                                    <div class="node-title">@user.Name</div>                    
+                                    <div class="node-title">@user.FirstName</div>
                                 </div>
 
+                                 <div class="node-title">@user.LastName</div>
                             }
                         }
 

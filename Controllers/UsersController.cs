@@ -239,7 +239,8 @@ namespace UserRoles.Controllers
             var manager = await _userManager.FindByIdAsync(id);
             if (manager == null) return NotFound();
 
-            manager.Name = name.Trim();
+            manager.FirstName = name.Trim();
+            manager.LastName = name.Trim();
             manager.Email = email.Trim();
             manager.UserName = email.Trim();
 
@@ -422,7 +423,7 @@ namespace UserRoles.Controllers
             {
                 search = search.Trim().ToLower();
                 usersQuery = usersQuery.Where(u =>
-                    u.Name != null && u.Name.ToLower().Contains(search));
+                    u.FirstName != null && u.FirstName.ToLower().Contains(search));
             }
 
             // ================= EXECUTE QUERY =================
@@ -447,7 +448,7 @@ namespace UserRoles.Controllers
             // ================= SORT =================
             result = result
                 .OrderByDescending(x => x.Role == "Manager")
-                .ThenBy(x => x.User.Name)
+                .ThenBy(x => x.User.FirstName)
                 .ToList();
 
             // ================= PAGINATION (AFTER SEARCH) =================
@@ -497,7 +498,7 @@ namespace UserRoles.Controllers
                 term = term.Trim().ToLower();
 
                 query = query.Where(u =>
-                    (u.Name != null && u.Name.ToLower().Contains(term)) ||
+                    (u.FirstName != null && u.FirstName.ToLower().Contains(term)) ||
                     (u.Email != null && u.Email.ToLower().Contains(term))
                 );
             }
@@ -519,7 +520,7 @@ namespace UserRoles.Controllers
 
             result = result
                 .OrderByDescending(x => x.Role == "Manager")
-                .ThenBy(x => x.User.Name)
+                .ThenBy(x => x.User.FirstName)
                 .ToList();
 
             return PartialView("_UserSearchResults", result);
@@ -786,7 +787,7 @@ namespace UserRoles.Controllers
 
             var user = new Users
             {
-                Name = name,
+                FirstName = name,
                 Email = email,
                 UserName = email,
                 EmailConfirmed = true
@@ -913,7 +914,7 @@ namespace UserRoles.Controllers
                     return Forbid();
             }
 
-            user.Name = name;
+            user.FirstName = name;
             user.Email = email;
             user.UserName = email;
 

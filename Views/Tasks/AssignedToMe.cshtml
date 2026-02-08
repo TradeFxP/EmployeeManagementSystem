@@ -22,7 +22,7 @@
                         @t.Priority
                     </span>
                 </td>
-                <td>@t.AssignedBy?.Name</td>
+                <td>@t.AssignedBy?.FirstName</td>
                 <td>@t.CreatedAt.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</td>
             </tr>
         }

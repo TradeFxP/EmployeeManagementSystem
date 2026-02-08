@@ -26,11 +26,11 @@
         <div class="node-actions-top above-name">
             @if (currentRole == "Admin" || currentRole == "Manager")
             {
-                <a onclick="openEditModal('@Model.Id','@Model.Name','@Model.Email','SubManager')">✏️</a>
+                <a onclick="openEditModal('@Model.Id','@Model.FirstName','@Model.Email','SubManager')">✏️</a>
             }
             @if (currentRole == "Admin")
             {
-                <a onclick="openDeleteModal('@Model.Id','@Model.Name','SubManager')">🗑</a>
+                <a onclick="openDeleteModal('@Model.Id','@Model.FirstName','SubManager')">🗑</a>
             }
 
             @if (currentRole == "Admin" || currentRole == "Manager")
@@ -44,7 +44,7 @@
         <div class="manager-header">
 
             <div class="manager-text">
-                <div class="node-title">@Model.Name</div>
+                <div class="node-title">@Model.FirstName</div>
                 <div class="role">Sub Manager</div>
             </div>
 
@@ -83,12 +83,12 @@
                         <div class="node-actions-top above-name">
                             @if (currentRole == "Admin" || currentRole == "Manager")
                             {
-                                <a onclick="openEditModal('@user.Id','@user.Name','@user.Email','User')">✏️</a>
+                                <a onclick="openEditModal('@user.Id','@user.FirstName','@user.Email','User')">✏️</a>
                             }
 
                             @if (currentRole == "Admin")
                             {
-                                <a onclick="openDeleteModal('@user.Id','@user.Name','User')">🗑</a>
+                                <a onclick="openDeleteModal('@user.Id','@user.FirstName','User')">🗑</a>
                             }
 
                             @if (currentRole == "Admin" || currentRole == "Manager")
@@ -98,7 +98,7 @@
                             }
                         </div>
 
-                        <div class="node-title">@user.Name</div>
+                        <div class="node-title">@user.FirstName</div>
                     </div>
                 }
             </div>

@@ -31,6 +31,14 @@ namespace UserRoles.Data
             builder.Entity<DailyReport>()
                 .Property(r => r.Date)
                 .HasColumnType("date");
+            // ✅ Configure Users date fields
+            builder.Entity<Users>()
+                .Property(u => u.DateOfBirth)
+                .HasColumnType("date");
+
+            builder.Entity<Users>()
+                .Property(u => u.DateOfJoining)
+                .HasColumnType("date");
         }
     }
 }

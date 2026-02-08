@@ -57,7 +57,7 @@
                             @task.Priority
                         </span>
                     </td>
-                    <td>@task.AssignedTo?.Name</td>
+                    <td>@task.AssignedTo?.FirstName</td>
                     <td>@task.CreatedAt.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</td>
                 </tr>
             }

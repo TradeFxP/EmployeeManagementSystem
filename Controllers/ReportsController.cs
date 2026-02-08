@@ -94,7 +94,7 @@ namespace UserRoles.Controllers
                 new AddReportPanelViewModel
                 {
                     TargetUserId = userId,
-                    ReportOwnerName = user.Name ?? user.Email,
+                    ReportOwnerName = user.FirstName ?? user.Email,
                     Date = formattedDate
                 });
         }
@@ -162,8 +162,8 @@ namespace UserRoles.Controllers
                 if (reportOwner != null)
                 {
                     reportOwnerName =
-                        !string.IsNullOrWhiteSpace(reportOwner.Name)
-                            ? reportOwner.Name
+                        !string.IsNullOrWhiteSpace(reportOwner.FirstName)
+                            ? reportOwner.FirstName
                             : reportOwner.Email ?? "User";
                 }
             }
@@ -253,8 +253,8 @@ namespace UserRoles.Controllers
             if (reportOwner != null)
             {
                 reportOwnerName =
-                    !string.IsNullOrWhiteSpace(reportOwner.Name)
-                        ? reportOwner.Name
+                    !string.IsNullOrWhiteSpace(reportOwner.FirstName)
+                        ? reportOwner.FirstName
                         : reportOwner.Email ?? "User";
             }
 
@@ -420,8 +420,8 @@ namespace UserRoles.Controllers
 
             // ✅ Name priority: FirstName → UserName → fallback
             string displayName =
-                !string.IsNullOrWhiteSpace(owner?.Name)
-                    ? owner.Name
+                !string.IsNullOrWhiteSpace(owner?.FirstName)
+                    ? owner.FirstName
                     : owner?.UserName ?? "User";
 
             return View(new ReportViewModel
@@ -626,7 +626,7 @@ namespace UserRoles.Controllers
                 return BadRequest("No reports found");
 
             var user = await _userManager.FindByIdAsync(userId);
-            var userName = user?.Name ?? user?.Email ?? "User";
+            var userName = user?.FirstName ?? user?.Email ?? "User";
 
             var document = new ReportsPdfDocument(reports, userName);
 

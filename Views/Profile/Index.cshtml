@@ -5,7 +5,7 @@
 }
 
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-8">
         <div class="card shadow-sm">
 
             <div class="card-header bg-primary text-white">
@@ -25,14 +25,32 @@
                 @if (!Model.IsEditMode)
                 {
                     <dl class="row">
-                        <dt class="col-sm-4">Name</dt>
+                        <dt class="col-sm-4">FirstName</dt>
                         <dd class="col-sm-8">@Model.FirstName</dd>
+
+                        <dt class="col-sm-4">LastName</dt>
+                        <dd class="col-sm-8">@Model.LastName</dd>
 
                         <dt class="col-sm-4">Email</dt>
                         <dd class="col-sm-8">@Model.Email</dd>
 
-                        <dt class="col-sm-4">Mobile</dt>
+                        <dt class="col-sm-4">Mobile no</dt>
                         <dd class="col-sm-8">@Model.MobileNumber</dd>
+
+                        <dt class="col-sm-4">Alternate Mobile number</dt>
+                        <dd class="col-sm-8">@Model.AlternateMobileNumber</dd>
+
+                        <dt class="col-sm-4">Gender</dt>
+                        <dd class="col-sm-8">@Model.Gender</dd>
+
+                        <dt class="col-sm-4">Blood Group</dt>
+                        <dd class="col-sm-8">@Model.BloodGroup</dd>
+
+                        <dt class="col-sm-4">Date Of Birth</dt>
+                        <dd class="col-sm-8">@Model.DateOfBirth</dd>
+
+                        <dt class="col-sm-4">Date Of Joining</dt>
+                        <dd class="col-sm-8">@Model.DateOfJoining</dd> 
                     </dl>
 
                     <!-- 🔑 EDIT BUTTON (GET) -->
@@ -50,15 +68,41 @@
                         <input type="hidden" asp-for="IsEditMode" />
                         <input type="hidden" asp-for="CanEditEmail" />
 
-                        <div class="mb-3">
-                            <label asp-for="FirstName" class="form-label"></label>
-                            <input asp-for="FirstName" class="form-control" />
+                        <div class="row mb-3">
+                            <label asp-for="FirstName" class="col-sm-3 col-form-label" 
+                            title="Enter your First name"></label>
+                            <div class="col-sm-9">
+                            <input asp-for="FirstName" Maxlength="20" readonly class="form-control"
+                            onkeypress="return /^[A-Za-z\s]$/.test(event.key)" />
+                            
                             <span asp-validation-for="FirstName" class="text-danger"></span>
                         </div>
+                        </div>
 
-                        <div class="mb-3">
-                            <label asp-for="Email" class="form-label"></label>
 
+                        @* <div class="row mb-3">
+                            <label asp-for="FirstName" class="col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9">
+                                <input asp-for="FirstName" class="form-control" />
+                                <span asp-validation-for="FirstName" class="text-danger"></span>
+                            </div>
+                        </div> *@
+
+
+                        <div class=" row mb-3">
+                            <label asp-for="LastName" class=col-sm-3 col-form-label" title="Enter your Last name"></label>
+                            <div class="col-sm-9">
+                                <input asp-for="LastName" Maxlength="20" readonly class="form-control"
+                            onkeypress="return /^[A-Za-z\s]$/.test(event.key)" />
+                          
+                            <span asp-validation-for="LastName" class="text-danger"></span>
+                        </div>
+                        </div>
+
+                        <div class=" row mb-3">
+                            <label asp-for="Email" class=col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9">
+                             
                             @if (Model.CanEditEmail)
                             {
                                 <!-- 🔐 ADMIN CAN EDIT EMAIL -->
@@ -72,14 +116,73 @@
                                 <!-- 👤 USER / MANAGER READONLY -->
                                 <input asp-for="Email" class="form-control" readonly />
                             }
+                            <span asp-validation-for="Email" class="text-danger"></span>
+</div>
                         </div>
 
-                        <div class="mb-3">
-                            <label asp-for="MobileNumber" class="form-label"></label>
-                            <input asp-for="MobileNumber" class="form-control" />
+                        <div class="row mb-3">
+                            <label asp-for="MobileNumber" class=col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9"> 
+                            <input asp-for="MobileNumber" class="form-control" type="tel" 
+                            onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                            title="Enter your mobile number"
+                            maxlength="10"/>
                             <span asp-validation-for="MobileNumber" class="text-danger"></span>
+                            </div>
                         </div>
 
+                        <div class="row mb-3">
+                            <label asp-for="AlternateMobileNumber" class=col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9">
+                            <input asp-for="AlternateMobileNumber" class="form-control" type="tel"
+                                   onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                                   title="Enter your mobile number"
+                                   maxlength="10" />
+                            <span asp-validation-for="AlternateMobileNumber" class="text-danger"></span>
+                        </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label asp-for="Gender" class=col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9">
+                                <input type="radio" asp-for="Gender" value="Male" /> Male
+                                <input type="radio" asp-for="Gender" value="Female" /> Female
+                                <input type="radio" asp-for="Gender" value="Other" /> Other
+                            </div>
+                            <span asp-validation-for="Gender" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <label asp-for="BloodGroup" class=col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9">
+                            <select asp-for="BloodGroup" class="form-select">
+                                <option value="">-- Select --</option>
+                                <option value="A+">A+</option>
+                                <option value="A-">A-</option>
+                                <option value="B+">B+</option>
+                                <option value="B-">B-</option>
+                                <option value="O+">O+</option>
+                                <option value="O-">O-</option>
+                                <option value="AB+">AB+</option>
+                                <option value="AB-">AB-</option>
+                            </select>
+
+                            <span asp-validation-for="BloodGroup" class="text-danger"></span>
+                        </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label asp-for="DateOfBirth" class=col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9">
+                            <input asp-for="DateOfBirth" type="date" class="form-control"/>
+                            <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+                        </div>
+                        </div>
+                         <div class="row mb-3">
+                            <label asp-for="DateOfJoining" class=col-sm-3 col-form-label"></label>
+                            <div class="col-sm-9">
+                            <input asp-for="DateOfJoining" type="date" class="form-control"  />
+                            <span asp-validation-for="DateOfJoining" class="text-danger"></span>
+                        </div> 
+                        </div>
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-success">
                                 Save Changes
@@ -89,12 +192,21 @@
                                 Cancel
                             </a>
                         </div>
+                        <div class="d-flex column-gap-sm-2">
+                            
+                            <button type="reset" class="btn btn-warning">
+                                Reset
+                            </button>
+
+                        </div>
+
                     </form>
                 }
             </div>
         </div>
     </div>
-</div>
+   
+
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

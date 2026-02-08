@@ -6,11 +6,18 @@ namespace UserRoles.Models
 {
     public class Users : IdentityUser
     {
-        public string? Name { get; set; }
+        public string? FirstName { get; set; }
+
+        public string? LastName { get; set; }
 
         // ================= HIERARCHY =================
         public string? ParentUserId { get; set; }
 
+        
+        public string? Gender { get; set; }
+        public string? BloodGroup { get; set; }
+        public DateTime? DateOfBirth { get; set; }
+        public DateTime? DateOfJoining { get; set; }
         public string? ManagerId { get; set; }
 
         [ForeignKey("ManagerId")]
@@ -26,6 +33,8 @@ namespace UserRoles.Models
         [Phone]
         public string? MobileNumber { get; set; }
 
+        public string? AlternateMobileNumber { get; set; }
+
         // ================= ADMIN EMAIL CHANGE (NEW) =================
 
         /// <summary>
@@ -38,7 +47,7 @@ namespace UserRoles.Models
         /// One-time login code sent to PendingEmail.
         /// </summary>
         public string? EmailChangeLoginCode { get; set; }
-
+        
         /// <summary>
         /// Expiry time for EmailChangeLoginCode (eg: now + 10 minutes).
         /// </summary>

@@ -6,7 +6,7 @@
 }
 
 <h4 class="text-danger">
-    Delete Manager: <strong>@manager?.Name</strong>
+    Delete Manager: <strong>@manager?.FirstName</strong>
 </h4>
 
 @if (Model.Any())
@@ -23,7 +23,7 @@
                 <option value="ADMIN">Admin</option>
                 @foreach (var m in managers.Where(m => m.Id != manager.Id))
                 {
-                    <option value="@m.Id">@m.Name</option>
+                    <option value="@m.Id">@m.FirstName</option>
                 }
             </select>
         </div>
@@ -53,7 +53,7 @@
                                    name="selectedUserIds"
                                    value="@user.Id" />
                         </td>
-                        <td>@user.Name</td>
+                        <td>@user.FirstName</td>
                         <td>@user.Email</td>
                     </tr>
                 }

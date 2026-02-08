@@ -146,7 +146,8 @@
 
                             // ✅ Display Name (Name → Email fallback)
                             var displayName =
-                            currentUser?.Name
+                            currentUser?.FirstName
+                            ??currentUser?.LastName 
                             ?? currentUser?.Email
                             ?? User.Identity.Name;
 

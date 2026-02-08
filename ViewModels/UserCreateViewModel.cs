@@ -8,7 +8,12 @@ namespace UserRoles.ViewModels
         [Required(ErrorMessage = "Name is required.")]
         [StringLength(20, ErrorMessage = "Name must be letters only and maximum 20 characters.")]
         [RegularExpression(@"^[A-Za-z\s]+$", ErrorMessage = "Name must contain only letters.")]
-        public string Name { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "LastName is required.")]
+        [StringLength(20, ErrorMessage = "Name must be letters only and maximum 20 characters.")]
+        [RegularExpression(@"^[A-Za-z\s]+$", ErrorMessage = "Name must contain only letters.")]
+        public string LastName { get; set; } = string.Empty;
 
         // ================= EMAIL (PERFECT VALIDATION) =================
         [Required(ErrorMessage = "Email is required.")]

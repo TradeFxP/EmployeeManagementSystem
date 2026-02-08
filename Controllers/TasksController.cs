@@ -348,7 +348,7 @@ public class TasksController : Controller
     [Authorize(Roles = "Admin")]
     public IActionResult RenameColumn([FromBody] RenameColumnRequest model)
     {
-        if (model == null || model.ColumnId <= 0 || string.IsNullOrWhiteSpace(model.Name))
+        if (model == null || model.ColumnId <= 0 || string.IsNullOrWhiteSpace(model.LastName))
             return BadRequest("Invalid request");
 
         var col = _context.TeamColumns.Find(model.ColumnId);
@@ -356,7 +356,7 @@ public class TasksController : Controller
         if (col == null)
             return NotFound("Column not found");
 
-        col.ColumnName = model.Name.Trim();
+        col.ColumnName = model.LastName.Trim();
         _context.SaveChanges();
 
         return Ok();

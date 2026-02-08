@@ -71,7 +71,7 @@
             {
                 <i class="bi bi-chevron-right text-muted"></i>
                 <span class="badge rounded-pill bg-success px-3 py-2">
-                    @selectedManager.Name
+                    @selectedManager.FirstName
                 </span>
             }
 
@@ -80,12 +80,12 @@
             {
                 <i class="bi bi-chevron-right text-muted"></i>
                 <span class="badge rounded-pill bg-success px-3 py-2">
-                    @parentManager.Name
+                    @parentManager.FirstName
                 </span>
 
                 <i class="bi bi-chevron-right text-muted"></i>
                 <span class="badge rounded-pill bg-warning text-dark px-3 py-2">
-                    @selectedManager.Name
+                    @selectedManager.FirstName
                 </span>
             }
         </div>
@@ -188,7 +188,7 @@
 
                                 <td>
                                     <input name="Name"
-                                           value="@user.Name"
+                                       value="@user.FirstName"
                                            class="form-control form-control-sm"
                                            maxlength="20"
                                            required />
@@ -224,7 +224,7 @@
                             else
                             {
                                 <!-- ===== READ MODE ===== -->
-                                <td class="user-name">@user.Name</td>
+                            <td class="user-name">@user.FirstName</td>
                                 <td>@user.Email</td>
                                 <td>@role</td>
 
@@ -246,7 +246,7 @@
                                                 class="btn btn-info btn-sm"
                                                 onclick="openAssignModal(
                                 '@user.Id',
-                                '@user.Name',
+                                                '@user.FirstName',
                                 '@user.ParentUserId',
                                 '@(user.ParentUserId == null
                                                                     ? "Admin"
@@ -278,7 +278,7 @@
                                                 <!-- Manager delete → popup only -->
                                                 <button type="button"
                                                         class="btn btn-danger btn-sm"
-                                                        onclick="openManagerDeleteModal('@user.Id', '@user.Name')">
+                                                    onclick="openManagerDeleteModal('@user.Id', '@user.FirstName')">
                                                     Delete
                                                 </button>
                                             }
@@ -445,9 +445,13 @@
 
                         @foreach (var manager in assignableManagers)
                         {
-                            <option value="@manager.Id">@manager.Name</option>
+                            <option value="@manager.Id">@manager.FirstName</option>
                         }
 
+                        @foreach (var manager in assignableManagers)
+                        {
+                            <option value="@manager.Id">@manager.LastName</option>
+                        }
                     </select>
 
 

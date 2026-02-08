@@ -5,7 +5,10 @@ namespace UserRoles.ViewModels
     public class RegisterViewModel
     {
         [Required(ErrorMessage = "Name is required.")]
-        public string Name { get; set; }
+        public string FirstName { get; set; }
+
+        [Required(ErrorMessage = "LastName is required.")]
+        public string LastName { get; set; }
 
         [Required(ErrorMessage = "Email is required.")]
         [EmailAddress]

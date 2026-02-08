@@ -14,13 +14,13 @@
         {
             <a onclick="openEditModal(
                 '@Model.User.Id',
-                '@Model.User.Name',
+                    '@Model.User.FirstName',
                 '@Model.User.Email',
                 'User')">✏️</a>
 
             <a onclick="openDeleteModal(
                 '@Model.User.Id',
-                '@Model.User.Name',
+                    '@Model.User.FirstName',
                 'User')">🗑</a>
         }
 
@@ -35,7 +35,7 @@
 
     <!-- NAME -->
     <div class="node-title">
-        @Model.User.Name
+        @Model.User.FirstName
     </div>
 </div>
 
