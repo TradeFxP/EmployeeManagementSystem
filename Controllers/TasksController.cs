@@ -79,6 +79,25 @@ public class TasksController : Controller
         if (column == null)
             return BadRequest("Column not found");
 
+        // Generate WorkItemId if project is selected
+        string? workItemId = null;
+        if (model.ProjectId.HasValue && model.ProjectId.Value > 0)
+        {
+            var project = await _context.Projects
+                .Include(p => p.Tasks)
+                .FirstOrDefaultAsync(p => p.Id == model.ProjectId.Value);
+
+            if (project != null)
+            {
+                // Count existing tasks linked to this project
+                int taskCount = await _context.TaskItems
+                    .CountAsync(t => t.ProjectId == model.ProjectId.Value);
+
+                // Generate ID: P{projectId}T{taskNumber}
+                workItemId = $"P{project.Id}T{taskCount + 1}";
+            }
+        }
+
         var task = new TaskItem
         {
             Title = model.Title.Trim(),
@@ -86,6 +105,10 @@ public class TasksController : Controller
 
             ColumnId = column.Id,
             TeamName = column.TeamName,
+
+            // Project linkage
+            ProjectId = model.ProjectId,
+            WorkItemId = workItemId,
 
             Status = TaskStatusEnum.ToDo,
 
@@ -104,7 +127,8 @@ public class TasksController : Controller
         return Ok(new
         {
             success = true,
-            message = "Task created successfully"
+            message = "Task created successfully",
+            workItemId = workItemId
         });
 
     }
@@ -466,5 +490,80 @@ public class TasksController : Controller
 
         return Ok();
     }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetAllTeams()
+    {
+        // Get all unique team names from TeamColumns
+        var teams = await _context.TeamColumns
+            .Select(c => c.TeamName)
+            .Distinct()
+            .ToListAsync();
+
+        return Ok(teams);
+    }
+
+    public class AssignTaskToTeamRequest
+    {
+        public int TaskId { get; set; }
+        public string TeamName { get; set; }
+    }
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> AssignTaskToTeam([FromBody] AssignTaskToTeamRequest model)
+    {
+        if (model == null || model.TaskId <= 0 || string.IsNullOrWhiteSpace(model.TeamName))
+            return BadRequest("Invalid request");
+
+        var task = await _context.TaskItems.FindAsync(model.TaskId);
+        if (task == null)
+            return NotFound("Task not found");
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized();
+
+        // 1. Find the FIRST column for the target team
+        var targetColumn = await _context.TeamColumns
+            .Where(c => c.TeamName == model.TeamName)
+            .OrderBy(c => c.Order)
+            .FirstOrDefaultAsync();
+
+        if (targetColumn == null)
+            return BadRequest($"No columns found for team '{model.TeamName}'. Create columns first.");
+
+        // 2. Update Task
+        task.TeamName = model.TeamName;
+        task.ColumnId = targetColumn.Id;
+        
+        // 3. Update Status based on the new column name (optional but good for consistency)
+        // If the column name matches a known status, update it. Otherwise, keep it or set to generic.
+        // For now, let's try to map it if possible, or default to ToDo if it's the first column
+        if (targetColumn.ColumnName.Contains("Todo", StringComparison.OrdinalIgnoreCase) || 
+            targetColumn.ColumnName.Contains("To Do", StringComparison.OrdinalIgnoreCase))
+        {
+            task.Status = TaskStatusEnum.ToDo;
+        }
+        else if (targetColumn.Order == 1) 
+        {
+            // If it's the first column, it's likely ToDo
+            task.Status = TaskStatusEnum.ToDo;
+        }
+
+        task.UpdatedAt = DateTime.UtcNow;
+        task.AssignedByUserId = user.Id; // The one who moved it
+        task.AssignedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new 
+        { 
+            success = true, 
+            message = $"Task moved to {model.TeamName} ({targetColumn.ColumnName})" 
+        });
+    }
 }
+
 

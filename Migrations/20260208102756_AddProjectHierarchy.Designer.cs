@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260208102756_AddProjectHierarchy")]
+    partial class AddProjectHierarchy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -435,9 +438,6 @@ namespace UserRoles.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("ProjectId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -468,31 +468,9 @@ namespace UserRoles.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("ProjectId");
-
                     b.HasIndex("StoryId");
 
                     b.ToTable("TaskItems");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Team", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Teams");
                 });
 
             modelBuilder.Entity("UserRoles.Models.TeamColumn", b =>
@@ -794,10 +772,6 @@ namespace UserRoles.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("UserRoles.Models.Project", "Project")
-                        .WithMany("Tasks")
-                        .HasForeignKey("ProjectId");
-
                     b.HasOne("UserRoles.Models.Story", "Story")
                         .WithMany("Tasks")
                         .HasForeignKey("StoryId");
@@ -809,8 +783,6 @@ namespace UserRoles.Migrations
                     b.Navigation("Column");
 
                     b.Navigation("CreatedByUser");
-
-                    b.Navigation("Project");
 
                     b.Navigation("Story");
                 });
@@ -848,8 +820,6 @@ namespace UserRoles.Migrations
             modelBuilder.Entity("UserRoles.Models.Project", b =>
                 {
                     b.Navigation("Epics");
-
-                    b.Navigation("Tasks");
                 });
 
             modelBuilder.Entity("UserRoles.Models.Story", b =>

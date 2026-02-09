@@ -19,6 +19,13 @@ namespace UserRoles.Data
 
         public DbSet<UserTeam> UserTeams { get; set; }
 
+        // Project Management Hierarchy
+        public DbSet<Project> Projects { get; set; }
+        public DbSet<Epic> Epics { get; set; }
+        public DbSet<Feature> Features { get; set; }
+        public DbSet<Story> Stories { get; set; }
+
+        public DbSet<Team> Teams { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

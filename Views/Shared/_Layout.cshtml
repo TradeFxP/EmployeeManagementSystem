@@ -23,7 +23,7 @@
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
-    <script src="~/js/tasks.js"></script>
+    <script src="~/js/tasks.js" asp-append-version="true"></script>
 
 
 
@@ -51,7 +51,16 @@
     </style>
 </head>
 
-<body>
+@{
+    string userRole = "";
+    if (User.Identity.IsAuthenticated)
+    {
+        if (User.IsInRole("Admin")) { userRole = "Admin"; }
+        else if (User.IsInRole("Manager")) { userRole = "Manager"; }
+        else if (User.IsInRole("User")) { userRole = "User"; }
+    }
+}
+<body data-role="@userRole">
 
 
     <header>
@@ -196,7 +205,7 @@
     <script src="~/js/site.js"></script>
 
     <!-- Org chart JS (exposes openEditModal, openDeleteModal, openAddModal, openAddReportInline, etc.) -->
-    <script src="~/js/orgchart.js"></script>
+    <script src="~/js/orgchart.js" asp-append-version="true"></script>
 
     <!-- Page-specific scripts -->
     @await RenderSectionAsync("Scripts", required: false)

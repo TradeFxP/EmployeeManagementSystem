@@ -24,6 +24,28 @@
             
             @if (isAdmin)
             {
+                <!-- ================= PROJECT SECTION (NEW) ================= -->
+                <button type="button"
+                        class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
+                        onclick="toggleProjectPanel()">
+                    <span>
+                        <i class="bi bi-diagram-3 me-2"></i> Project
+                    </span>
+                    <span id="projectArrow">▼</span>
+                </button>
+
+                <!-- Project Dropdown -->
+                <div id="projectDropdown" style="display:none;">
+                    <div id="projectList">
+                        <!-- Dynamically loaded projects -->
+                    </div>
+                    <button type="button"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4 text-primary"
+                            onclick="openCreateProjectModal()">
+                        <i class="bi bi-plus-lg me-2"></i> New Project
+                    </button>
+                </div>
+
                 <!-- ================= ADMIN: TEAM TASKS ================= -->
 
 
@@ -40,26 +62,27 @@
 
                 <!-- Team Tasks Dropdown -->
                 <div id="teamTasksDropdown" style="display:none;">
-                    <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
-                            data-team="Development"
-                            onclick="loadTeamBoard('Development')">
-                        <i class="bi bi-code-slash me-2"></i> Development Team
-                    </button>
+                    <div id="adminTeamList">
+                        <!-- Dynamically loaded teams -->
+                    </div>
+                   
+                    <div class="mt-2 border-top pt-2 ps-3 pe-3">
+                         <div id="addTeamInputContainer" style="display:none;" class="mb-2">
+                            <input type="text" id="newTeamNameInput" 
+                                   class="form-control form-control-sm" 
+                                   placeholder="Enter team name..." />
+                            <div class="d-flex justify-content-end mt-1">
+                                <button class="btn btn-xs btn-secondary me-1" onclick="toggleAddTeamInput()">Cancel</button>
+                                <button class="btn btn-xs btn-primary" onclick="submitCreateTeam()">Add</button>
+                            </div>
+                         </div>
 
-                    <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
-                            data-team="Testing"
-                            onclick="loadTeamBoard('Testing')">
-                        <i class="bi bi-bug-fill me-2"></i> Testing Team
-                    </button>
-
-                    <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
-                            data-team="Sales"
-                            onclick="loadTeamBoard('Sales')">
-                        <i class="bi bi-briefcase-fill me-2"></i> Sales Team
-                    </button>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-secondary w-100 text-start"
+                                onclick="toggleAddTeamInput()">
+                            <i class="bi bi-plus-circle me-2"></i> Add Team
+                        </button>
+                    </div>
                 </div>
             }
             else
@@ -167,6 +190,15 @@
                         <label class="form-label">Description</label>
                         <textarea id="taskDescription" class="form-control"></textarea>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Link to Project (optional - for auto ID)</label>
+                        <select id="taskProjectId" class="form-select">
+                            <option value="">-- No Project --</option>
+                            <!-- Dynamically loaded -->
+                        </select>
+                        <small class="text-muted">Selecting a project generates an ID like P1T1, P1T2...</small>
+                    </div>
                 </div>
 
                 <div class="modal-footer">
@@ -221,6 +253,32 @@
                     </button>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE PROJECT MODAL -->
+    <div class="modal fade" id="createProjectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-folder-plus me-2"></i>Create Project</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Project Name</label>
+                        <input type="text" id="newProjectName" class="form-control" placeholder="Enter project name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description (optional)</label>
+                        <textarea id="newProjectDescription" class="form-control" rows="3" placeholder="Project description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitCreateProject()">Create Project</button>
+                </div>
             </div>
         </div>
     </div>
@@ -284,11 +342,246 @@
         dropdown.style.display = isOpen ? "none" : "block";
         arrow.innerText = isOpen ? "▼" : "▲";
     }
+
+    // ===== PROJECT PANEL =====
+    function toggleProjectPanel() {
+        const dropdown = document.getElementById("projectDropdown");
+        const arrow = document.getElementById("projectArrow");
+
+        if (!dropdown) return;
+
+        const isOpen = dropdown.style.display === "block";
+        dropdown.style.display = isOpen ? "none" : "block";
+        arrow.innerText = isOpen ? "▼" : "▲";
+
+        if (!isOpen) {
+            loadProjectList();
+        }
+    }
+
+    function loadProjectList() {
+        fetch('/Project/GetProjects')
+            .then(res => res.json())
+            .then(projects => {
+                const container = document.getElementById('projectList');
+                if (projects.length === 0) {
+                    container.innerHTML = '<div class="text-muted ps-4 py-2">No projects yet</div>';
+                    return;
+                }
+
+                container.innerHTML = projects.map(p => `
+                    <div class="d-flex align-items-center justify-content-between group-hover-container px-0">
+                        <button type="button"
+                                class="list-group-item list-group-item-action bg-dark text-white project-btn flex-grow-1 text-start border-0 py-2 ps-4"
+                                data-project-id="${p.id}"
+                                onclick="loadProjectBoard(${p.id})">
+                            <i class="bi bi-folder2 me-2"></i> ${p.name}
+                        </button>
+                        <button class="btn btn-sm btn-link text-danger p-0 me-2" 
+                                style="opacity:0.5;"
+                                onmouseover="this.style.opacity=1"
+                                onmouseout="this.style.opacity=0.5"
+                                onclick="event.stopPropagation(); deleteProject(${p.id}, '${p.name}')" 
+                                title="Delete Project">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+            })
+            .catch(() => {
+                document.getElementById('projectList').innerHTML = 
+                    '<div class="text-danger ps-4 py-2">Failed to load</div>';
+            });
+    }
+
+    function loadProjectBoard(projectId) {
+        const container = document.getElementById('taskBoardContainer');
+        container.innerHTML = "<div class='text-muted p-3'>Loading project...</div>";
+
+        // Clear team button highlights
+        document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.project-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`[data-project-id="${projectId}"]`)?.classList.add('active');
+
+        fetch(`/Project/Board/${projectId}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load project board");
+                return res.text();
+            })
+            .then(html => {
+                container.innerHTML = html;
+                
+                // Execute scripts from the dynamically loaded content
+                const scripts = container.querySelectorAll('script');
+                scripts.forEach(script => {
+                    const newScript = document.createElement('script');
+                    if (script.src) {
+                        newScript.src = script.src;
+                    } else {
+                        newScript.textContent = script.textContent;
+                    }
+                    document.body.appendChild(newScript);
+                    // Remove after execution to avoid duplicates
+                    setTimeout(() => newScript.remove(), 100);
+                });
+            })
+            .catch(err => {
+                container.innerHTML = "<div class='text-danger'>Error loading project</div>";
+                console.error(err);
+            });
+    }
+
+    function openCreateProjectModal() {
+        document.getElementById('newProjectName').value = '';
+        document.getElementById('newProjectDescription').value = '';
+        new bootstrap.Modal(document.getElementById('createProjectModal')).show();
+    }
+
+    function submitCreateProject() {
+        const data = {
+            name: document.getElementById('newProjectName').value.trim(),
+            description: document.getElementById('newProjectDescription').value.trim()
+        };
+
+        if (!data.name) {
+            alert('Project name is required');
+            return;
+        }
+
+        fetch('/Project/CreateProject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to create project');
+            return res.json();
+        })
+        .then(result => {
+            bootstrap.Modal.getInstance(document.getElementById('createProjectModal'))?.hide();
+            loadProjectList();
+            loadProjectBoard(result.id);
+        })
+        .catch(err => alert(err.message));
+    }
 </script>
 
 <script>
     // expose admin flag to JS as boolean
     const __isTasksAdmin = @((isAdmin).ToString().ToLower());
+
+    // ===== ADMIN TEAM MANAGEMENT =====
+
+    function toggleAddTeamInput() {
+        const container = document.getElementById('addTeamInputContainer');
+        const input = document.getElementById('newTeamNameInput');
+        
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            input.value = '';
+            input.focus();
+            
+            // Enter key to submit
+            input.onkeydown = function(e) {
+                if(e.key === 'Enter') submitCreateTeam();
+            };
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    function submitCreateTeam() {
+        const input = document.getElementById('newTeamNameInput');
+        const name = input.value.trim();
+        
+        if (!name) {
+             toggleAddTeamInput();
+             return;
+        }
+
+        fetch('/Teams/Create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Name: name })
+        })
+        .then(res => {
+            if(!res.ok) return res.text().then(t => { throw new Error(t); });
+            return res.json();
+        })
+        .then(() => {
+            toggleAddTeamInput();
+            loadAdminTeamList(); // Refresh list
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Failed to add team: ' + err.message);
+        });
+    }
+
+    function loadAdminTeamList() {
+        const container = document.getElementById('adminTeamList');
+        if(!container) return;
+
+        fetch('/Teams/GetAll')
+        .then(res => res.json())
+        .then(teams => {
+            if(teams.length === 0) {
+                 container.innerHTML = '<div class="text-muted ps-4 py-2 small">No teams found</div>';
+                 return;
+            }
+
+            container.innerHTML = teams.map(t => `
+               <div class="d-flex align-items-center justify-content-between group-hover-container px-0">
+                    <button type="button"
+                            class="list-group-item list-group-item-action bg-dark text-white team-btn flex-grow-1 text-start border-0 py-2 ps-4"
+                            data-team="${t.name}"
+                            onclick="loadTeamBoard('${t.name}')">
+                        <i class="bi bi-people me-2"></i> ${t.name}
+                    </button>
+                    
+                    <button class="btn btn-sm btn-link text-danger p-0 me-2" 
+                            style="opacity:0.5;"
+                            onmouseover="this.style.opacity=1"
+                            onmouseout="this.style.opacity=0.5"
+                            onclick="deleteTeam(${t.id}, '${t.name}')" 
+                            title="Delete Team">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+            
+            // Re-highlight if needed
+            if(typeof currentTeamName !== 'undefined') {
+                 document.querySelectorAll(`.team-btn[data-team="${currentTeamName}"]`)
+                         .forEach(b => b.classList.add('active'));
+            }
+        });
+    }
+
+    function deleteTeam(id, name) {
+        if(!confirm(`Delete team '${name}'? This cannot be undone.`)) return;
+
+        fetch('/Teams/Delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(id)
+        })
+        .then(res => {
+             if(!res.ok) throw new Error('Failed to delete');
+             loadAdminTeamList();
+             // clear board if deleted team was active
+             const boardContainer = document.getElementById('taskBoardContainer');
+             boardContainer.innerHTML = '';
+        })
+        .catch(err => alert(err.message));
+    }
+
+    // Load initially if Admin
+    document.addEventListener('DOMContentLoaded', function() {
+        if(__isTasksAdmin) {
+            loadAdminTeamList();
+        }
+    });
 
     // open add column modal (admin only)
     function openAddColumnModal(teamName) {
@@ -591,14 +884,38 @@
         document.getElementById('taskTitle').value = '';
         document.getElementById('taskDescription').value = '';
 
+        // Load projects into dropdown
+        loadProjectsForTaskModal();
+
         new bootstrap.Modal(document.getElementById('createTaskModal')).show();
     }
 
+    function loadProjectsForTaskModal() {
+        const select = document.getElementById('taskProjectId');
+        if (!select) return;
+
+        fetch('/Project/GetProjects')
+            .then(res => res.json())
+            .then(projects => {
+                select.innerHTML = '<option value="">-- No Project --</option>';
+                projects.forEach(p => {
+                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                });
+            })
+            .catch(() => {
+                select.innerHTML = '<option value="">-- No Project --</option>';
+            });
+    }
+
     function submitCreateTask() {
+        const projectSelect = document.getElementById('taskProjectId');
+        const projectId = projectSelect?.value ? parseInt(projectSelect.value) : null;
+
         const data = {
             columnId: parseInt(document.getElementById('taskColumnId').value),
             title: document.getElementById('taskTitle').value.trim(),
-            description: document.getElementById('taskDescription').value.trim()
+            description: document.getElementById('taskDescription').value.trim(),
+            projectId: projectId
         };
 
         fetch('/Tasks/CreateTask', {
@@ -938,6 +1255,24 @@
             // reload board to recover UI
             loadTeamBoard(currentTeamName);
         });
+    }
+
+    function deleteProject(id, name) {
+        if(!confirm(`Delete project '${name}' and all its contents? This cannot be undone.`)) return;
+
+        fetch('/Project/DeleteProject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(id)
+        })
+        .then(res => {
+             if(!res.ok) throw new Error('Failed to delete project');
+             loadProjectList();
+             // clear board if deleted project was active
+             const boardContainer = document.getElementById('taskBoardContainer');
+             boardContainer.innerHTML = '';
+        })
+        .catch(err => alert(err.message));
     }
 
 </script>

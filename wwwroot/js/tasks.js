@@ -164,47 +164,30 @@ $(document).on("dragover", ".kanban-column", function (e) {
 $(document).on("drop", ".kanban-column", function (e) {
     e.preventDefault();
 
+    // 🔥 IGNORE IF NOT DRAGGING A TASK (e.g. column drag)
+    if (!draggedTaskId) return;
+
     const targetStatus = $(this).data("status");
 
-    if (!isMoveAllowed(draggedFromStatus, targetStatus)) {
-        alert("You are not allowed to move this task.");
-        return;
-    }
 
-    $.post("/Tasks/UpdateStatus", {
-        taskId: draggedTaskId,
-        newStatus: targetStatus
-    })
-        .done(() => {
-            location.reload();
-        })
-        .fail(() => {
-            alert("Status update failed");
-        });
+
+    // $.post("/Tasks/UpdateStatus", {
+    //     taskId: draggedTaskId,
+    //     newStatus: targetStatus
+    // })
+    //     .done(() => {
+    //         location.reload();
+    //     })
+    //     .fail(() => {
+    //         alert("Status update failed");
+    //     });
 });
 
 
 
 function isMoveAllowed(from, to) {
-
-    // SAME COLUMN
     if (from === to) return false;
-
-    const role = document.body.dataset.role; // we’ll add this next
-
-    if (role === "User") {
-        return (
-            (from === "ToDo" && to === "Doing") ||
-            (from === "Doing" && to === "Review")
-        );
-    }
-
-    // Admin / Manager / Sub-Manager
-    return (
-        (from === "ToDo" && to === "Doing") ||
-        (from === "Doing" && to === "Review") ||
-        (from === "Review" && to === "Complete")
-    );
+    return true; // Allow all moves
 }
 
 
