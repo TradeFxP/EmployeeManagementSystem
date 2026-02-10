@@ -19,7 +19,7 @@ namespace UserRoles.Data
 
         public DbSet<UserTeam> UserTeams { get; set; }
 
-
+        public DbSet<EMSHierarchy> EMSHierarchy { get; set; }
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

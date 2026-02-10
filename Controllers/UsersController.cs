@@ -725,16 +725,18 @@ namespace UserRoles.Controllers
                 }
 
                 // Role adjustments
-                if (targetRole == "Manager")
-                {
-                    if (!await _userManager.IsInRoleAsync(existing, "Manager"))
-                    {
-                        if (!await _roleManager.RoleExistsAsync("Manager"))
-                            await _roleManager.CreateAsync(new IdentityRole("Manager"));
+                const string roleName = "Manager";
 
-                        await _userManager.AddToRoleAsync(existing, "Manager");
-                    }
+                if (!await _roleManager.RoleExistsAsync(roleName))
+                {
+                    await _roleManager.CreateAsync(new IdentityRole(roleName));
                 }
+
+                if (!await _userManager.IsInRoleAsync(existing, roleName))
+                {
+                    await _userManager.AddToRoleAsync(existing, roleName);
+                }
+
                 else // targetRole == "User"
                 {
                     if (await _userManager.IsInRoleAsync(existing, "Manager"))

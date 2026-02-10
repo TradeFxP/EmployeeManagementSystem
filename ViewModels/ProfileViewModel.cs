@@ -20,6 +20,27 @@ namespace UserRoles.ViewModels
         [RegularExpression(@"^\d{10}$", ErrorMessage = "Mobile number must be exactly 10 digits.")]
         public string MobileNumber { get; set; }
 
+        //[Required]
+        //[RegularExpression(@"^\d{10}$", ErrorMessage = "Mobile number must be exactly 10 digits.")]
+
+        //public string AlternativeMobileNumber { get; set; }
+        //[Required]
+        //[Display(Name = "UserRole")]
+        //public string UserRole { get; set; }
+        ////public string Address { get; set; }
+
+        //[Required]
+        //public string BloodGroup { get; set; }
+        //[Required]
+        //[Display(Name = "Date of Joining")]
+        //public DateTime? DateOfJoing { get; set; }
+        //[Required]
+        //[Display(Name = "Date of Birth")]
+        //public DateTime? DateOfBirth { get; set; }
+
+
+
+
         // View state
         public bool IsEditMode { get; set; }
 

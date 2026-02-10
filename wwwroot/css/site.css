@@ -419,6 +419,8 @@ body {
     padding: 20px;
 }
 
+/* ================= TREE LAYOUT ================= */
+
 /* MANAGER BLOCK */
 .tree-manager {
     margin-bottom: 30px;
@@ -429,9 +431,38 @@ body {
     margin-left: 40px;
     margin-top: 10px;
     display: flex;
-    flex-direction: column; /* 🔴 VERY IMPORTANT */
+    flex-direction: column;
     gap: 10px;
 }
+    /* ================= USER BOX SPACING ================= */
+
+    /* Space between green user boxes */
+    .tree-users .org-box.user {
+        margin-bottom: 12px;
+    }
+/* If users are directly under admin */
+.org-box.admin + .org-box.user,
+.org-box.admin ~ .org-box.user {
+    margin-top: 10px;
+}
+
+
+/* Extra spacing between admin users */
+.org-box.admin ~ .org-box.user {
+    margin-bottom: 10px;
+}
+
+/* Optional indent for admin users */
+.org-box.admin ~ .org-box.user {
+    margin-left: 20px;
+}
+/* Admin → User spacing */
+.org-admin-users {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 
 /* DRAG RULES */
 .manager {
@@ -532,6 +563,7 @@ body {
     flex-direction: column;
     align-items: flex-start;
 }
+
 
 
 /* RIGHT PANEL (Reports / Details) */
@@ -719,3 +751,112 @@ body {
         background-color: #f0f8ff;
         border-radius: 6px;
     }
+/* ===============================
+   BASIC RESET
+================================ */
+body {
+    font-family: Arial, sans-serif;
+    background: #f8fafc;
+}
+
+.org-tree {
+    padding: 30px;
+}
+
+/* ===============================
+   ORG BOXES
+================================ */
+.org-box {
+    position: relative;
+    width: 220px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    color: white;
+    margin: 14px 0;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.15);
+}
+
+.admin {
+    background: #1e293b;
+}
+
+.manager {
+    background: #2563eb;
+}
+
+.user {
+    background: #22c55e;
+    width: 200px;
+}
+
+/* + BUTTON */
+.add-btn {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.25);
+    color: black;
+}
+
+/* ===============================
+   TREE CONNECTORS (├── └──)
+================================ */
+
+/* Admin → Users container */
+#children-ADMIN,
+.tree-users {
+    position: relative;
+    margin-left: 40px;
+    padding-left: 25px;
+    border-left: 2px solid #475569; /* DARK GREY */
+}
+    /* User box */
+    #children-ADMIN .org-box.user,
+    .tree-users .org-box.user {
+        position: relative;
+        margin: 14px 0;
+    }
+
+        #children-ADMIN .org-box.user::before,
+        .tree-users .org-box.user::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: -27px;
+            width: 27px;
+            border-top: 2px solid #475569; /* DARK GREY */
+        }
+
+.org-box.user:last-child::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -27px;
+    height: 100%;
+    border-left: 2px solid #475569; /* DARK GREY */
+}
+.tree-branch,
+.tree-users {
+    position: relative;
+    margin-left: 40px;
+    padding-left: 25px;
+    border-left: 2px solid #475569;
+}
+
+/* ===============================
+   COLORS FOR LINES
+================================ */
+#children-ADMIN {
+    color: #334155;
+}
+
+.tree-users {
+    color: #2563eb;
+}
+

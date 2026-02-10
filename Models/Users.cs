@@ -25,6 +25,13 @@ namespace UserRoles.Models
         // ================= CONTACT =================
         [Phone]
         public string? MobileNumber { get; set; }
+        //public string? AlternativeMobileNumber { get; set; }
+        //public string? UserRole { get; set; }
+        ////public string Address { get; set; }
+        //public string BloodGroup { get; set; }
+        //public DateTime? DateOfJoing { get; set; }
+        //public DateTime? DateOfBirth { get; set; }
+
 
         // ================= ADMIN EMAIL CHANGE (NEW) =================
 

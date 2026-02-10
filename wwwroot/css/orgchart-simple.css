@@ -1,455 +1,293 @@
-﻿/* ================= CONTAINER ================= */
-.org-wrapper {
-    padding: 40px;
-    text-align: center;
-    overflow-x: auto;
-}
-
-/* ================= ADMIN ================= */
-/* Changed to column so admin-held users render below the admin box */
-.org-admin {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start; 
-    margin-bottom: 20px;
-    gap: 12px;
-}
-
-/* ================= LINES ================= */
-
-
-
-    /* smaller vertical line */
-    .org-line.small {
-        height: 25px;
-    }
-
-/* horizontal manager connector */
-.org-managers {
-    position: relative;
-}
-
-    .org-managers::before {
-        content: "";
-        position: absolute;
-        top: -20px;
-        left: 5%;
-        right: 5%;
-        height: 3px;
-        background-color: #94a3b8;
-    }
-
-
-/* ================= MANAGERS ================= */
-.org-managers {
-    display: flex;
-    justify-content: center;
-    gap: 60px;
-    position: relative;
-}
-
-    /* horizontal line connecting managers */
-    .org-managers::before {
-        content: "";
-        position: absolute;
-        top: -15px;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background-color: #cbd5e1;
-    }
-
-/* ================= MANAGER COLUMN ================= */
-.org-manager-column {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-/* ================= USERS ================= */
-.org-users {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-/* ================= BOXES ================= */
-.org-box {
-    padding: 12px 20px;
-    border-radius: 8px;
-    min-width: 160px;
-    font-size: 14px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-}
-
-    /* ADMIN */
-    .org-box.admin {
-        background: #1e293b;
-        color: #fff;
-    }
-
-    /* MANAGER */
-    .org-box.manager {
-        background: #2563eb;
-        color: #fff;
-    }
-
-    /* USER */
-    .org-box.user {
-        background: #22c55e;
-        color: #fff;
-    }
-
-/* ================= TEXT ================= */
-.role {
-    font-size: 12px;
-    opacity: 0.85;
-}
-
-.org-empty {
-    font-size: 12px;
-    color: #888;
-}
-
-.org-box:hover {
-    transform: translateY(-2px);
-    transition: 0.2s;
-}
-
-
-/* ================= PLUS ICON ================= */
-.org-plus {
-    background: rgba(255,255,255,0.25);
-    border-radius: 50%;
-    padding: 4px 8px;
-    font-size: 14px;
-    color: #fff;
-    text-decoration: none;
-    margin-left: 8px;
-}
-
-    .org-plus:hover {
-        background: rgba(255,255,255,0.4);
-        color: #fff;
-    }
-
-.org-box:hover {
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.3);
-}
-
-
-/* ================= NODE SELECTION ACTIONS ================= */
-
-.org-node {
-    position: relative;
-    cursor: pointer;
-}
-/* ================= ICON VISIBILITY CONTROL ================= */
-
-/* Hide icons by default */
-.node-actions-top {
-    display: none;
-    position: absolute;
-    top: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #fff;
-    padding: 4px 6px;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    gap: 8px;
-    z-index: 999;
-    pointer-events: auto;
-}
-
-/* Show icons ONLY when selected */
-.org-node.selected .node-actions-top {
-    display: flex;
-}
-
-/* Optional highlight */
-.org-node.selected {
-    outline: 3px solid #0d6efd;
-    outline-offset: 3px;
-    position: relative;
-}
-
-/* ================= NODE SELECTION SPACE ================= */
-
-/* default: NO space */
-.org-node {
-    position: relative;
-    cursor: pointer;
-}
-
-    /* space appears ONLY when selected */
-    .org-node.selected {
-        padding-top: 36px; /* creates space above name */
-    }
-
-    /* ================= ICON CONTAINER ================= */
-
-.node-actions-top {
-    display: none;
-    position: absolute;
-    top: 6px; /* sits inside padding-top space */
-    left: 50%;
-    transform: translateX(-50%);
-    background: #ffffff;
-    padding: 4px 6px;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    gap: 8px;
-    z-index: 10;
-}
-/* Show icons on hover OR selected */
-.org-node:hover .node-actions-top,
-.org-node.selected .node-actions-top {
-    display: flex;
-}
-
-
-
-/* ================= ADMIN HOD USERS ================= */       
-/* Render admin-held users as a vertical stack under the admin box (green user boxes) */
-.org-admin-users {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: center;
-}
-
-/* Admin-held users should use the user style (green). If specific override needed, keep this rule. */
-.org-admin-users .org-box {
-    background: #22c55e;
-    color: #fff;
-}
-
-/* Optional label */
-.admin-add-user span {
-    font-size: 12px;
-    opacity: 0.9;
-}
-
-/* ===== SMALLER MANAGER BOX ===== */
-.org-box.manager.small {
-    width: 160px;
-    height: 70px;
-    font-size: 14px;
-}
-
-/* ===== EXTRA SMALL BOXES ===== */
-.org-box.xsmall {
-    width: 140px;
-    height: 52px;
-    font-size: 12px;
-}
-
-/* ===== CHILD LAYOUT ===== */
-.org-children-row {
-    display: flex;
-    gap: 30px;
-    margin-top: 22px;
-}
-
-/* LEFT: SUB MANAGERS */
-.org-submanagers {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-end;
-}
-
-/* RIGHT: USERS */
-.org-users {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-}
-
-/* ================= ADMIN BOX ================= */
-.org-box.admin {
-    width: 100px;
-    height: 70px;
-    font-size: 15px;
-}
-
-/* ================= MANAGER BOX ================= */
-.org-box.manager {
-    width: 170px; /* reduced */
-    height: 60px; /* reduced */
-    font-size: 14px;
-    border-radius: 10px;
-}
-
-/* ================= USER BOX ================= */
-.org-box.user {
-    width: 40px; /* reduced */
-    height: 50px; /* reduced */
-    font-size: 13px;
-    border-radius: 8px;
-}
-
-/* ================= ADMIN HOLD BOX ================= */
-.admin-hold-node {
-    background: #2563eb; /* not used for admin-held users; kept for compatibility */
-}
-
-/* ================= COLUMN LAYOUT ================= */
-.org-managers {
-    display: flex;
-    align-items: flex-start;
-    gap: 40px; /* spacing between columns */
-    justify-content: center;
-    flex-wrap: nowrap; /* CRITICAL: prevents Admin Users going down */
-}
-
-/* ================= USERS STACK ================= */
-.org-users {
-    margin-top: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-/* ================= EMPTY TEXT ================= */
-.org-empty {
-    font-size: 13px;
-    color: #777;
-    margin-top: 8px;
-    text-align: center;
-}
-
-
-/* ================= ICONS ABOVE NAME ================= */
-
-/* Container */
-.node-actions-top.above-name {
-    position: absolute;
-    top: -12px; /* lift above box */
-    left: 50%;
-    transform: translateX(-50%);
-    background: #ffffff;
-    padding: 4px 8px;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-    display: flex;
-    gap: 8px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-    z-index: 10;
-}
-
-/* Show on hover or active */
-.org-node:hover .node-actions-top.above-name,
-.org-node.active .node-actions-top.above-name {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-/* Icons style */
-.node-actions-top.above-name a {
-    text-decoration: none;
-    font-size: 14px;
-    cursor: pointer;
-}
-
-/* Name spacing */
-.node-title {
-    margin-top: 12px; /* creates space below icons */
-    font-weight: 600;
-}
-
-
-/* Manager header layout */
-.manager-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-.manager-text {
-    display: flex;
-    flex-direction: column;
-}
-
-/* Plus button */
-.org-box.manager .org-plus {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.25);
-    color: #fff;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Force left alignment in Add User modal */
-#addUserModal .modal-body {
-    text-align: left;
-}
-
-#addUserModal input {
-    text-align: left;
-}
-
-
-/* CHILD ROW */
-.org-children-row {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 14px;
-    position: relative;
-}
-
-/* LEFT SUB MANAGERS */
-.org-submanagers {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-    position: relative;
-}
-
-/* SUB MANAGER BOX */
-.sub-manager-node {
-    background-color: #2563eb; /* blue */
-    color: #fff;
-    min-width: 130px;
-    text-align: center;
-}
-
-
-
-/* ================= ICON BUTTON FIX ================= */
-
-/* Used for Edit/Delete icons */
-.icon-btn {
-    background: none;
-    border: none;
-    padding: 0;
+﻿/* ================================================================
+   ORG CHART — ENTERPRISE TREE DESIGN V2
+   Refinements: L-Shape Connectors, Cleaner Actions
+   ================================================================ */
+
+/* ... Core Layout (unchanged) ... */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body,
+.org-wrapper-full {
+    font-family: 'Inter', sans-serif;
+    background-color: #f8fafc;
+    color: #334155;
     margin: 0;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1;
+    padding: 0;
 }
 
+.org-layout-container {
+    display: flex;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+}
 
-/*FIX TABLE TEXT WRAPPING (CSS)
-📍 Add this CSS (global or in this view) userreportpanel.cshtml tasknot*/
+.org-sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: #fff;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.tree-root {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0 16px 12px;
+}
+
+/* ================= TREE ITEM & CONNECTORS ================= */
+.tree-item {
+    position: relative;
+    padding-left: 20px;
+}
+
+    /* Vertical Line */
+    .tree-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background-color: #e2e8f0;
+    }
+
+    /* Horizontal Line (L-shape) */
+    .tree-item::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 18px;
+        width: 20px;
+        height: 1px;
+        background-color: #e2e8f0;
+    }
+
+    /* Fix for Last Child: Stop vertical line halfway */
+    .tree-item:last-child::before {
+        height: 19px;
+    }
+
+/* Root Items (Admin/Manager): No connectors usually, unless nested. */
+.tree-root > .tree-item {
+    padding-left: 0;
+}
+
+    .tree-root > .tree-item::before,
+    .tree-root > .tree-item::after {
+        display: none;
+    }
+
+/* ================= NODE CONTENT ================= */
+.tree-content {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    margin-bottom: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+    min-height: 36px;
+    background: #fff;
+    border: 1px solid transparent;
+    /* Role Indicator as simple left stripe */
+    border-left: 3px solid transparent;
+}
+
+    .tree-content:hover {
+        background-color: #f1f5f9;
+    }
+
+    .tree-content.expanded {
+        background-color: #f8fafc;
+    }
+
+    /* Selected/Active state if needed */
+    .tree-content:active {
+        background-color: #e2e8f0;
+    }
+
+    /* Role Colors */
+    .tree-content.role-admin {
+        border-left-color: #1e293b;
+    }
+
+    .tree-content.role-manager {
+        border-left-color: #2563eb;
+    }
+
+    .tree-content.role-submanager {
+        border-left-color: #6366f1;
+    }
+
+    .tree-content.role-user {
+        border-left-color: #10b981;
+    }
 
 
+/* ================= TOGGLE ICON ================= */
+.tree-toggle-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 10px;
+    margin-right: 4px;
+    transition: transform 0.2s ease;
+}
+
+/* Leaf nodes - push content to align with toggles */
+.tree-item.leaf .tree-content {
+    padding-left: 32px;
+}
+
+.tree-item.leaf .tree-toggle-icon {
+    display: none;
+}
+
+/* ================= NODE INFO ================= */
+.node-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    margin-right: 8px;
+}
+
+.node-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.node-role {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 0px;
+}
+
+/* ================= ACTIONS ================= */
+.node-actions {
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    /* Hidden by default */
+    transition: opacity 0.2s;
+    margin-left: auto;
+    /* Push to right */
+    gap: 4px;
+}
+
+/* Show actions on hover */
+.tree-content:hover .node-actions {
+    opacity: 1;
+}
+
+.action-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+    .action-btn:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .action-btn.add-btn {
+        font-size: 16px;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+/* ================= CHILDREN CONTAINER ================= */
+.tree-children {
+    display: block;
+    margin-left: 10px;
+}
+
+/* ================= AVATAR (Users) ================= */
+.user-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+/* ================= RIGHT PANEL ================= */
+.org-right-panel {
+    flex: 1;
+    background: #fff;
+    padding: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.empty-state {
+    text-align: center;
+    color: #cbd5e1;
+}
+
+    .empty-state svg {
+        width: 48px;
+        height: 48px;
+        margin-bottom: 12px;
+    }
+
+    .empty-state h3 {
+        font-size: 16px;
+        color: #334155;
+        margin: 0 0 4px 0;
+    }
+
+    .empty-state p {
+        font-size: 13px;
+    }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .org-layout-container {
+        flex-direction: column;
+    }
+
+    .org-sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #e2e8f0;
+    }
+}
+
+/* Toast/Report styles preservation */
 .report-task,
 .report-note,
 .report-reviewer {
-    max-width: 250px;
     white-space: normal;
+    max-width: 250px;
     word-break: break-word;
-    overflow-wrap: break-word;
 }
