@@ -37,18 +37,26 @@
             @* ================= ADMIN NODE ================= *@
             @if (currentRole == "Admin" && admin != null)
             {
-                <div class="tree-item">
+                <!-- 👇 ADD admin-root HERE -->
+                <div class="tree-item admin-root">
                     <div class="tree-content role-admin"
                          onclick="toggleNode(this, 'children-ADMIN')"
                          ondragover="allowDrop(event)"
                          ondrop="drop(event, 'ADMIN')">
+
                         <span class="tree-toggle-icon">▶</span>
+
                         <div class="node-info">
                             <span class="node-name">@admin.Name</span>
                             <span class="node-role">Administrator</span>
                         </div>
+
                         <div class="node-actions">
-                            <button class="action-btn add-btn" onclick="openAddModal('', 'ADMIN'); event.stopPropagation();" title="Add Manager">+</button>
+                            <button class="action-btn add-btn"
+                                    onclick="openAddModal('', 'ADMIN'); event.stopPropagation();"
+                                    title="Add Manager">
+                                +
+                            </button>
                         </div>
                     </div>
 
@@ -61,15 +69,25 @@
                                  ondragstart="drag(event)"
                                  data-id="@user.Id"
                                  data-role="User">
+
                                 <div class="tree-content role-user">
-                                    <div class="user-avatar">@user.Name?.Substring(0, 1).ToUpper()</div>
                                     <div class="node-info">
                                         <span class="node-name">@user.Name</span>
                                     </div>
+
                                     <div class="node-actions">
-                                        <button class="action-btn" onclick="openEditModal('@user.Id','@user.Name','@user.Email','User'); event.stopPropagation();">✎</button>
-                                        <button class="action-btn" onclick="openDeleteModal('@user.Id','@user.Name','User'); event.stopPropagation();">🗑</button>
-                                        <button class="action-btn" onclick="loadReports('@user.Id'); event.stopPropagation();">📊</button>
+                                        <button class="action-btn"
+                                                onclick="openEditModal('@user.Id','@user.Name','@user.Email','User'); event.stopPropagation();">
+                                            ✎
+                                        </button>
+                                        <button class="action-btn"
+                                                onclick="openDeleteModal('@user.Id','@user.Name','User'); event.stopPropagation();">
+                                            🗑
+                                        </button>
+                                        <button class="action-btn"
+                                                onclick="loadReports('@user.Id'); event.stopPropagation();">
+                                            📊
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -77,6 +95,7 @@
                     </div>
                 </div>
             }
+
 
             @* ================= MANAGER NODES (SIBLINGS) ================= *@
             @foreach (var manager in managers)
@@ -94,19 +113,26 @@
                         <div class="node-info">
                             <span class="node-name">@manager.Name</span>
                             <span class="node-role">Manager</span>
+                           
                         </div>
-                        <div class="node-actions">
+                      
+                        <div class="node-actions d-flex align-items-center">
+                        <div>
                             @if (currentRole == "Admin")
                             {
                                 <button class="action-btn add-btn" onclick="openAddModal('User', '@manager.Id'); event.stopPropagation();" title="Add User">+</button>
                             }
+                            </div>
+                           
                             <button class="action-btn hover-only" onclick="openEditModal('@manager.Id','@manager.Name','@manager.Email','Manager'); event.stopPropagation();">✎</button>
                             @if (currentRole == "Admin")
                             {
                                 <button class="action-btn hover-only" onclick="openDeleteModal('@manager.Id','@manager.Name','Manager'); event.stopPropagation();">🗑</button>
                             }
                             <button class="action-btn hover-only" onclick="loadReports('@manager.Id'); event.stopPropagation();">📊</button>
+                            
                         </div>
+                        
                     </div>
 
                     <!-- MANAGER CHILDREN -->
@@ -123,18 +149,42 @@
                                      data-id="@user.Id"
                                      data-role="User">
                                     <div class="tree-content role-user">
-                                        <div class="user-avatar">@user.Name?.Substring(0, 1).ToUpper()</div>
                                         <div class="node-info">
                                             <span class="node-name">@user.Name</span>
                                         </div>
                                         <div class="node-actions">
-                                            <button class="action-btn" onclick="openEditModal('@user.Id','@user.Name','@user.Email','User'); event.stopPropagation();">✎</button>
+                                            <!-- + always visible -->
                                             @if (currentRole == "Admin")
                                             {
-                                                <button class="action-btn" onclick="openDeleteModal('@user.Id','@user.Name','User'); event.stopPropagation();">🗑</button>
+                                                <button class="action-btn add-btn"
+                                                        onclick="openAddModal('User', '@manager.Id'); event.stopPropagation();"
+                                                        title="Add User">
+                                                    +
+                                                </button>
                                             }
-                                            <button class="action-btn" onclick="loadReports('@user.Id'); event.stopPropagation();">📊</button>
+
+                                            <!-- hover actions -->
+                                            <div class="hover-actions">
+                                                <button class="action-btn"
+                                                        onclick="openEditModal('@manager.Id','@manager.Name','@manager.Email','Manager'); event.stopPropagation();">
+                                                    ✎
+                                                </button>
+
+                                                @if (currentRole == "Admin")
+                                                {
+                                                    <button class="action-btn"
+                                                            onclick="openDeleteModal('@manager.Id','@manager.Name','Manager'); event.stopPropagation();">
+                                                        🗑
+                                                    </button>
+                                                }
+
+                                                <button class="action-btn"
+                                                        onclick="loadReports('@manager.Id'); event.stopPropagation();">
+                                                    📊
+                                                </button>
+                                            </div>
                                         </div>
+
                                     </div>
                                 </div>
                             }
@@ -160,17 +210,39 @@
                                             <span class="node-role">Sub-Manager</span>
                                         </div>
                                         <div class="node-actions">
+                                            <!-- + always visible -->
                                             @if (currentRole == "Admin" || currentRole == "Manager")
                                             {
-                                                <button class="action-btn add-btn" onclick="openAddModal('User', '@subMgr.Id'); event.stopPropagation();" title="Add User">+</button>
+                                                <button class="action-btn add-btn"
+                                                        onclick="openAddModal('User', '@subMgr.Id'); event.stopPropagation();"
+                                                        title="Add User">
+                                                    +
+                                                </button>
                                             }
-                                            <button class="action-btn" onclick="openEditModal('@subMgr.Id','@subMgr.Name','@subMgr.Email','SubManager'); event.stopPropagation();">✎</button>
-                                            @if (currentRole == "Admin")
-                                            {
-                                                <button class="action-btn" onclick="openDeleteModal('@subMgr.Id','@subMgr.Name','SubManager'); event.stopPropagation();">🗑</button>
-                                            }
-                                            <button class="action-btn" onclick="loadReports('@subMgr.Id'); event.stopPropagation();">📊</button>
                                         </div>
+
+                                            <!-- hover actions -->
+                                            <div class="hover-actions">
+                                                <button class="action-btn"
+                                                        onclick="openEditModal('@subMgr.Id','@subMgr.Name','@subMgr.Email','SubManager'); event.stopPropagation();">
+                                                    ✎
+                                                </button>
+
+                                                @if (currentRole == "Admin")
+                                                {
+                                                    <button class="action-btn"
+                                                            onclick="openDeleteModal('@subMgr.Id','@subMgr.Name','SubManager'); event.stopPropagation();">
+                                                        🗑
+                                                    </button>
+                                                }
+
+                                                <button class="action-btn"
+                                                        onclick="loadReports('@subMgr.Id'); event.stopPropagation();">
+                                                    📊
+                                                </button>
+                                            </div>
+                                       
+
                                     </div>
 
                                     <!-- SUB-MANAGER CHILDREN -->
@@ -185,7 +257,6 @@
                                                      data-id="@smUser.Id"
                                                      data-role="User">
                                                     <div class="tree-content role-user">
-                                                        <div class="user-avatar">@smUser.Name?.Substring(0, 1).ToUpper()</div>
                                                         <div class="node-info">
                                                             <span class="node-name">@smUser.Name</span>
                                                         </div>

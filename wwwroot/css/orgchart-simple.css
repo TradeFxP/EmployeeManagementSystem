@@ -45,48 +45,50 @@ body,
     padding-left: 20px;
 }
 
-    /* Vertical Line */
+/* Vertical Line */
     .tree-item::before {
         content: '';
         position: absolute;
         left: 0;
         top: 0;
         bottom: 0;
-        width: 1px;
-        background-color: #e2e8f0;
+        width: 2px;
+        background-color: #1e293b;
     }
 
-    /* Horizontal Line (L-shape) */
+/* Horizontal Line (L-shape) */
     .tree-item::after {
         content: '';
         position: absolute;
         left: 0;
         top: 18px;
         width: 20px;
-        height: 1px;
-        background-color: #e2e8f0;
+        height: 2px;
+        background-color: #1e293b;
     }
 
-    /* Fix for Last Child: Stop vertical line halfway */
-    .tree-item:last-child::before {
-        height: 19px;
-    }
+/* Fix for Last Child: Stop vertical line halfway */
+.tree-item:last-child::before {
+    height: 19px;
+}
 
 /* Root Items (Admin/Manager): No connectors usually, unless nested. */
-.tree-root > .tree-item {
+
+.tree-root>.tree-item {
     padding-left: 0;
 }
 
-    .tree-root > .tree-item::before,
-    .tree-root > .tree-item::after {
-        display: none;
-    }
+.tree-root>.tree-item::before,
+.tree-root>.tree-item::after {
+    display: none;
+}
 
 /* ================= NODE CONTENT ================= */
 .tree-content {
     display: flex;
     align-items: center;
-    padding: 6px 8px;
+    justify-content: space-between;
+    padding: 4px 8px;
     margin-bottom: 2px;
     cursor: pointer;
     border-radius: 4px;
@@ -98,35 +100,35 @@ body,
     border-left: 3px solid transparent;
 }
 
-    .tree-content:hover {
-        background-color: #f1f5f9;
-    }
+.tree-content:hover {
+    background-color: #f1f5f9;
+}
 
-    .tree-content.expanded {
-        background-color: #f8fafc;
-    }
+.tree-content.expanded {
+    background-color: #f8fafc;
+}
 
-    /* Selected/Active state if needed */
-    .tree-content:active {
-        background-color: #e2e8f0;
-    }
+/* Selected/Active state if needed */
+.tree-content:active {
+    background-color: #e2e8f0;
+}
 
-    /* Role Colors */
-    .tree-content.role-admin {
-        border-left-color: #1e293b;
-    }
+/* Role Colors */
+.tree-content.role-admin {
+    border-left-color: #1e293b;
+}
 
-    .tree-content.role-manager {
-        border-left-color: #2563eb;
-    }
+.tree-content.role-manager {
+    border-left-color: #2563eb;
+}
 
-    .tree-content.role-submanager {
-        border-left-color: #6366f1;
-    }
+.tree-content.role-submanager {
+    border-left-color: #6366f1;
+}
 
-    .tree-content.role-user {
-        border-left-color: #10b981;
-    }
+.tree-content.role-user {
+    border-left-color: #10b981;
+}
 
 
 /* ================= TOGGLE ICON ================= */
@@ -184,7 +186,7 @@ body,
     transition: opacity 0.2s;
     margin-left: auto;
     /* Push to right */
-    gap: 4px;
+    gap: 8px;
 }
 
 /* Show actions on hover */
@@ -204,18 +206,19 @@ body,
     justify-content: center;
     cursor: pointer;
     font-size: 14px;
+    padding:4px 8px;
 }
 
-    .action-btn:hover {
-        background: #e2e8f0;
-        color: #0f172a;
-    }
+.action-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
 
-    .action-btn.add-btn {
-        font-size: 16px;
-        font-weight: 600;
-        color: #64748b;
-    }
+.action-btn.add-btn {
+    font-size: 16px;
+    font-weight: 600;
+    color: #64748b;
+}
 
 /* ================= CHILDREN CONTAINER ================= */
 .tree-children {
@@ -224,7 +227,7 @@ body,
 }
 
 /* ================= AVATAR (Users) ================= */
-.user-avatar {
+/*.user-avatar {
     width: 20px;
     height: 20px;
     border-radius: 4px;
@@ -237,7 +240,7 @@ body,
     justify-content: center;
     margin-right: 8px;
     border: 1px solid #e2e8f0;
-}
+}*/
 
 /* ================= RIGHT PANEL ================= */
 .org-right-panel {
@@ -254,21 +257,21 @@ body,
     color: #cbd5e1;
 }
 
-    .empty-state svg {
-        width: 48px;
-        height: 48px;
-        margin-bottom: 12px;
-    }
+.empty-state svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+}
 
-    .empty-state h3 {
-        font-size: 16px;
-        color: #334155;
-        margin: 0 0 4px 0;
-    }
+.empty-state h3 {
+    font-size: 16px;
+    color: #334155;
+    margin: 0 0 4px 0;
+}
 
-    .empty-state p {
-        font-size: 13px;
-    }
+.empty-state p {
+    font-size: 13px;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -291,3 +294,157 @@ body,
     max-width: 250px;
     word-break: break-word;
 }
+/* =========================
+   REMOVE ADMIN → MANAGER LINE
+========================= */
+
+/* Kill vertical line under ADMIN */
+#children-ADMIN {
+    border-left: none !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+    /* Kill horizontal connectors */
+    /*#children-ADMIN > .tree-item::before {
+        display: none !important;
+    }*/
+
+/* =========================
+   ADMIN → USERS CONNECTOR
+========================= */
+
+#children-ADMIN > .leaf {
+    position: relative;
+    margin-left: 28px;
+}
+
+    #children-ADMIN > .leaf::before {
+        content: '';
+        position: absolute;
+        left: 0px;
+        top: 0px;
+        width: 2px;
+        border-top: 2px solid #22c55e; /* green */
+    }
+    /* =====================================================
+   NODE ACTIONS – FINAL FIX (NO OVERLAP, NO CLICK BUG)
+===================================================== */
+
+/* Node actions container */
+.node-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;               /* SPACE between + and hover icons */
+    margin-left: auto;
+    position: relative;
+}
+
+/* + button (always visible, safe click area) */
+.action-btn.add-btn {
+    position: relative;
+    z-index: 3;
+    pointer-events: auto;
+}
+
+/* Hover actions wrapper */
+.hover-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;   /* 🔑 KEY: no click when hidden */
+    transition: opacity 0.2s ease;
+}
+
+/* Show hover actions only when node is hovered */
+.tree-content:hover .hover-actions {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;   /* enable click ONLY when visible */
+}
+
+/* Action buttons (icons) */
+.action-btn {
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+/* Prevent hover icons from shrinking node */
+.hover-actions .action-btn {
+    flex-shrink: 0;
+}
+
+/* REMOVE OLD BUGGY RULE (IMPORTANT) */
+.tree-content:hover .node-actions {
+    opacity: 1 !important; /* override old behavior safely */
+}
+
+/* ===============================
+   INLINE ACTIONS – FINAL FIX
+================================ */
+
+/* Actions container */
+.node-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+/* + button always visible */
+.action-btn.add-btn {
+    flex-shrink: 0;
+}
+
+/* Hover actions wrapper
+   👉 space is RESERVED */
+.hover-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 90px; /* 🔑 reserves space */
+    justify-content: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+/* Show hover icons */
+.tree-content:hover .hover-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Action buttons */
+.action-btn {
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+    .action-btn:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+

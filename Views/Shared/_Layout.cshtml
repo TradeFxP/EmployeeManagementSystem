@@ -8,6 +8,7 @@
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -18,7 +19,7 @@
     <link rel="stylesheet" href="~/css/orgchart-simple.css" />
     <script src="~/js/reports-actions.js"></script>
     <script src="~/js/orgchart.js"></script>
-    
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
@@ -36,18 +37,17 @@
     <style>
         .nav-username {
             font-weight: 600;
-            color: rgba(0,0,0,.85);
+            color: rgba(0, 0, 0, .85);
         }
 
         header nav.navbar {
-            background-color: #0d6efd !important; /* Bootstrap primary blue */
+            background-color: #0d6efd !important;
+            /* Bootstrap primary blue */
         }
 
-            header nav.navbar * {
-                color: #ffffff !important;
-            }
-
-
+        header nav.navbar * {
+            color: #ffffff !important;
+        }
     </style>
 </head>
 
@@ -60,9 +60,8 @@
 
                 <span class="navbar-brand">EmployeeManagementSystem</span>
 
-                <button class="navbar-toggler" type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target=".navbar-collapse">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target=".navbar-collapse">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
@@ -73,22 +72,20 @@
 
                         @* Show Profile to Admin, Manager and User *@
                         @if (User.Identity.IsAuthenticated &&
-                                                (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("Admin")))
+                        (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("Admin")))
                         {
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Profile" asp-action="Index">
                                     👤 Profile
                                 </a>
-                            </li>           
+                            </li>
                         }
 
                         @* Organization Chart visible to Admin and Manager *@
                         @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Users"
-                                   asp-action="OrgChart">
+                                <a class="nav-link" asp-controller="Users" asp-action="OrgChart">
                                     Organization Chart
                                 </a>
                             </li>
@@ -101,12 +98,12 @@
                                     Reports
                                 </a>
                             </li>
-                        } 
+                        }
 
 
                         @* @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager"))
                         {
-                            
+
                         } *@
 
 
@@ -115,24 +112,24 @@
                         </li>
 
 
-                        @*  @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                        @* @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                         {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Tasks" asp-action="Create">
-                                    Assign Tasks
-                                </a>
-                            </li>
-                        }  *@
+                        <li class="nav-item">
+                        <a class="nav-link" asp-controller="Tasks" asp-action="Create">
+                        Assign Tasks
+                        </a>
+                        </li>
+                        } *@
 
-                        
+
 
                         @* @if (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("SubManager"))
                         {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Tasks" asp-action="Index">
-                                   view  Tasks
-                                </a>
-                            </li>
+                        <li class="nav-item">
+                        <a class="nav-link" asp-controller="Tasks" asp-action="Index">
+                        view Tasks
+                        </a>
+                        </li>
                         } *@
 
                     </ul>
@@ -203,4 +200,5 @@
 
 
 </body>
+
 </html>
