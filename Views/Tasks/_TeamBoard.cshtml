@@ -166,21 +166,51 @@
                              data-column-id="@column.Id"
                              onclick="focusTask(@task.Id)">
 
-                            <!-- ✏️ Editable Title -->
-                            <input class="form-control task-title-input d-none"
-                                   value="@task.Title"
-                                   data-task-id="@task.Id" />
-
-                            <strong class="task-title-text">@task.Title</strong>
 
 
-                            <!-- ✏️ Editable Description -->
-                            <textarea class="form-control mt-2 task-desc-input d-none"
-                              data-task-id="@task.Id">@task.Description</textarea>
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong class="task-title-text">@task.Title</strong>
+                                @{
+                                    var priorityClass = task.Priority switch
+                                    {
+                                        UserRoles.Models.Enums.TaskPriority.Low => "bg-secondary",
+                                        UserRoles.Models.Enums.TaskPriority.Medium => "bg-info",
+                                        UserRoles.Models.Enums.TaskPriority.High => "bg-warning text-dark",
+                                        UserRoles.Models.Enums.TaskPriority.Critical => "bg-danger",
+                                        _ => "bg-secondary"
+                                    };
+                                }
+                                <span class="badge @priorityClass">@task.Priority</span>
+                            </div>
+
+
+
 
                             <div class="task-desc-text mt-2">
                                 @task.Description
                             </div>
+                            
+                            @* 📋 CUSTOM FIELDS DISPLAY (SUMMARY) *@
+                            @if (task.CustomFieldValues != null && task.CustomFieldValues.Any())
+                            {
+                                <div class="custom-fields-summary mt-2">
+                                    @foreach (var fv in task.CustomFieldValues)
+                                    {
+                                        if (fv.Field == null) continue;
+                                        <div class="small mb-1">
+                                            <strong>@fv.Field.FieldName:</strong>
+                                            @if (fv.Field.FieldType == "Date" && DateTime.TryParse(fv.Value, out var sd))
+                                            {
+                                                <span> @sd.ToString("dd MMM yyyy")</span>
+                                            }
+                                            else
+                                            {
+                                                <span> @fv.Value</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
 
                             <!-- 🕒 Created -->
                             <div class="small text-muted mt-1">
@@ -282,24 +312,27 @@
                             </div>
 
                             <!-- ASSIGN BUTTON -->
-                            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
-                            {
-                                <button class="btn btn-sm btn-outline-primary mt-2 assign-btn"
+                            <!-- ⚙️ Actions -->
+                            <div class="task-actions mt-2 d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-info flex-fill"
+                                        onclick="openTaskHistoryModal(@task.Id); event.stopPropagation();">
+                                    <i class="bi bi-clock-history"></i> History
+                                </button>
+                                
+                                <button class="btn btn-sm btn-outline-secondary flex-fill"
                                         data-task-id="@task.Id"
-                                        onclick="showAssignDropdown(@task.Id); event.stopPropagation();">
-                                    Assign
+                                        onclick="showAssignUI(@task.Id); event.stopPropagation();">
+                                    <i class="bi bi-person"></i> Assign
                                 </button>
-                            }
 
-
-                            <!-- 🗑 ADMIN DELETE -->
-                            @if (User.IsInRole("Admin"))
-                            {
-                                <button class="btn btn-sm btn-danger mt-3"
-                                        onclick="deleteTask(@task.Id); event.stopPropagation();">
-                                    Delete
-                                </button>
-                            }
+                                @if (User.IsInRole("Admin"))
+                                {
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            onclick="deleteTask(@task.Id); event.stopPropagation();">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                }
+                            </div>
                             @* @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                             {
                                 <button class="btn btn-sm btn-outline-primary mt-2 me-2"
@@ -309,22 +342,15 @@
                             } *@
 
 
-                            <div class="task-actions text-end">
                                 <!-- Edit -->
-                                <i class="bi bi-pencil-square text-warning edit-task-btn"
-                                   onclick="enableTaskEdit(@task.Id); event.stopPropagation();"></i>
-
-                                <!-- Save -->
-                                <i class="bi bi-check-lg text-success d-none save-task-btn"
-                                   onclick="saveTaskEdit(@task.Id); event.stopPropagation();"></i>
-
-                                <!-- Cancel -->
-                                <i class="bi bi-x-lg text-danger d-none cancel-task-btn"
-                                   onclick="cancelTaskEdit(@task.Id); event.stopPropagation();"></i>
-                            </div>
-
-
+                                <i class="bi bi-pencil-square text-warning"
+                                   style="cursor: pointer;"
+                                   title="Edit Task"
+                                   onclick="openEditTaskModal(@task.Id); event.stopPropagation();"></i>
                         </div>
+
+
+                        
 
                     }
                 </div>

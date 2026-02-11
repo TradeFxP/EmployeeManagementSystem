@@ -50,21 +50,23 @@
                         <div class="card-body p-2">
 
                             <!-- CLICKABLE TITLE -->
-                            <div class="task-title"
+                            <!-- CLICKABLE TITLE WITH LABEL -->
+                            <div class="task-title small"
                                  data-task-id="@task.Id">
-                                @task.Title
+                                <strong>Title:</strong>
+                                <span>@task.Title</span>
                             </div>
+
 
                             <!-- EXPANDED DETAILS -->
                             <div class="task-details d-none" id="task-details-@task.Id">
 
                                 <hr class="my-2" />
-
-                                <div class="mb-2">
+                                <div class="mb-2 small">
                                     <strong>Description:</strong>
-                                    <div class="text-muted small">
+                                    <span class="text-muted">
                                         @task.Description
-                                    </div>
+                                    </span>
                                 </div>
 
                                 <div class="small text-muted">
@@ -76,6 +78,30 @@
                                     <strong>Created By:</strong>
                                     @(task.CreatedByUser?.Name ?? "Unknown")
                                 </div>
+
+                                @* CUSTOM FIELDS DISPLAY *@
+                                @if (task.CustomFieldValues != null && task.CustomFieldValues.Any())
+                                {
+                                    <div class="custom-fields-display mt-2 pt-2 border-top">
+                                        <small class="text-muted d-block mb-1"><i class="bi bi-list-ul"></i> Custom Fields:</small>
+                                        @foreach (var fv in task.CustomFieldValues)
+                                        {
+                                            if (fv.Field == null) continue;
+
+                                            <div class="field-value-item small">
+                                                <strong>@fv.Field.FieldName:</strong>
+                                                @if (fv.Field.FieldType == "Date" && DateTime.TryParse(fv.Value, out var dt))
+                                                {
+                                                    <span> @dt.ToString("dd MMM yyyy")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span> @fv.Value</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
 
                                 <!-- ADMIN ACTIONS -->
                                 @if (User.IsInRole("Admin"))
@@ -130,7 +156,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
 
-            <form id="addTaskForm">
+            <form id="addTaskForm" onsubmit="return false;">
 
                 <div class="modal-header">
                     <h5 class="modal-title">Add Task</h5>
@@ -138,6 +164,8 @@
                 </div>
 
                 <div class="modal-body">
+                    <input type="hidden" id="taskColumnId" />
+
                     <div class="mb-3">
                         <label class="form-label">Title</label>
                         <input type="text"
@@ -161,10 +189,14 @@
                             <span id="descCount">200</span> characters remaining
                         </small>
                     </div>
+
+                    <!-- Render custom fields container so admin/user can fill values -->
+                    <div id="customFieldsContainer"></div>
                 </div>
 
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-primary">Create</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="submitCreateTask()">Create</button>
                 </div>
 
             </form>

@@ -182,28 +182,118 @@
                     <input type="hidden" id="taskColumnId" />
 
                     <div class="mb-3">
-                        <label class="form-label">Title</label>
-                        <input type="text" id="taskTitle" class="form-control" />
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0">Title</label>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Focus title" onclick="document.getElementById('taskTitle').focus();">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-link text-danger p-0" title="Clear title" onclick="document.getElementById('taskTitle').value='';">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <input type="text" id="taskTitle" class="form-control" required />
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Description</label>
                         <textarea id="taskDescription" class="form-control"></textarea>
                     </div>
-
+                    
                     <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select id="taskPriority" class="form-select">
+                            <option value="0">Low</option>
+                            <option value="1" selected>Medium</option>
+                            <option value="2">High</option>
+                            <option value="3">Critical</option>
+                        </select>
+                    </div>
+                    
+                  @*  <div class="mb-3">
                         <label class="form-label">Link to Project (optional - for auto ID)</label>
                         <select id="taskProjectId" class="form-select">
                             <option value="">-- No Project --</option>
                             <!-- Dynamically loaded -->
                         </select>
                         <small class="text-muted">Selecting a project generates an ID like P1T1, P1T2...</small>
+                    </div>*@
+                    
+                    <!-- Custom Fields Container -->
+                    <div id="customFieldsContainer"></div>
+                </div>
+
+                <div class="modal-footer">
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager"))
+                    {
+                        <button class="btn btn-sm btn-outline-secondary me-auto" onclick="openManageFieldsModal(); event.preventDefault();">
+                            <i class="bi bi-gear"></i> Manage Fields
+                        </button>
+                    }
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitCreateTask()">Create</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT TASK MODAL -->
+    <div class="modal fade" id="editTaskModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Task</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="editTaskId" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text" id="editTaskTitle" class="form-control" required />
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea id="editTaskDescription" class="form-control" rows="4"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Priority</label>
+                            <select id="editTaskPriority" class="form-select">
+                                <option value="0">Low</option>
+                                <option value="1">Medium</option>
+                                <option value="2">High</option>
+                                <option value="3">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Assign To</label>
+                            <select id="editTaskAssignedTo" class="form-select">
+                                <option value="">-- Unassigned --</option>
+                                @if (Model != null && Model.AssignableUsers != null)
+                                {
+                                    foreach (var u in Model.AssignableUsers)
+                                    {
+                                        <option value="@u.Id">@u.UserName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Custom Fields Container -->
+                    <div id="editCustomFieldsContainer"></div>
                 </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" onclick="submitCreateTask()">Create</button>
+                    <button class="btn btn-primary" onclick="submitEditTask()">Save Changes</button>
                 </div>
 
             </div>
@@ -282,10 +372,93 @@
             </div>
         </div>
     </div>
+    
+    <!-- MANAGE CUSTOM FIELDS MODAL (Admin Only) -->
+    <div class="modal fade" id="manageFieldsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-sliders me-2"></i>Manage Custom Fields</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Existing Fields List -->
+                    <h6 class="mb-3">Existing Fields</h6>
+                    <div id="fieldsList" class="mb-4">
+                        <!-- Dynamically loaded fields -->
+                    </div>
+                    
+                    <!-- Add New Field Form -->
+                    <h6 class="mb-3 border-top pt-3">Add New Field</h6>
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Field Name</label>
+                            <input type="text" id="newFieldName" class="form-control" placeholder="e.g., Estimated Hours" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Field Type</label>
+                            <select id="newFieldType" class="form-select">
+                                <option value="Text">Text</option>
+                                <option value="Number">Number</option>
+                                <option value="Date">Date</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="newFieldRequired" />
+                                <label class="form-check-label" for="newFieldRequired">
+                                    Required
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-success mt-2" onclick="createNewField()">
+                        <i class="bi bi-plus-lg"></i> Add Field
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+            </div>
+        </div>
+    </div>
 
 
 </div>
 
+<!-- Task History Modal -->
+<div class="modal fade" id="taskHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock-history"></i> Task History - <span id="historyModalTaskId"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="historyTimeline" class="p-3">
+                    <!-- Timeline content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // Define admin status for JS
+    const isAdmin = @(User.IsInRole("Admin") ? "true" : "false");
+    const isManager = @((User.IsInRole("Manager") || User.IsInRole("SubManager")) ? "true" : "false");
+    window.isAdmin = isAdmin;
+    console.log("Admin status loaded:", window.isAdmin);
+</script>
+
+<!-- Load Custom Fields JS -->
 
 
 <style>
@@ -297,174 +470,10 @@
 
     .team-btn.active {
         background-color: #0d6efd;
-        color: #fff;
     }
-
-
-        .assign-toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #198754;
-            color: white;
-            padding: 14px 18px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,.25);
-            z-index: 9999;
-            font-size: 14px;
-        }
 
 </style>
 
-
-<script>
-    function toggleTeamTasks() {
-        const dropdown = document.getElementById("teamTasksDropdown");
-        const arrow = document.getElementById("teamArrow");
-
-        if (dropdown.style.display === "none") {
-            dropdown.style.display = "block";
-            arrow.innerText = "▲";
-        } else {
-            dropdown.style.display = "none";
-            arrow.innerText = "▼";
-        }
-    }
-
-
-    function toggleMyTasks() {
-        const dropdown = document.getElementById("myTasksDropdown");
-        const arrow = document.getElementById("myTasksArrow");
-
-        if (!dropdown) return;
-
-        const isOpen = dropdown.style.display === "block";
-        dropdown.style.display = isOpen ? "none" : "block";
-        arrow.innerText = isOpen ? "▼" : "▲";
-    }
-
-    // ===== PROJECT PANEL =====
-    function toggleProjectPanel() {
-        const dropdown = document.getElementById("projectDropdown");
-        const arrow = document.getElementById("projectArrow");
-
-        if (!dropdown) return;
-
-        const isOpen = dropdown.style.display === "block";
-        dropdown.style.display = isOpen ? "none" : "block";
-        arrow.innerText = isOpen ? "▼" : "▲";
-
-        if (!isOpen) {
-            loadProjectList();
-        }
-    }
-
-    function loadProjectList() {
-        fetch('/Project/GetProjects')
-            .then(res => res.json())
-            .then(projects => {
-                const container = document.getElementById('projectList');
-                if (projects.length === 0) {
-                    container.innerHTML = '<div class="text-muted ps-4 py-2">No projects yet</div>';
-                    return;
-                }
-
-                container.innerHTML = projects.map(p => `
-                    <div class="d-flex align-items-center justify-content-between group-hover-container px-0">
-                        <button type="button"
-                                class="list-group-item list-group-item-action bg-dark text-white project-btn flex-grow-1 text-start border-0 py-2 ps-4"
-                                data-project-id="${p.id}"
-                                onclick="loadProjectBoard(${p.id})">
-                            <i class="bi bi-folder2 me-2"></i> ${p.name}
-                        </button>
-                        <button class="btn btn-sm btn-link text-danger p-0 me-2" 
-                                style="opacity:0.5;"
-                                onmouseover="this.style.opacity=1"
-                                onmouseout="this.style.opacity=0.5"
-                                onclick="event.stopPropagation(); deleteProject(${p.id}, '${p.name}')" 
-                                title="Delete Project">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                `).join('');
-            })
-            .catch(() => {
-                document.getElementById('projectList').innerHTML = 
-                    '<div class="text-danger ps-4 py-2">Failed to load</div>';
-            });
-    }
-
-    function loadProjectBoard(projectId) {
-        const container = document.getElementById('taskBoardContainer');
-        container.innerHTML = "<div class='text-muted p-3'>Loading project...</div>";
-
-        // Clear team button highlights
-        document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.project-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector(`[data-project-id="${projectId}"]`)?.classList.add('active');
-
-        fetch(`/Project/Board/${projectId}`)
-            .then(res => {
-                if (!res.ok) throw new Error("Failed to load project board");
-                return res.text();
-            })
-            .then(html => {
-                container.innerHTML = html;
-                
-                // Execute scripts from the dynamically loaded content
-                const scripts = container.querySelectorAll('script');
-                scripts.forEach(script => {
-                    const newScript = document.createElement('script');
-                    if (script.src) {
-                        newScript.src = script.src;
-                    } else {
-                        newScript.textContent = script.textContent;
-                    }
-                    document.body.appendChild(newScript);
-                    // Remove after execution to avoid duplicates
-                    setTimeout(() => newScript.remove(), 100);
-                });
-            })
-            .catch(err => {
-                container.innerHTML = "<div class='text-danger'>Error loading project</div>";
-                console.error(err);
-            });
-    }
-
-    function openCreateProjectModal() {
-        document.getElementById('newProjectName').value = '';
-        document.getElementById('newProjectDescription').value = '';
-        new bootstrap.Modal(document.getElementById('createProjectModal')).show();
-    }
-
-    function submitCreateProject() {
-        const data = {
-            name: document.getElementById('newProjectName').value.trim(),
-            description: document.getElementById('newProjectDescription').value.trim()
-        };
-
-        if (!data.name) {
-            alert('Project name is required');
-            return;
-        }
-
-        fetch('/Project/CreateProject', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        })
-        .then(res => {
-            if (!res.ok) throw new Error('Failed to create project');
-            return res.json();
-        })
-        .then(result => {
-            bootstrap.Modal.getInstance(document.getElementById('createProjectModal'))?.hide();
-            loadProjectList();
-            loadProjectBoard(result.id);
-        })
-        .catch(err => alert(err.message));
-    }
-</script>
 
 <script>
     // expose admin flag to JS as boolean
@@ -615,7 +624,18 @@
     });
 </script>
 
+@{
+    ViewData["Title"] = "Task Board";
+}
+
+
+<link rel="stylesheet" href="~/css/taskHistory.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
+
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="~/js/customFields.js"></script>
+<script src="~/js/taskHistory.js"></script>
+<script src="~/js/index_ui.js"></script>
 
     <script>
            function enableColumnDrag() {
@@ -656,6 +676,9 @@
 
     }
 
+
+// NOTE: openCreateTaskModal and submitCreateTask are defined later in this file.
+// Removed duplicate definitions to avoid function override/conflict
 
         function startRename(columnId) {
             if (!__isTasksAdmin) return;
@@ -887,7 +910,99 @@
         // Load projects into dropdown
         loadProjectsForTaskModal();
 
+        // Render custom fields into the modal (preserve any existing values)
+        if (typeof renderCustomFieldInputs === 'function') {
+            try {
+                renderCustomFieldInputs('customFieldsContainer', {});
+            } catch (e) { console.error(e); }
+        }
+
         new bootstrap.Modal(document.getElementById('createTaskModal')).show();
+    }
+
+    // ================= EDIT TASK MODAL =================
+
+    function openEditTaskModal(taskId) {
+        // Fetch task details
+        fetch(`/Tasks/GetTask?id=${taskId}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load task details");
+                return res.json();
+            })
+            .then(task => {
+                // Populate Modal
+                document.getElementById('editTaskId').value = task.id;
+                document.getElementById('editTaskTitle').value = task.title;
+                document.getElementById('editTaskDescription').value = task.description || "";
+                document.getElementById('editTaskPriority').value = task.priority;
+                document.getElementById('editTaskAssignedTo').value = task.assignedToUserId || "";
+
+                // Render Custom Fields with values
+                if (typeof renderCustomFieldInputs === 'function') {
+                    renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {});
+                }
+
+                // Show Modal
+                new bootstrap.Modal(document.getElementById('editTaskModal')).show();
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error loading task details");
+            });
+    }
+
+    function submitEditTask() {
+        const taskId = parseInt(document.getElementById('editTaskId').value);
+        const title = document.getElementById('editTaskTitle').value.trim();
+        const description = document.getElementById('editTaskDescription').value.trim();
+        const priority = parseInt(document.getElementById('editTaskPriority').value);
+        const assignedToUserId = document.getElementById('editTaskAssignedTo').value;
+
+        if (!title) {
+            alert("Title is required");
+            return;
+        }
+
+        // Validate custom fields
+        if (typeof validateCustomFields === 'function' && !validateCustomFields()) {
+            return;
+        }
+
+        const data = {
+            taskId: taskId,
+            title: title,
+            description: description,
+            priority: priority,
+            assignedToUserId: assignedToUserId, // Send assigned user
+            customFieldValues: (typeof collectCustomFieldValues === 'function') ? 
+                               // Need to target the specific container or ensure helper works globally
+                               // The helper targets 'customFieldsContainer' by default in customFields.js? 
+                               // Wait, let me check customFields.js
+                               collectCustomFieldValues('editCustomFieldsContainer') : {}
+        };
+
+        fetch('/Tasks/UpdateTask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Failed to update task");
+            return res.json();
+        })
+        .then(() => {
+            // Close modal
+            const modalEl = document.getElementById('editTaskModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            // Reload board
+            loadTeamBoard(currentTeamName);
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Failed to update task");
+        });
     }
 
     function loadProjectsForTaskModal() {
@@ -911,11 +1026,16 @@
         const projectSelect = document.getElementById('taskProjectId');
         const projectId = projectSelect?.value ? parseInt(projectSelect.value) : null;
 
+        const priorityEl = document.getElementById('taskPriority');
+        const priority = priorityEl ? parseInt(priorityEl.value) : 1;
+
         const data = {
             columnId: parseInt(document.getElementById('taskColumnId').value),
             title: document.getElementById('taskTitle').value.trim(),
             description: document.getElementById('taskDescription').value.trim(),
-            projectId: projectId
+            projectId: projectId,
+            priority: priority,
+            customFieldValues: (typeof collectCustomFieldValues === 'function') ? collectCustomFieldValues() : {}
         };
 
         fetch('/Tasks/CreateTask', {
@@ -1041,102 +1161,10 @@
 
 
 
-        function enableTaskEdit(taskId) {
-
-        // Close any other open edits (very important)
-        document.querySelectorAll('.task-card.editing').forEach(card => {
-            cancelTaskEdit(card.dataset.taskId);
-        });
-
-        const card = document.querySelector(`[data-task-id='${taskId}']`).closest('.task-card');
-        card.classList.add('editing');
-
-        // Toggle title
-        card.querySelector('.task-title-text').classList.add('d-none');
-        card.querySelector('.task-title-input').classList.remove('d-none');
-
-        // Toggle description
-        card.querySelector('.task-desc-text').classList.add('d-none');
-        card.querySelector('.task-desc-input').classList.remove('d-none');
-
-        // Toggle buttons
-        card.querySelector('.edit-task-btn').classList.add('d-none');
-        card.querySelector('.save-task-btn').classList.remove('d-none');
-        card.querySelector('.cancel-task-btn').classList.remove('d-none');
-    }
 
 
-        function cancelTaskEdit(taskId) {
-        const card = document.querySelector(`[data-task-id='${taskId}']`).closest('.task-card');
-        card.classList.remove('editing');
 
-        // Restore values from text
-        const titleText = card.querySelector('.task-title-text').innerText;
-        const descText = card.querySelector('.task-desc-text').innerText;
 
-        card.querySelector('.task-title-input').value = titleText;
-        card.querySelector('.task-desc-input').value = descText;
-
-        // Toggle back
-        card.querySelector('.task-title-text').classList.remove('d-none');
-        card.querySelector('.task-title-input').classList.add('d-none');
-
-        card.querySelector('.task-desc-text').classList.remove('d-none');
-        card.querySelector('.task-desc-input').classList.add('d-none');
-
-        card.querySelector('.edit-task-btn').classList.remove('d-none');
-        card.querySelector('.save-task-btn').classList.add('d-none');
-        card.querySelector('.cancel-task-btn').classList.add('d-none');
-    }
-
-        function saveTaskEdit(taskId) {
-
-        const card = document
-            .querySelector(`[data-task-id='${taskId}']`)
-            ?.closest('.task-card');
-
-        if (!card) return;
-
-        const titleInput = card.querySelector('.task-title-input');
-        const descInput = card.querySelector('.task-desc-input');
-
-        const title = titleInput.value.trim();
-        const description = descInput.value.trim();
-
-        if (!title) {
-            alert("Title cannot be empty");
-            titleInput.focus();
-            return;
-        }
-
-        fetch('/Tasks/UpdateTask', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                taskId: taskId,
-                title: title,
-                description: description
-            })
-        })
-        .then(res => {
-            if (!res.ok) throw new Error('Save failed');
-            return res.json();   // ✅ now valid
-        })
-        .then(() => {
-
-            // ✅ Update UI immediately
-            card.querySelector('.task-title-text').innerText = title;
-            card.querySelector('.task-desc-text').innerText = description;
-
-            cancelTaskEdit(taskId);
-        })
-        .catch(err => {
-            console.error(err);
-            alert("Failed to save task");
-        });
-    }
 
 
         function showAssignDropdown(taskId) {

@@ -8,6 +8,7 @@ using UserRoles.Models;
 using UserRoles.ViewModels;
 using UserRoles.Models.Enums;
 using UserRoles.DTOs;
+using UserRoles.Services; // Added for ITaskHistoryService
 
 using TaskStatusEnum = UserRoles.Models.Enums.TaskStatus;
 
@@ -17,11 +18,13 @@ public class TasksController : Controller
 {
     private readonly AppDbContext _context;
     private readonly UserManager<Users> _userManager;
+    private readonly ITaskHistoryService _historyService;
 
-    public TasksController(AppDbContext context, UserManager<Users> userManager)
+    public TasksController(AppDbContext context, UserManager<Users> userManager, ITaskHistoryService historyService)
     {
         _context = context;
         _userManager = userManager;
+        _historyService = historyService;
     }
 
     // Loads page
@@ -65,8 +68,8 @@ public class TasksController : Controller
         if (model.ColumnId <= 0)
             return BadRequest("ColumnId is required");
 
-        if (string.IsNullOrWhiteSpace(model.Title))
-            return BadRequest("Title is required");
+        //if (string.IsNullOrWhiteSpace(model.Title))
+        //    return BadRequest("Title is required");
 
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
@@ -109,6 +112,9 @@ public class TasksController : Controller
             // Project linkage
             ProjectId = model.ProjectId,
             WorkItemId = workItemId,
+            
+            // Priority
+            Priority = model.Priority,
 
             Status = TaskStatusEnum.ToDo,
 
@@ -122,6 +128,30 @@ public class TasksController : Controller
 
         _context.TaskItems.Add(task);
         await _context.SaveChangesAsync();
+        
+        // Set column entry timestamp for time tracking
+        task.CurrentColumnEntryAt = DateTime.UtcNow;
+        
+        // Log task creation
+        await _historyService.LogTaskCreated(task.Id, user.Id);
+        await _context.SaveChangesAsync();
+        
+        // Save custom field values if provided
+        if (model.CustomFieldValues != null && model.CustomFieldValues.Any())
+        {
+            foreach (var fieldValue in model.CustomFieldValues)
+            {
+                var customFieldValue = new TaskFieldValue
+                {
+                    TaskId = task.Id,
+                    FieldId = fieldValue.Key,
+                    Value = fieldValue.Value,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.TaskFieldValues.Add(customFieldValue);
+            }
+            await _context.SaveChangesAsync();
+        }
 
 
         return Ok(new
@@ -156,6 +186,9 @@ public class TasksController : Controller
         var currentUser = await _userManager.GetUserAsync(User);
         if (currentUser == null)
             return Unauthorized();
+
+        // ✅ LOG ASSIGNMENT
+        await _historyService.LogAssignment(task.Id, assignToUser.Id, currentUser.Id);
 
         task.AssignedToUserId = assignToUser.Id;
         task.AssignedByUserId = currentUser.Id;
@@ -203,9 +236,36 @@ public class TasksController : Controller
         if (task == null)
             return NotFound();
 
-        task.Title = model.Title?.Trim();
-        task.Description = model.Description?.Trim();
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        // 1. Title
+        if (task.Title != model.Title?.Trim())
+        {
+            await _historyService.LogTaskUpdated(task.Id, user.Id, "Title", task.Title, model.Title?.Trim());
+            task.Title = model.Title?.Trim();
+        }
+
+        // 2. Description
+        if (task.Description != model.Description?.Trim())
+        {
+            // Just logging that it changed, or the full value if needed. 
+            // _historyService.LogTaskUpdated(task.Id, user.Id, "Description", task.Description, model.Description?.Trim());
+            await _historyService.LogTaskUpdated(task.Id, user.Id, "Description", "Old Description", "New Description");
+            task.Description = model.Description?.Trim();
+        }
+        
         task.UpdatedAt = DateTime.UtcNow;
+        
+        // 3. Update priority if provided
+        if (model.Priority.HasValue)
+        {
+            if (task.Priority != model.Priority.Value)
+            {
+                await _historyService.LogPriorityChange(task.Id, task.Priority, model.Priority.Value, user.Id);
+                task.Priority = model.Priority.Value;
+            }
+        }
 
         if (!string.IsNullOrEmpty(model.AssignedToUserId))
         {
@@ -213,13 +273,121 @@ public class TasksController : Controller
                 User.IsInRole("Manager") ||
                 User.IsInRole("SubManager"))
             {
-                task.AssignedToUserId = model.AssignedToUserId;
+                if (task.AssignedToUserId != model.AssignedToUserId)
+                {
+                    await _historyService.LogAssignment(task.Id, model.AssignedToUserId, user.Id);
+                    task.AssignedToUserId = model.AssignedToUserId;
+                }
             }
+        }
+        
+        // 4. Update custom field values
+        if (model.CustomFieldValues != null && model.CustomFieldValues.Any())
+        {
+            // Remove existing field values for this task
+            var existingValues = await _context.TaskFieldValues
+                .Include(v => v.Field)
+                .Where(v => v.TaskId == task.Id)
+                .ToListAsync();
+
+            var existingDict = existingValues.ToDictionary(v => v.FieldId, v => v);
+            
+            foreach (var fieldValue in model.CustomFieldValues)
+            {
+                int fieldId = fieldValue.Key;
+                string newValue = fieldValue.Value;
+
+                if (existingDict.TryGetValue(fieldId, out var existingVal))
+                {
+                    if (existingVal.Value != newValue)
+                    {
+                         await _historyService.LogCustomFieldChange(task.Id, existingVal.Field?.FieldName ?? $"Field #{fieldId}", existingVal.Value, newValue, user.Id);
+                         existingVal.Value = newValue;
+                    }
+                }
+                else
+                {
+                    // New value
+                    var fieldDef = await _context.TaskCustomFields.FindAsync(fieldId);
+                    if (fieldDef != null)
+                    {
+                        await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(empty)", newValue, user.Id);
+                         var customFieldValue = new TaskFieldValue
+                        {
+                            TaskId = task.Id,
+                            FieldId = fieldValue.Key,
+                            Value = fieldValue.Value,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.TaskFieldValues.Add(customFieldValue);
+                    }
+                }
+            }
+            
+            // Clean up old method: We used to remove all and re-add. Now we update in place? 
+            // The Original code did: _context.TaskFieldValues.RemoveRange(existingValues);
+            // If I change to update-in-place, I must ensure I don't break anything.
+            // AND I need to handle fields that are NOT in the payload (if any).
+            // Typically UpdateTask payload sends ALL fields.
+            // But to be safe and match original "replace all" behavior while logging diffs:
+            
+            // Re-fetch or stick to Original Logic but with logging?
+            // Original logic:
+            // RemoveRange(existingValues) -> Add(newValues).
+            // This is easier but we lose "OldValue" reference if we delete first.
+            // So:
+            // 1. Log diffs (done above)
+            // 2. Remove all existing (except maybe ones we just updated? effectively same result)
+            // 3. Add all new.
+            
+            // Let's stick to "Log then Replace" pattern to minimize side effects, 
+            // BUT we must be careful not to hold onto entities we are about to delete?
+            // Actually, if I logged changes, I don't need the entities anymore.
+            
+             _context.TaskFieldValues.RemoveRange(existingValues);
+             
+             foreach (var fieldValue in model.CustomFieldValues)
+             {
+                var customFieldValue = new TaskFieldValue
+                {
+                    TaskId = task.Id,
+                    FieldId = fieldValue.Key,
+                    Value = fieldValue.Value,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.TaskFieldValues.Add(customFieldValue);
+             }
         }
 
         await _context.SaveChangesAsync();
         // ✅ RETURN JSON (IMPORTANT)
         return Json(new { success = true });
+    }
+
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetTask(int id)
+    {
+        var task = await _context.TaskItems
+            .Include(t => t.CustomFieldValues)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
+        if (task == null) return NotFound();
+
+        // 1. Get basic info
+        var result = new
+        {
+            id = task.Id,
+            title = task.Title,
+            description = task.Description,
+            priority = (int)task.Priority,
+            assignedToUserId = task.AssignedToUserId,
+            // 2. Convert custom fields to dictionary for easy JS consumption
+            customFieldValues = task.CustomFieldValues.ToDictionary(k => k.FieldId, v => v.Value)
+        };
+
+        return Ok(result);
     }
 
 
@@ -269,12 +437,14 @@ public class TasksController : Controller
             .OrderBy(c => c.Order)
             .ToListAsync();
 
-        // Load all tasks for team (with users)
+        // Load all tasks for team (with users and custom field values)
         var allTasks = await _context.TaskItems
      .Where(t => t.TeamName == team)
      .Include(t => t.CreatedByUser)
      .Include(t => t.AssignedToUser)
      .Include(t => t.AssignedByUser)   // ✅ REQUIRED
+     .Include(t => t.CustomFieldValues)  // Load custom field values
+        .ThenInclude(v => v.Field)      // Load field definitions
      .ToListAsync();
 
 
@@ -299,13 +469,20 @@ public class TasksController : Controller
         var assignableUsers = await _userManager.Users
             .OrderBy(u => u.UserName)
             .ToListAsync();
+        
+        // Load active custom fields
+        var customFields = await _context.TaskCustomFields
+            .Where(f => f.IsActive)
+            .OrderBy(f => f.Order)
+            .ToListAsync();
 
         // ✅ 2. Build ViewModel AFTER data exists
         var vm = new TeamBoardViewModel
         {
             TeamName = team,
             Columns = columns,
-            AssignableUsers = assignableUsers
+            AssignableUsers = assignableUsers,
+            CustomFields = customFields
         };
 
         // ✅ 3. Return partial view
@@ -471,6 +648,12 @@ public class TasksController : Controller
         if (targetColumn == null)
             return NotFound("Target column not found");
 
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        // ✅ LOG HISTORY before move to capture time spent in previous column
+        await _historyService.LogColumnMove(task.Id, task.ColumnId, targetColumn.Id, user.Id);
+
         // ✅ Move task to new column
         task.ColumnId = targetColumn.Id;
 
@@ -485,7 +668,8 @@ public class TasksController : Controller
         };
 
         task.UpdatedAt = DateTime.UtcNow;
-
+        task.CurrentColumnEntryAt = DateTime.UtcNow; // Reset timer for new column
+        
         await _context.SaveChangesAsync();
 
         return Ok();
@@ -534,6 +718,10 @@ public class TasksController : Controller
         if (targetColumn == null)
             return BadRequest($"No columns found for team '{model.TeamName}'. Create columns first.");
 
+        // ✅ LOG HISTORY (Column Move + Assignment)
+        await _historyService.LogColumnMove(task.Id, task.ColumnId, targetColumn.Id, user.Id);
+        await _historyService.LogAssignment(task.Id, user.Id, user.Id); // Self-assigned by mover
+
         // 2. Update Task
         task.TeamName = model.TeamName;
         task.ColumnId = targetColumn.Id;
@@ -554,7 +742,16 @@ public class TasksController : Controller
 
         task.UpdatedAt = DateTime.UtcNow;
         task.AssignedByUserId = user.Id; // The one who moved it
+        // task.AssignedToUserId = user.Id; // Keep original assignment or assign to mover? 
+        // Logic says "AssignTaskToTeam" might imply unassigning from individual? 
+        // But the previous code didn't change AssignedToUserId, only AssignedBy. 
+        // So I will stick to previous logic BUT log the "AssignedBy" change?
+        // Actually, let's assume it keeps the assignee or assigns to self as it's a team move.
+        // The previous code ONLY updated AssignedByUserId.
+        // I will keep it consistent.
+        
         task.AssignedAt = DateTime.UtcNow;
+        task.CurrentColumnEntryAt = DateTime.UtcNow; // Reset timer
 
         await _context.SaveChangesAsync();
 
@@ -564,6 +761,168 @@ public class TasksController : Controller
             message = $"Task moved to {model.TeamName} ({targetColumn.ColumnName})" 
         });
     }
+    
+    // ========== CUSTOM FIELD MANAGEMENT ENDPOINTS ==========
+    
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetCustomFields()
+    {
+        var fields = await _context.TaskCustomFields
+            .Where(f => f.IsActive)
+            .OrderBy(f => f.Order)
+            .Select(f => new
+            {
+                f.Id,
+                f.FieldName,
+                f.FieldType,
+                f.IsRequired,
+                f.Order
+            })
+            .ToListAsync();
+            
+        return Ok(fields);
+    }
+    
+    public class CreateFieldRequest
+    {
+        public string FieldName { get; set; } = string.Empty;
+        public string FieldType { get; set; } = "Text";
+        public bool IsRequired { get; set; } = false;
+    }
+    
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> CreateCustomField([FromBody] CreateFieldRequest model)
+    {
+        if (string.IsNullOrWhiteSpace(model.FieldName))
+            return BadRequest("Field name is required");
+            
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized();
+        
+        // Get max order
+        var maxOrder = await _context.TaskCustomFields
+            .MaxAsync(f => (int?)f.Order) ?? 0;
+        
+        var field = new TaskCustomField
+        {
+            FieldName = model.FieldName.Trim(),
+            FieldType = model.FieldType,
+            IsRequired = model.IsRequired,
+            IsActive = true,
+            Order = maxOrder + 1,
+            CreatedByUserId = user.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+        
+        _context.TaskCustomFields.Add(field);
+        await _context.SaveChangesAsync();
+        
+        return Ok(new { success = true, fieldId = field.Id });
+    }
+    
+    public class UpdateFieldRequest
+    {
+        public int FieldId { get; set; }
+        public string? FieldName { get; set; }
+        public string? FieldType { get; set; }
+        public bool? IsRequired { get; set; }
+    }
+    
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> UpdateCustomField([FromBody] UpdateFieldRequest model)
+    {
+        var field = await _context.TaskCustomFields.FindAsync(model.FieldId);
+        if (field == null)
+            return NotFound("Field not found");
+        
+        if (!string.IsNullOrWhiteSpace(model.FieldName))
+            field.FieldName = model.FieldName.Trim();
+            
+        if (!string.IsNullOrWhiteSpace(model.FieldType))
+            field.FieldType = model.FieldType;
+            
+        if (model.IsRequired.HasValue)
+            field.IsRequired = model.IsRequired.Value;
+        
+        await _context.SaveChangesAsync();
+        
+        return Ok(new { success = true });
+    }
+    
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> DeleteCustomField([FromBody] int fieldId)
+    {
+        var field = await _context.TaskCustomFields.FindAsync(fieldId);
+        if (field == null)
+            return NotFound("Field not found");
+        
+        // Soft delete - set IsActive to false
+        field.IsActive = false;
+        await _context.SaveChangesAsync();
+        
+        // Or hard delete (this will cascade delete all field values)
+        // _context.TaskCustomFields.Remove(field);
+        // await _context.SaveChangesAsync();
+        
+        return Ok(new { success = true });
+    }
+    
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ReorderCustomFields([FromBody] List<int> fieldIds)
+    {
+        if (fieldIds == null || !fieldIds.Any())
+            return BadRequest("No field IDs provided");
+        
+        var fields = await _context.TaskCustomFields
+            .Where(f => fieldIds.Contains(f.Id))
+            .ToListAsync();
+        
+        for (int i = 0; i < fieldIds.Count; i++)
+        {
+            var field = fields.FirstOrDefault(f => f.Id == fieldIds[i]);
+            if (field != null)
+            {
+                field.Order = i + 1;
+            }
+        }
+        
+        await _context.SaveChangesAsync();
+        
+        return Ok(new { success = true });
+    }
+    
+    // ========== TASK HISTORY ==========
+    
+    [HttpGet("/Tasks/{taskId}/History")]
+    [Authorize]
+    public async Task<IActionResult> GetTaskHistory(int taskId)
+    {
+        var history = await _historyService.GetTaskHistory(taskId);
+        return Ok(history);
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetTaskCustomFields(int taskId)
+    {
+        if (taskId <= 0) return BadRequest("Invalid task id");
+
+        var values = await _context.TaskFieldValues
+            .Where(v => v.TaskId == taskId)
+            .Select(v => new { v.FieldId, v.Value })
+            .ToListAsync();
+
+        var dict = values.ToDictionary(v => v.FieldId, v => v.Value ?? string.Empty);
+
+        return Ok(dict);
+    }
 }
+
 
 

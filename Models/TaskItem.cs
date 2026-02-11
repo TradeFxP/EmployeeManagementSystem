@@ -9,6 +9,9 @@
 
         public string Title { get; set; }
         public string Description { get; set; }
+        
+        // Priority level
+        public UserRoles.Models.Enums.TaskPriority Priority { get; set; } = UserRoles.Models.Enums.TaskPriority.Medium;
 
         // Optional: Direct link to Project (for team tasks with project context)
         public int? ProjectId { get; set; }
@@ -40,6 +43,15 @@
         // Column (FK)
         public int ColumnId { get; set; }
         public TeamColumn Column { get; set; }
+        
+        // Custom field values
+        public ICollection<TaskFieldValue> CustomFieldValues { get; set; } = new List<TaskFieldValue>();
+        
+        // Column tracking
+        public DateTime CurrentColumnEntryAt { get; set; } // When task entered current column
+        
+        // History tracking
+        public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();
     }
 
 }
