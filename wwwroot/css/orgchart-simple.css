@@ -46,26 +46,26 @@ body,
 }
 
 /* Vertical Line */
-    .tree-item::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background-color: #1e293b;
-    }
+.tree-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #1e293b;
+}
 
 /* Horizontal Line (L-shape) */
-    .tree-item::after {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 18px;
-        width: 20px;
-        height: 2px;
-        background-color: #1e293b;
-    }
+.tree-item::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 18px;
+    width: 20px;
+    height: 2px;
+    background-color: #1e293b;
+}
 
 /* Fix for Last Child: Stop vertical line halfway */
 .tree-item:last-child::before {
@@ -181,17 +181,37 @@ body,
 .node-actions {
     display: flex;
     align-items: center;
-    opacity: 0;
-    /* Hidden by default */
+    opacity: 1;
+    /* Visible by default (mostly for + button) */
     transition: opacity 0.2s;
     margin-left: auto;
-    /* Push to right */
     gap: 8px;
 }
 
-/* Show actions on hover */
-.tree-content:hover .node-actions {
+/* For leaf nodes (Users), keep actions hidden by default */
+.tree-item.leaf .node-actions {
+    opacity: 0;
+}
+
+.tree-item.leaf .tree-content:hover .node-actions {
     opacity: 1;
+}
+
+/* Hover Actions Group (Edit/Delete/Report) */
+.hover-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    /* Hidden by default */
+    transition: opacity 0.2s;
+    pointer-events: none;
+    /* Prevent clicks when hidden */
+}
+
+/* Show hover actions when row is hovered */
+.tree-content:hover .hover-actions {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .action-btn {
@@ -206,7 +226,7 @@ body,
     justify-content: center;
     cursor: pointer;
     font-size: 14px;
-    padding:4px 8px;
+    padding: 4px 8px;
 }
 
 .action-btn:hover {
@@ -218,6 +238,8 @@ body,
     font-size: 16px;
     font-weight: 600;
     color: #64748b;
+    margin-left: 4px;
+    /* separation from hover actions */
 }
 
 /* ================= CHILDREN CONTAINER ================= */
@@ -247,14 +269,20 @@ body,
     flex: 1;
     background: #fff;
     padding: 40px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    overflow-y: auto;
+    /* Allow scrolling for long lists */
+    /* REMOVED: display: flex; center center - this was breaking the list view */
 }
 
 .empty-state {
     text-align: center;
     color: #cbd5e1;
+    /* Added to center empty state content specifically */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
 }
 
 .empty-state svg {
@@ -294,6 +322,7 @@ body,
     max-width: 250px;
     word-break: break-word;
 }
+
 /* =========================
    REMOVE ADMIN → MANAGER LINE
 ========================= */
@@ -305,8 +334,8 @@ body,
     padding-left: 0 !important;
 }
 
-    /* Kill horizontal connectors */
-    /*#children-ADMIN > .tree-item::before {
+/* Kill horizontal connectors */
+/*#children-ADMIN > .tree-item::before {
         display: none !important;
     }*/
 
@@ -314,20 +343,22 @@ body,
    ADMIN → USERS CONNECTOR
 ========================= */
 
-#children-ADMIN > .leaf {
+#children-ADMIN>.leaf {
     position: relative;
     margin-left: 28px;
 }
 
-    #children-ADMIN > .leaf::before {
-        content: '';
-        position: absolute;
-        left: 0px;
-        top: 0px;
-        width: 2px;
-        border-top: 2px solid #22c55e; /* green */
-    }
-    /* =====================================================
+#children-ADMIN>.leaf::before {
+    content: '';
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 2px;
+    border-top: 2px solid #22c55e;
+    /* green */
+}
+
+/* =====================================================
    NODE ACTIONS – FINAL FIX (NO OVERLAP, NO CLICK BUG)
 ===================================================== */
 
@@ -335,7 +366,8 @@ body,
 .node-actions {
     display: flex;
     align-items: center;
-    gap: 12px;               /* SPACE between + and hover icons */
+    gap: 12px;
+    /* SPACE between + and hover icons */
     margin-left: auto;
     position: relative;
 }
@@ -355,7 +387,8 @@ body,
 
     opacity: 0;
     visibility: hidden;
-    pointer-events: none;   /* 🔑 KEY: no click when hidden */
+    pointer-events: none;
+    /* 🔑 KEY: no click when hidden */
     transition: opacity 0.2s ease;
 }
 
@@ -363,7 +396,8 @@ body,
 .tree-content:hover .hover-actions {
     opacity: 1;
     visibility: visible;
-    pointer-events: auto;   /* enable click ONLY when visible */
+    pointer-events: auto;
+    /* enable click ONLY when visible */
 }
 
 /* Action buttons (icons) */
@@ -392,7 +426,8 @@ body,
 
 /* REMOVE OLD BUGGY RULE (IMPORTANT) */
 .tree-content:hover .node-actions {
-    opacity: 1 !important; /* override old behavior safely */
+    opacity: 1 !important;
+    /* override old behavior safely */
 }
 
 /* ===============================
@@ -418,7 +453,8 @@ body,
     display: flex;
     align-items: center;
     gap: 8px;
-    min-width: 90px; /* 🔑 reserves space */
+    min-width: 90px;
+    /* 🔑 reserves space */
     justify-content: flex-end;
     opacity: 0;
     pointer-events: none;
@@ -442,9 +478,7 @@ body,
     cursor: pointer;
 }
 
-    .action-btn:hover {
-        background: #e2e8f0;
-        color: #0f172a;
-    }
-
-
+.action-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
