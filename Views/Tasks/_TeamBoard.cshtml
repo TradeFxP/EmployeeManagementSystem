@@ -25,8 +25,8 @@
 </div>
 
 <!-- 🔍 SEARCH & FILTER BAR -->
-<div class="row g-2 mb-4 bg-light p-3 rounded border">
-    <div class="col-md-4">
+<div class="row g-2 mb-4 bg-white p-3 rounded border shadow-sm">
+    <div class="col-12 col-md-4">
         <div class="input-group">
             <span class="input-group-text bg-white border-end-0">
                 <i class="bi bi-search text-muted"></i>
@@ -39,7 +39,7 @@
         </div>
     </div>
     
-    <div class="col-md-2">
+    <div class="col-6 col-md-2">
         <select id="priorityFilter" class="form-select" onchange="filterBoardTasks()">
             <option value="">All Priorities</option>
             <option value="0">Low</option>
@@ -49,7 +49,7 @@
         </select>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-6 col-md-3">
         <select id="assigneeFilter" class="form-select" onchange="filterBoardTasks()">
             <option value="">All Assignees</option>
             @foreach (var u in Model.AssignableUsers)
@@ -59,7 +59,7 @@
         </select>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-12 col-md-3">
         <select id="adminAssignedFilter" class="form-select" onchange="filterBoardTasks()">
             <option value="">Filter By Assignor</option>
             <option value="Admin">Assigned by Admin</option>
