@@ -17,8 +17,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/account.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/orgchart-simple.css" asp-append-version="true" />
-    <script src="~/js/reports-actions.js"></script>
-    <script src="~/js/orgchart.js"></script>
+    @* Scripts moved to bottom for better loading *@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
@@ -71,7 +70,7 @@
                     <ul class="navbar-nav me-auto align-items-center">
 
                         @* Show Profile to Admin, Manager and User *@
-                        @if (User.Identity.IsAuthenticated &&
+                        @if (User.Identity?.IsAuthenticated == true &&
                         (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("Admin")))
                         {
                             <li class="nav-item">
@@ -192,8 +191,9 @@
     <!-- Site JS -->
     <script src="~/js/site.js"></script>
 
-    <!-- Org chart JS (exposes openEditModal, openDeleteModal, openAddModal, openAddReportInline, etc.) -->
-    <script src="~/js/orgchart.js"></script>
+    <!-- Org chart JS -->
+    <script src="~/js/reports-actions.js" asp-append-version="true"></script>
+    <script src="~/js/orgchart.js" asp-append-version="true"></script>
 
     <!-- Page-specific scripts -->
     @await RenderSectionAsync("Scripts", required: false)

@@ -113,22 +113,43 @@ body,
     background-color: #e2e8f0;
 }
 
-/* Role Colors */
+/* Role Colors & Styles */
 .tree-content.role-admin {
-    border-left-color: #1e293b;
+    border-left: none;
+    /* Removed side line */
+    background-color: lightgrey;
+    /* Lite Grey */
+}
+
+.tree-content.role-admin .node-name {
+    font-weight: 700;
+    /* Extra Strong */
 }
 
 .tree-content.role-manager {
-    border-left-color: #2563eb;
+    border-left: none;
+    /* Removed side line */
+    background-color: #f0f7ff;
+    /* Minimal Blue */
+}
+
+.tree-content.role-manager .node-name {
+    font-weight: 700;
+    /* Extra Strong */
 }
 
 .tree-content.role-submanager {
-    border-left-color: #6366f1;
+    border-left: none;
+    /* Removed side line */
+    background-color: #e2e8f0;
+    /* Water Blue */
 }
 
-.tree-content.role-user {
-    border-left-color: #10b981;
-}
+    .tree-content.role-user {
+        /*border-left-color: #22c55e;*/
+        background-color: #f0fdf5;
+        /* Lite Green Background */
+    }
 
 
 /* ================= TOGGLE ICON ================= */
@@ -271,13 +292,12 @@ body,
     padding: 40px;
     overflow-y: auto;
     /* Allow scrolling for long lists */
-    /* REMOVED: display: flex; center center - this was breaking the list view */
 }
 
 .empty-state {
     text-align: center;
     color: #cbd5e1;
-    /* Added to center empty state content specifically */
+    /* Centering logic specifically for empty state */
     display: flex;
     flex-direction: column;
     align-items: center;
