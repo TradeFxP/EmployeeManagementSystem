@@ -25,6 +25,46 @@ function toggleMyTasks() {
     arrow.innerText = isOpen ? "▼" : "▲";
 }
 
+// ===== EMPLOYEES PANEL =====
+function loadEmployeesAdminPanel() {
+    const container = document.getElementById("taskBoardContainer");
+    if (!container) return;
+
+    container.innerHTML = '<div class="text-center py-5 text-muted"><div class="spinner-border mb-3" role="status"></div><br>Loading employee list...</div>';
+
+    fetch('/Users/ListEmployeesForAdmin')
+        .then(res => {
+            if (!res.ok) throw new Error("Failed to load");
+            return res.text();
+        })
+        .then(html => {
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            console.error(err);
+            container.innerHTML = '<div class="alert alert-danger m-4">Failed to load employee management.</div>';
+        });
+}
+
+function updateUserTeamAssignment(userId, teamName, isAssigned) {
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("teamName", teamName);
+    fd.append("isAssigned", isAssigned);
+
+    fetch('/Users/UpdateUserTeams', {
+        method: 'POST',
+        body: fd
+    }).then(res => {
+        if (!res.ok) {
+            alert("Failed to update team assignment");
+        }
+    }).catch(err => {
+        console.error(err);
+        alert("Error updating team assignment");
+    });
+}
+
 // ===== PROJECT PANEL =====
 function toggleProjectPanel() {
     const dropdown = document.getElementById("projectDropdown");

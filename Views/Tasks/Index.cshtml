@@ -46,6 +46,15 @@
                     </button>
                 </div>
 
+                <!-- ================= EMPLOYEES SECTION (NEW) ================= -->
+                <button type="button"
+                        class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
+                        onclick="loadEmployeesAdminPanel()">
+                    <span>
+                        <i class="bi bi-person-badge-fill me-2"></i> Employees
+                    </span>
+                </button>
+
                 <!-- ================= ADMIN: TEAM TASKS ================= -->
 
 
@@ -1071,9 +1080,9 @@
         const taskId = window.__focusedTaskId;
         if (!taskId) return;
 
-        const title = document.querySelector(`.task-title-input[data-task-id='${taskId}']`).value;
-        const desc = document.querySelector(`.task-desc-input[data-task-id='${taskId}']`).value;
-        const assignedTo = document.querySelector(`.task-assign-select[data-task-id='${taskId}']`).value;
+        const title = document.getElementById('focusedTaskTitle').value;
+        const desc = document.getElementById('focusedTaskDescription').value;
+        const assignedTo = document.getElementById('focusedTaskAssignUser').value;
 
         fetch('/Tasks/UpdateTask', {
             method: 'POST',
@@ -1303,6 +1312,54 @@
         .catch(err => alert(err.message));
     }
 
+    function filterBoardTasks() {
+        const searchText = document.getElementById('taskSearchInput')?.value.toLowerCase() || "";
+        const priorityFilter = document.getElementById('priorityFilter')?.value || "";
+        const assigneeFilter = document.getElementById('assigneeFilter')?.value || "";
+        const adminFilter = document.getElementById('adminAssignedFilter')?.value || "";
+
+        const cards = document.querySelectorAll('.task-card');
+        
+        cards.forEach(card => {
+            // 1. Search Text (Title, Description, Custom Fields)
+            const title = card.querySelector('.task-title-text')?.innerText.toLowerCase() || "";
+            const desc = card.querySelector('.task-desc-text')?.innerText.toLowerCase() || "";
+            const customFields = card.querySelector('.custom-fields-summary')?.innerText.toLowerCase() || "";
+            
+            const matchesSearch = !searchText || 
+                                 title.includes(searchText) || 
+                                 desc.includes(searchText) || 
+                                 customFields.includes(searchText);
+
+            // 2. Priority
+            const cardPriority = card.dataset.priority || "";
+            const matchesPriority = !priorityFilter || cardPriority === priorityFilter;
+
+            // 3. Assignee
+            const cardAssigneeId = card.dataset.assignedToId || "";
+            const matchesAssignee = !assigneeFilter || cardAssigneeId === assigneeFilter;
+
+            // 4. Assigned by Admin
+            const isAdminAssigned = card.dataset.assignedByAdmin === "true";
+            let matchesAdmin = true;
+            if (adminFilter === "Admin") {
+                matchesAdmin = isAdminAssigned;
+            }
+
+            // Combine all
+            if (matchesSearch && matchesPriority && matchesAssignee && matchesAdmin) {
+                card.style.display = "block";
+                card.classList.remove('d-none'); // Ensure no d-none override
+            } else {
+                card.style.display = "none";
+            }
+        });
+    }
+
+    function getCsrfToken() {
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+        return tokenInput ? tokenInput.value : '';
+    }
 </script>
 
 

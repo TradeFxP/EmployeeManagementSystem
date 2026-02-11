@@ -1155,7 +1155,60 @@ namespace UserRoles.Controllers
             return managers;
         }
 
-        // 2️⃣ Get ALL descendant managers (recursive)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ListEmployeesForAdmin()
+        {
+            var teams = await _context.Teams.Select(t => t.Name).ToListAsync();
+            var users = await _userManager.Users.AsNoTracking().ToListAsync();
+            
+            var userRoles = new Dictionary<string, string>();
+            var userTeams = new Dictionary<string, List<string>>();
+
+            foreach (var user in users)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                userRoles[user.Id] = roles.FirstOrDefault() ?? "User";
+                
+                userTeams[user.Id] = await _context.UserTeams
+                    .Where(ut => ut.UserId == user.Id)
+                    .Select(ut => ut.TeamName)
+                    .ToListAsync();
+            }
+
+            ViewBag.AllTeams = teams;
+            ViewBag.UserRoles = userRoles;
+            ViewBag.UserTeams = userTeams;
+
+            return PartialView("_AdminEmployeesPanel", users);
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> UpdateUserTeams(string userId, string teamName, bool isAssigned)
+        {
+            if (isAssigned)
+            {
+                // Add if not exists
+                bool exists = await _context.UserTeams.AnyAsync(ut => ut.UserId == userId && ut.TeamName == teamName);
+                if (!exists)
+                {
+                    _context.UserTeams.Add(new UserTeam { UserId = userId, TeamName = teamName });
+                    await _context.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                // Remove if exists
+                var ut = await _context.UserTeams.FirstOrDefaultAsync(ut => ut.UserId == userId && ut.TeamName == teamName);
+                if (ut != null)
+                {
+                    _context.UserTeams.Remove(ut);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            return Ok();
+        }
+
         private List<Users> GetDescendantManagers(
             string managerId,
             List<Users> allManagers)

@@ -24,6 +24,50 @@
     }
 </div>
 
+<!-- 🔍 SEARCH & FILTER BAR -->
+<div class="row g-2 mb-4 bg-light p-3 rounded border">
+    <div class="col-md-4">
+        <div class="input-group">
+            <span class="input-group-text bg-white border-end-0">
+                <i class="bi bi-search text-muted"></i>
+            </span>
+            <input type="text" 
+                   id="taskSearchInput" 
+                   class="form-control border-start-0" 
+                   placeholder="Search title, desc, fields..." 
+                   oninput="filterBoardTasks()">
+        </div>
+    </div>
+    
+    <div class="col-md-2">
+        <select id="priorityFilter" class="form-select" onchange="filterBoardTasks()">
+            <option value="">All Priorities</option>
+            <option value="0">Low</option>
+            <option value="1">Medium</option>
+            <option value="2">High</option>
+            <option value="3">Critical</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <select id="assigneeFilter" class="form-select" onchange="filterBoardTasks()">
+            <option value="">All Assignees</option>
+            @foreach (var u in Model.AssignableUsers)
+            {
+                <option value="@u.Id">@u.UserName</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <select id="adminAssignedFilter" class="form-select" onchange="filterBoardTasks()">
+            <option value="">Filter By Assignor</option>
+            <option value="Admin">Assigned by Admin</option>
+            <option value="All">Show All</option>
+        </select>
+    </div>
+</div>
+
 
 <!-- KANBAN BOARD -->
 <div class="kanban-board" id="kanbanBoard">
@@ -39,19 +83,19 @@
             <!-- TITLE -->
             <div class="mb-3">
                 <label class="form-label">Title</label>
-                <input id="editTaskTitle" class="form-control" />
+                <input id="focusedTaskTitle" class="form-control" />
             </div>
 
             <!-- DESCRIPTION -->
             <div class="mb-3">
                 <label class="form-label">Description</label>
-                <textarea id="editTaskDescription" class="form-control" rows="4"></textarea>
+                <textarea id="focusedTaskDescription" class="form-control" rows="4"></textarea>
             </div>
 
             <!-- ASSIGN USER -->
             <div class="mb-3">
                 <label class="form-label">Assign to</label>
-                <select id="assignUserSelect" class="form-select"></select>
+                <select id="focusedTaskAssignUser" class="form-select"></select>
             </div>
 
             <!-- CREATED INFO -->
@@ -164,6 +208,9 @@
                              draggable="true"
                              data-task-id="@task.Id"
                              data-column-id="@column.Id"
+                             data-priority="@((int)task.Priority)"
+                             data-assigned-to-id="@(task.AssignedToUserId ?? "")"
+                             data-assigned-by-admin="@(task.AssignedByUser != null && task.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                              onclick="focusTask(@task.Id)">
 
 
@@ -340,7 +387,7 @@
                                     Assign
                                 </button>
                             } *@
-
+                                            
 
                                 <!-- Edit -->
                                 <i class="bi bi-pencil-square text-warning"
