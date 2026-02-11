@@ -20,6 +20,9 @@ namespace UserRoles.ViewModels
         [RegularExpression(@"^\d{10}$", ErrorMessage = "Mobile number must be exactly 10 digits.")]
         public string MobileNumber { get; set; }
 
+
+        public string Address { get; set; }
+
         // View state
         public bool IsEditMode { get; set; }
 

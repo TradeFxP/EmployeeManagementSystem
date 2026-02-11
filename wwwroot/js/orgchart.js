@@ -132,7 +132,7 @@ window.drop = function (event, newParentId) {
         }
     }
 
-   
+
 
     // ---------------- Load reports ----------------
     window.loadReports = function (userId) {
@@ -325,6 +325,9 @@ window.drop = function (event, newParentId) {
                 if (modalTitle) modalTitle.innerText = 'Add User';
             }
 
+            // Load teams dynamically
+            loadTeamCheckboxes();
+
             // Ensure second radio label/value reflect context:
             const secondRadio = document.getElementById('addSecondType');
             const secondLabel = document.getElementById('addSecondLabel');
@@ -438,7 +441,7 @@ window.drop = function (event, newParentId) {
                 }
 
 
-              
+
 
 
                 if (!name || !email) { alert('Name and Email required'); return; }
@@ -541,8 +544,41 @@ window.drop = function (event, newParentId) {
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        try { if (typeof window.__org_bind_modals === 'function') window.__org_bind_modals(); } catch {}
+        try { if (typeof window.__org_bind_modals === 'function') window.__org_bind_modals(); } catch { }
     });
+
+    // Helper to load teams
+    function loadTeamCheckboxes() {
+        const container = document.getElementById('teamCheckboxesContainer');
+        if (!container) return;
+
+        container.innerHTML = '<div class="text-muted small">Loading...</div>';
+
+        fetch('/Teams/GetAll')
+            .then(res => res.json())
+            .then(teams => {
+                if (teams.length === 0) {
+                    container.innerHTML = '<div class="text-muted small">No teams defined</div>';
+                    return;
+                }
+
+                container.innerHTML = teams.map(t => `
+                    <div class="form-check">
+                        <input class="form-check-input team-checkbox"
+                               type="checkbox"
+                               name="teams"
+                               value="${t.name}"
+                               id="team_${t.id}" />
+                        <label class="form-check-label" for="team_${t.id}">
+                            ${t.name} Team
+                        </label>
+                    </div>
+                `).join('');
+            })
+            .catch(() => {
+                container.innerHTML = '<div class="text-danger small">Failed to load teams</div>';
+            });
+    }
 
 })();
 

@@ -19,9 +19,45 @@
 
         <div class="list-group list-group-flush">
 
+            
+
+            
             @if (isAdmin)
             {
+                <!-- ================= PROJECT SECTION (NEW) ================= -->
+                <button type="button"
+                        class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
+                        onclick="toggleProjectPanel()">
+                    <span>
+                        <i class="bi bi-diagram-3 me-2"></i> Project
+                    </span>
+                    <span id="projectArrow">▼</span>
+                </button>
+
+                <!-- Project Dropdown -->
+                <div id="projectDropdown" style="display:none;">
+                    <div id="projectList">
+                        <!-- Dynamically loaded projects -->
+                    </div>
+                    <button type="button"
+                            class="list-group-item list-group-item-action bg-dark text-white ps-4 text-primary"
+                            onclick="openCreateProjectModal()">
+                        <i class="bi bi-plus-lg me-2"></i> New Project
+                    </button>
+                </div>
+
+                <!-- ================= EMPLOYEES SECTION (NEW) ================= -->
+                <button type="button"
+                        class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
+                        onclick="loadEmployeesAdminPanel()">
+                    <span>
+                        <i class="bi bi-person-badge-fill me-2"></i> Employees
+                    </span>
+                </button>
+
                 <!-- ================= ADMIN: TEAM TASKS ================= -->
+
+
                 <button type="button"
                         class="list-group-item list-group-item-action bg-dark text-white d-flex justify-content-between align-items-center"
                         onclick="toggleTeamTasks()">
@@ -31,28 +67,31 @@
                     <span id="teamArrow">▼</span>
                 </button>
 
+                        
+
                 <!-- Team Tasks Dropdown -->
                 <div id="teamTasksDropdown" style="display:none;">
-                    <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
-                            data-team="Development"
-                            onclick="loadTeamBoard('Development')">
-                        <i class="bi bi-code-slash me-2"></i> Development Team
-                    </button>
+                    <div id="adminTeamList">
+                        <!-- Dynamically loaded teams -->
+                    </div>
+                   
+                    <div class="mt-2 border-top pt-2 ps-3 pe-3">
+                         <div id="addTeamInputContainer" style="display:none;" class="mb-2">
+                            <input type="text" id="newTeamNameInput" 
+                                   class="form-control form-control-sm" 
+                                   placeholder="Enter team name..." />
+                            <div class="d-flex justify-content-end mt-1">
+                                <button class="btn btn-xs btn-secondary me-1" onclick="toggleAddTeamInput()">Cancel</button>
+                                <button class="btn btn-xs btn-primary" onclick="submitCreateTeam()">Add</button>
+                            </div>
+                         </div>
 
-                    <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
-                            data-team="Testing"
-                            onclick="loadTeamBoard('Testing')">
-                        <i class="bi bi-bug-fill me-2"></i> Testing Team
-                    </button>
-
-                    <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white ps-4 team-btn"
-                            data-team="Sales"
-                            onclick="loadTeamBoard('Sales')">
-                        <i class="bi bi-briefcase-fill me-2"></i> Sales Team
-                    </button>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-secondary w-100 text-start"
+                                onclick="toggleAddTeamInput()">
+                            <i class="bi bi-plus-circle me-2"></i> Add Team
+                        </button>
+                    </div>
                 </div>
             }
             else
@@ -152,19 +191,118 @@
                     <input type="hidden" id="taskColumnId" />
 
                     <div class="mb-3">
-                        <label class="form-label">Title</label>
-                        <input type="text" id="taskTitle" class="form-control" />
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0">Title</label>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Focus title" onclick="document.getElementById('taskTitle').focus();">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-link text-danger p-0" title="Clear title" onclick="document.getElementById('taskTitle').value='';">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <input type="text" id="taskTitle" class="form-control" required />
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Description</label>
                         <textarea id="taskDescription" class="form-control"></textarea>
                     </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select id="taskPriority" class="form-select">
+                            <option value="0">Low</option>
+                            <option value="1" selected>Medium</option>
+                            <option value="2">High</option>
+                            <option value="3">Critical</option>
+                        </select>
+                    </div>
+                    
+                  @*  <div class="mb-3">
+                        <label class="form-label">Link to Project (optional - for auto ID)</label>
+                        <select id="taskProjectId" class="form-select">
+                            <option value="">-- No Project --</option>
+                            <!-- Dynamically loaded -->
+                        </select>
+                        <small class="text-muted">Selecting a project generates an ID like P1T1, P1T2...</small>
+                    </div>*@
+                    
+                    <!-- Custom Fields Container -->
+                    <div id="customFieldsContainer"></div>
+                </div>
+
+                <div class="modal-footer">
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager"))
+                    {
+                        <button class="btn btn-sm btn-outline-secondary me-auto" onclick="openManageFieldsModal(); event.preventDefault();">
+                            <i class="bi bi-gear"></i> Manage Fields
+                        </button>
+                    }
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitCreateTask()">Create</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT TASK MODAL -->
+    <div class="modal fade" id="editTaskModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Task</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="editTaskId" />
+
+                    <div class="mb-3">
+                        <label class="form-label">Title</label>
+                        <input type="text" id="editTaskTitle" class="form-control" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea id="editTaskDescription" class="form-control" rows="4"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Priority</label>
+                            <select id="editTaskPriority" class="form-select">
+                                <option value="0">Low</option>
+                                <option value="1">Medium</option>
+                                <option value="2">High</option>
+                                <option value="3">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Assign To</label>
+                            <select id="editTaskAssignedTo" class="form-select">
+                                <option value="">-- Unassigned --</option>
+                                @if (Model != null && Model.AssignableUsers != null)
+                                {
+                                    foreach (var u in Model.AssignableUsers)
+                                    {
+                                        <option value="@u.Id">@u.UserName</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Custom Fields Container -->
+                    <div id="editCustomFieldsContainer"></div>
                 </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" onclick="submitCreateTask()">Create</button>
+                    <button class="btn btn-primary" onclick="submitEditTask()">Save Changes</button>
                 </div>
 
             </div>
@@ -218,68 +356,250 @@
         </div>
     </div>
 
+    <!-- CREATE PROJECT MODAL -->
+    <div class="modal fade" id="createProjectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-folder-plus me-2"></i>Create Project</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Project Name</label>
+                        <input type="text" id="newProjectName" class="form-control" placeholder="Enter project name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description (optional)</label>
+                        <textarea id="newProjectDescription" class="form-control" rows="3" placeholder="Project description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitCreateProject()">Create Project</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MANAGE CUSTOM FIELDS MODAL (Admin Only) -->
+    <div class="modal fade" id="manageFieldsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-sliders me-2"></i>Manage Custom Fields</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Existing Fields List -->
+                    <h6 class="mb-3">Existing Fields</h6>
+                    <div id="fieldsList" class="mb-4">
+                        <!-- Dynamically loaded fields -->
+                    </div>
+                    
+                    <!-- Add New Field Form -->
+                    <h6 class="mb-3 border-top pt-3">Add New Field</h6>
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label">Field Name</label>
+                            <input type="text" id="newFieldName" class="form-control" placeholder="e.g., Estimated Hours" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Field Type</label>
+                            <select id="newFieldType" class="form-select">
+                                <option value="Text">Text</option>
+                                <option value="Number">Number</option>
+                                <option value="Date">Date</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="newFieldRequired" />
+                                <label class="form-check-label" for="newFieldRequired">
+                                    Required
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-success mt-2" onclick="createNewField()">
+                        <i class="bi bi-plus-lg"></i> Add Field
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+            </div>
+        </div>
+    </div>
+
 
 </div>
 
+<!-- Task History Modal -->
+<div class="modal fade" id="taskHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock-history"></i> Task History - <span id="historyModalTaskId"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="historyTimeline" class="p-3">
+                    <!-- Timeline content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // Define admin status for JS
+    const isAdmin = @(User.IsInRole("Admin") ? "true" : "false");
+    const isManager = @((User.IsInRole("Manager") || User.IsInRole("SubManager")) ? "true" : "false");
+    window.isAdmin = isAdmin;
+    console.log("Admin status loaded:", window.isAdmin);
+</script>
+
+<!-- Load Custom Fields JS -->
 
 
 <style>
+
+
     .list-group-item {
         border: none;
     }
 
     .team-btn.active {
         background-color: #0d6efd;
-        color: #fff;
     }
-
-
-        .assign-toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #198754;
-            color: white;
-            padding: 14px 18px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,.25);
-            z-index: 9999;
-            font-size: 14px;
-        }
 
 </style>
 
 
 <script>
-    function toggleTeamTasks() {
-        const dropdown = document.getElementById("teamTasksDropdown");
-        const arrow = document.getElementById("teamArrow");
+    // expose admin flag to JS as boolean
+    const __isTasksAdmin = @((isAdmin).ToString().ToLower());
 
-        if (dropdown.style.display === "none") {
-            dropdown.style.display = "block";
-            arrow.innerText = "▲";
+    // ===== ADMIN TEAM MANAGEMENT =====
+
+    function toggleAddTeamInput() {
+        const container = document.getElementById('addTeamInputContainer');
+        const input = document.getElementById('newTeamNameInput');
+        
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            input.value = '';
+            input.focus();
+            
+            // Enter key to submit
+            input.onkeydown = function(e) {
+                if(e.key === 'Enter') submitCreateTeam();
+            };
         } else {
-            dropdown.style.display = "none";
-            arrow.innerText = "▼";
+            container.style.display = 'none';
         }
     }
 
+    function submitCreateTeam() {
+        const input = document.getElementById('newTeamNameInput');
+        const name = input.value.trim();
+        
+        if (!name) {
+             toggleAddTeamInput();
+             return;
+        }
 
-    function toggleMyTasks() {
-        const dropdown = document.getElementById("myTasksDropdown");
-        const arrow = document.getElementById("myTasksArrow");
-
-        if (!dropdown) return;
-
-        const isOpen = dropdown.style.display === "block";
-        dropdown.style.display = isOpen ? "none" : "block";
-        arrow.innerText = isOpen ? "▼" : "▲";
+        fetch('/Teams/Create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Name: name })
+        })
+        .then(res => {
+            if(!res.ok) return res.text().then(t => { throw new Error(t); });
+            return res.json();
+        })
+        .then(() => {
+            toggleAddTeamInput();
+            loadAdminTeamList(); // Refresh list
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Failed to add team: ' + err.message);
+        });
     }
-</script>
 
-<script>
-    // expose admin flag to JS as boolean
-    const __isTasksAdmin = @((isAdmin).ToString().ToLower());
+    function loadAdminTeamList() {
+        const container = document.getElementById('adminTeamList');
+        if(!container) return;
+
+        fetch('/Teams/GetAll')
+        .then(res => res.json())
+        .then(teams => {
+            if(teams.length === 0) {
+                 container.innerHTML = '<div class="text-muted ps-4 py-2 small">No teams found</div>';
+                 return;
+            }
+
+            container.innerHTML = teams.map(t => `
+               <div class="d-flex align-items-center justify-content-between group-hover-container px-0">
+                    <button type="button"
+                            class="list-group-item list-group-item-action bg-dark text-white team-btn flex-grow-1 text-start border-0 py-2 ps-4"
+                            data-team="${t.name}"
+                            onclick="loadTeamBoard('${t.name}')">
+                        <i class="bi bi-people me-2"></i> ${t.name}
+                    </button>
+                    
+                    <button class="btn btn-sm btn-link text-danger p-0 me-2" 
+                            style="opacity:0.5;"
+                            onmouseover="this.style.opacity=1"
+                            onmouseout="this.style.opacity=0.5"
+                            onclick="deleteTeam(${t.id}, '${t.name}')" 
+                            title="Delete Team">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+            
+            // Re-highlight if needed
+            if(typeof currentTeamName !== 'undefined') {
+                 document.querySelectorAll(`.team-btn[data-team="${currentTeamName}"]`)
+                         .forEach(b => b.classList.add('active'));
+            }
+        });
+    }
+
+    function deleteTeam(id, name) {
+        if(!confirm(`Delete team '${name}'? This cannot be undone.`)) return;
+
+        fetch('/Teams/Delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(id)
+        })
+        .then(res => {
+             if(!res.ok) throw new Error('Failed to delete');
+             loadAdminTeamList();
+             // clear board if deleted team was active
+             const boardContainer = document.getElementById('taskBoardContainer');
+             boardContainer.innerHTML = '';
+        })
+        .catch(err => alert(err.message));
+    }
+
+    // Load initially if Admin
+    document.addEventListener('DOMContentLoaded', function() {
+        if(__isTasksAdmin) {
+            loadAdminTeamList();
+        }
+    });
 
     // open add column modal (admin only)
     function openAddColumnModal(teamName) {
@@ -313,7 +633,18 @@
     });
 </script>
 
+@{
+    ViewData["Title"] = "Task Board";
+}
+
+
+<link rel="stylesheet" href="~/css/taskHistory.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
+
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="~/js/customFields.js"></script>
+<script src="~/js/taskHistory.js"></script>
+<script src="~/js/index_ui.js"></script>
 
     <script>
            function enableColumnDrag() {
@@ -331,25 +662,32 @@
             board._sortableInstance = null;
         }
 
-        board._sortableInstance = new Sortable(board, {
-            animation: 150,
-            direction: 'horizontal',
-            draggable: '.kanban-column',
+           board._sortableInstance = new Sortable(board, {
+        animation: 150,
+        direction: 'horizontal',
+        draggable: '.kanban-column',
 
-            onEnd: function () {
-                const columnIds = Array.from(
-                    board.querySelectorAll('.kanban-column')
-                ).map(c => parseInt(c.dataset.columnId));
+        // 🔥 THIS IS THE FIX
+        handle: '.column-drag-handle',
 
-                fetch('/Tasks/ReorderColumns', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(columnIds)
-                }).catch(err => console.error('Failed to save column order', err));
-            }
-        });
+        onEnd: function () {
+            const columnIds = Array.from(
+                board.querySelectorAll('.kanban-column')
+            ).map(c => parseInt(c.dataset.columnId));
+
+            fetch('/Tasks/ReorderColumns', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(columnIds)
+            });
+        }
+    });
+
     }
 
+
+// NOTE: openCreateTaskModal and submitCreateTask are defined later in this file.
+// Removed duplicate definitions to avoid function override/conflict
 
         function startRename(columnId) {
             if (!__isTasksAdmin) return;
@@ -413,6 +751,7 @@
 
                 if (typeof enableColumnDrag === "function") {
                     enableColumnDrag();
+                    enableTaskDragDrop();
                 }
             })
             .catch(err => {
@@ -456,12 +795,12 @@
             window.__focusedTaskId = taskId;
 
     // show inputs
-    document.querySelector(`.task-title-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
-    document.querySelector(`.task-desc-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
+    // document.querySelector(`.task-title-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
+    // document.querySelector(`.task-desc-input[data-task-id='${taskId}']`)?.classList.remove('d-none');
 
     // hide static text
-    document.querySelector(`.task-title-text`)?.classList.add('d-none');
-    document.querySelector(`.task-desc-text`)?.classList.add('d-none');
+    // document.querySelector(`.task-title-text`)?.classList.add('d-none');
+    // document.querySelector(`.task-desc-text`)?.classList.add('d-none');
 
 
 
@@ -577,14 +916,135 @@
         document.getElementById('taskTitle').value = '';
         document.getElementById('taskDescription').value = '';
 
+        // Load projects into dropdown
+        loadProjectsForTaskModal();
+
+        // Render custom fields into the modal (preserve any existing values)
+        if (typeof renderCustomFieldInputs === 'function') {
+            try {
+                renderCustomFieldInputs('customFieldsContainer', {});
+            } catch (e) { console.error(e); }
+        }
+
         new bootstrap.Modal(document.getElementById('createTaskModal')).show();
     }
 
+    // ================= EDIT TASK MODAL =================
+
+    function openEditTaskModal(taskId) {
+        // Fetch task details
+        fetch(`/Tasks/GetTask?id=${taskId}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load task details");
+                return res.json();
+            })
+            .then(task => {
+                // Populate Modal
+                document.getElementById('editTaskId').value = task.id;
+                document.getElementById('editTaskTitle').value = task.title;
+                document.getElementById('editTaskDescription').value = task.description || "";
+                document.getElementById('editTaskPriority').value = task.priority;
+                document.getElementById('editTaskAssignedTo').value = task.assignedToUserId || "";
+
+                // Render Custom Fields with values
+                if (typeof renderCustomFieldInputs === 'function') {
+                    renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {});
+                }
+
+                // Show Modal
+                new bootstrap.Modal(document.getElementById('editTaskModal')).show();
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error loading task details");
+            });
+    }
+
+    function submitEditTask() {
+        const taskId = parseInt(document.getElementById('editTaskId').value);
+        const title = document.getElementById('editTaskTitle').value.trim();
+        const description = document.getElementById('editTaskDescription').value.trim();
+        const priority = parseInt(document.getElementById('editTaskPriority').value);
+        const assignedToUserId = document.getElementById('editTaskAssignedTo').value;
+
+        if (!title) {
+            alert("Title is required");
+            return;
+        }
+
+        // Validate custom fields
+        if (typeof validateCustomFields === 'function' && !validateCustomFields()) {
+            return;
+        }
+
+        const data = {
+            taskId: taskId,
+            title: title,
+            description: description,
+            priority: priority,
+            assignedToUserId: assignedToUserId, // Send assigned user
+            customFieldValues: (typeof collectCustomFieldValues === 'function') ? 
+                               // Need to target the specific container or ensure helper works globally
+                               // The helper targets 'customFieldsContainer' by default in customFields.js? 
+                               // Wait, let me check customFields.js
+                               collectCustomFieldValues('editCustomFieldsContainer') : {}
+        };
+
+        fetch('/Tasks/UpdateTask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error("Failed to update task");
+            return res.json();
+        })
+        .then(() => {
+            // Close modal
+            const modalEl = document.getElementById('editTaskModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            // Reload board
+            loadTeamBoard(currentTeamName);
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Failed to update task");
+        });
+    }
+
+    function loadProjectsForTaskModal() {
+        const select = document.getElementById('taskProjectId');
+        if (!select) return;
+
+        fetch('/Project/GetProjects')
+            .then(res => res.json())
+            .then(projects => {
+                select.innerHTML = '<option value="">-- No Project --</option>';
+                projects.forEach(p => {
+                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+                });
+            })
+            .catch(() => {
+                select.innerHTML = '<option value="">-- No Project --</option>';
+            });
+    }
+
     function submitCreateTask() {
+        const projectSelect = document.getElementById('taskProjectId');
+        const projectId = projectSelect?.value ? parseInt(projectSelect.value) : null;
+
+        const priorityEl = document.getElementById('taskPriority');
+        const priority = priorityEl ? parseInt(priorityEl.value) : 1;
+
         const data = {
             columnId: parseInt(document.getElementById('taskColumnId').value),
             title: document.getElementById('taskTitle').value.trim(),
-            description: document.getElementById('taskDescription').value.trim()
+            description: document.getElementById('taskDescription').value.trim(),
+            projectId: projectId,
+            priority: priority,
+            customFieldValues: (typeof collectCustomFieldValues === 'function') ? collectCustomFieldValues() : {}
         };
 
         fetch('/Tasks/CreateTask', {
@@ -620,9 +1080,9 @@
         const taskId = window.__focusedTaskId;
         if (!taskId) return;
 
-        const title = document.querySelector(`.task-title-input[data-task-id='${taskId}']`).value;
-        const desc = document.querySelector(`.task-desc-input[data-task-id='${taskId}']`).value;
-        const assignedTo = document.querySelector(`.task-assign-select[data-task-id='${taskId}']`).value;
+        const title = document.getElementById('focusedTaskTitle').value;
+        const desc = document.getElementById('focusedTaskDescription').value;
+        const assignedTo = document.getElementById('focusedTaskAssignUser').value;
 
         fetch('/Tasks/UpdateTask', {
             method: 'POST',
@@ -707,4 +1167,199 @@
                 setTimeout(() => toast.remove(), 5000);
             });
     }
+
+
+
+
+
+
+
+
+
+        function showAssignDropdown(taskId) {
+
+        // Hide all other assign containers
+        document.querySelectorAll('.task-assign-container').forEach(c => {
+            c.classList.add('d-none');
+        });
+
+        // Show current task assign UI
+        const container = document.querySelector(
+            `.task-assign-container[data-task-id='${taskId}']`
+        );
+
+        if (container) {
+            container.classList.remove('d-none');
+        }
+    }
+
+        function cancelAssignTask(taskId) {
+        const container = document.querySelector(
+            `.task-assign-container[data-task-id='${taskId}']`
+        );
+
+        if (container) {
+            container.classList.add('d-none');
+        }
+    }
+
+
+        function confirmAssignTask(taskId) {
+
+        const select = document.querySelector(
+            `.task-assign-select[data-task-id='${taskId}']`
+        );
+
+        if (!select || !select.value) {
+            alert("Please select a user");
+            return;
+        }
+
+        const userId = select.value;
+
+        fetch('/Tasks/AssignTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `taskId=${taskId}&userId=${userId}`
+        })
+        .then(res => {
+            if (!res.ok) throw new Error();
+            return res.json();
+        })
+        .then(result => {
+
+            // Optional toast (you already have this)
+            showAssignToast(userId, result.assignedBy, result.assignedAt);
+
+            // Hide assign UI
+            cancelAssignTask(taskId);
+
+            // Reload board to reflect assignment
+            loadTeamBoard(currentTeamName);
+        })
+        .catch(() => alert("Failed to assign task"));
+    }
+
+
+                function enableTaskDragDrop() {
+
+        document.querySelectorAll('.kanban-tasks').forEach(container => {
+
+            if (container._taskSortable) {
+                container._taskSortable.destroy();
+            }
+
+            container._taskSortable = new Sortable(container, {
+                group: 'tasks',
+                animation: 150,
+                draggable: '.task-card',
+                ghostClass: 'task-ghost',
+                chosenClass: 'task-chosen',
+
+                onEnd: function (evt) {
+                    const taskId = parseInt(evt.item.dataset.taskId);
+                    const newColumnId = parseInt(evt.to.dataset.columnId);
+
+                    if (!taskId || !newColumnId) return;
+
+                    updateTaskColumn(taskId, newColumnId);
+                }
+            });
+        });
+    }
+
+
+
+        function updateTaskColumn(taskId, columnId) {
+
+        fetch('/Tasks/MoveTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                taskId: taskId,
+                columnId: columnId
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to move task');
+        })
+        .catch(err => {
+            alert(err.message);
+            // reload board to recover UI
+            loadTeamBoard(currentTeamName);
+        });
+    }
+
+    function deleteProject(id, name) {
+        if(!confirm(`Delete project '${name}' and all its contents? This cannot be undone.`)) return;
+
+        fetch('/Project/DeleteProject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(id)
+        })
+        .then(res => {
+             if(!res.ok) throw new Error('Failed to delete project');
+             loadProjectList();
+             // clear board if deleted project was active
+             const boardContainer = document.getElementById('taskBoardContainer');
+             boardContainer.innerHTML = '';
+        })
+        .catch(err => alert(err.message));
+    }
+
+    function filterBoardTasks() {
+        const searchText = document.getElementById('taskSearchInput')?.value.toLowerCase() || "";
+        const priorityFilter = document.getElementById('priorityFilter')?.value || "";
+        const assigneeFilter = document.getElementById('assigneeFilter')?.value || "";
+        const adminFilter = document.getElementById('adminAssignedFilter')?.value || "";
+
+        const cards = document.querySelectorAll('.task-card');
+        
+        cards.forEach(card => {
+            // 1. Search Text (Title, Description, Custom Fields)
+            const title = card.querySelector('.task-title-text')?.innerText.toLowerCase() || "";
+            const desc = card.querySelector('.task-desc-text')?.innerText.toLowerCase() || "";
+            const customFields = card.querySelector('.custom-fields-summary')?.innerText.toLowerCase() || "";
+            
+            const matchesSearch = !searchText || 
+                                 title.includes(searchText) || 
+                                 desc.includes(searchText) || 
+                                 customFields.includes(searchText);
+
+            // 2. Priority
+            const cardPriority = card.dataset.priority || "";
+            const matchesPriority = !priorityFilter || cardPriority === priorityFilter;
+
+            // 3. Assignee
+            const cardAssigneeId = card.dataset.assignedToId || "";
+            const matchesAssignee = !assigneeFilter || cardAssigneeId === assigneeFilter;
+
+            // 4. Assigned by Admin
+            const isAdminAssigned = card.dataset.assignedByAdmin === "true";
+            let matchesAdmin = true;
+            if (adminFilter === "Admin") {
+                matchesAdmin = isAdminAssigned;
+            }
+
+            // Combine all
+            if (matchesSearch && matchesPriority && matchesAssignee && matchesAdmin) {
+                card.style.display = "block";
+                card.classList.remove('d-none'); // Ensure no d-none override
+            } else {
+                card.style.display = "none";
+            }
+        });
+    }
+
+    function getCsrfToken() {
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+        return tokenInput ? tokenInput.value : '';
+    }
 </script>
+
+

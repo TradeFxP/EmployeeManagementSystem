@@ -26,6 +26,9 @@ namespace UserRoles.Models
         [Phone]
         public string? MobileNumber { get; set; }
 
+
+        public string? Address { get; set; }
+
         // ================= ADMIN EMAIL CHANGE (NEW) =================
 
         /// <summary>

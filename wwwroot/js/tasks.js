@@ -164,47 +164,30 @@ $(document).on("dragover", ".kanban-column", function (e) {
 $(document).on("drop", ".kanban-column", function (e) {
     e.preventDefault();
 
+    // 🔥 IGNORE IF NOT DRAGGING A TASK (e.g. column drag)
+    if (!draggedTaskId) return;
+
     const targetStatus = $(this).data("status");
 
-    if (!isMoveAllowed(draggedFromStatus, targetStatus)) {
-        alert("You are not allowed to move this task.");
-        return;
-    }
 
-    $.post("/Tasks/UpdateStatus", {
-        taskId: draggedTaskId,
-        newStatus: targetStatus
-    })
-        .done(() => {
-            location.reload();
-        })
-        .fail(() => {
-            alert("Status update failed");
-        });
+
+    // $.post("/Tasks/UpdateStatus", {
+    //     taskId: draggedTaskId,
+    //     newStatus: targetStatus
+    // })
+    //     .done(() => {
+    //         location.reload();
+    //     })
+    //     .fail(() => {
+    //         alert("Status update failed");
+    //     });
 });
 
 
 
 function isMoveAllowed(from, to) {
-
-    // SAME COLUMN
     if (from === to) return false;
-
-    const role = document.body.dataset.role; // we’ll add this next
-
-    if (role === "User") {
-        return (
-            (from === "ToDo" && to === "Doing") ||
-            (from === "Doing" && to === "Review")
-        );
-    }
-
-    // Admin / Manager / Sub-Manager
-    return (
-        (from === "ToDo" && to === "Doing") ||
-        (from === "Doing" && to === "Review") ||
-        (from === "Review" && to === "Complete")
-    );
+    return true; // Allow all moves
 }
 
 
@@ -215,3 +198,148 @@ $(document).on("dragenter", ".kanban-column", function () {
 $(document).on("dragleave drop", ".kanban-column", function () {
     $(this).removeClass("drag-over");
 });
+
+// ========== NEW TASK CREATION WITH PRIORITY & CUSTOM FIELDS ==========
+
+// Open create task modal
+async function openCreateTaskModal(columnId) {
+    document.getElementById("taskColumnId").value = columnId;
+    document.getElementById("taskTitle").value = "";
+    document.getElementById("taskDescription").value = "";
+    document.getElementById("taskPriority").value = "1"; // Default to Medium
+
+    // Render custom fields if available and wait for them to load
+    if (typeof renderCustomFieldInputs === 'function') {
+        try {
+            await renderCustomFieldInputs('customFieldsContainer');
+        } catch (e) {
+            console.error('Failed to render custom fields before showing modal', e);
+        }
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('createTaskModal'));
+    modal.show();
+}
+
+// Submit create task form
+function submitCreateTask() {
+    const title = document.getElementById("taskTitle")?.value.trim();
+    const description = document.getElementById("taskDescription")?.value.trim();
+    const columnId = document.getElementById("taskColumnId").value;
+    const projectId = document.getElementById("taskProjectId")?.value || null;
+    const priority = parseInt(document.getElementById("taskPriority").value);
+
+    if (!title) {
+        alert("Please enter a task title");
+        return;
+    }
+
+    if (!columnId) {
+        alert("Column ID is missing");
+        return;
+    }
+
+    // Ensure custom fields are rendered and validated before collecting values
+    if (typeof validateCustomFields === 'function' && !validateCustomFields()) {
+        return;
+    }
+
+    const customFieldValues = (typeof collectCustomFieldValues === 'function')
+        ? collectCustomFieldValues()
+        : {};
+
+    $.ajax({
+        url: "/Tasks/CreateTask",
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+            columnId: parseInt(columnId),
+            title: title,
+            description: description,
+            projectId: projectId ? parseInt(projectId) : null,
+            priority: priority,
+            customFieldValues: customFieldValues
+        }),
+        success: function (response) {
+            if (response && response.success) {
+                bootstrap.Modal.getInstance(document.getElementById("createTaskModal"))?.hide();
+                // reload board
+                if (typeof currentTeamName !== 'undefined') {
+                    // prefer partial reload
+                    if (window.loadTeamBoard) loadTeamBoard(currentTeamName);
+                    else location.reload();
+                } else {
+                    location.reload();
+                }
+            } else {
+                bootstrap.Modal.getInstance(document.getElementById("createTaskModal"))?.hide();
+                // still reload to pick up new task
+                if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) loadTeamBoard(currentTeamName);
+                else location.reload();
+            }
+        },
+        error: function (xhr) {
+            const text = xhr.responseText || 'An error occurred while creating the task.';
+            alert(text);
+        }
+    });
+}
+
+// Get priority badge HTML
+function getPriorityBadge(priority) {
+    const badges = {
+        0: '<span class="badge bg-secondary">Low</span>',
+        1: '<span class="badge bg-info">Medium</span>',
+        2: '<span class="badge bg-warning text-dark">High</span>',
+        3: '<span class="badge bg-danger">Critical</span>'
+    };
+    return badges[priority] || '';
+}
+
+// ================= ASSIGN TASK UI HELPERS =================
+
+function showAssignUI(taskId) {
+    // Hide actions toolbar
+    $(`.task-card[data-task-id="${taskId}"] .task-actions`).addClass('d-none');
+
+    // Show assign container
+    $(`.task-assign-container[data-task-id="${taskId}"]`).removeClass('d-none');
+}
+
+function cancelAssignTask(taskId) {
+    // Hide assign container
+    $(`.task-assign-container[data-task-id="${taskId}"]`).addClass('d-none');
+
+    // Show actions toolbar
+    $(`.task-card[data-task-id="${taskId}"] .task-actions`).removeClass('d-none');
+}
+
+function confirmAssignTask(taskId) {
+    const container = $(`.task-assign-container[data-task-id="${taskId}"]`);
+    const select = container.find('.task-assign-select');
+    const userId = select.val();
+
+    if (!userId) {
+        alert("Please select a user");
+        return;
+    }
+
+    $.post("/Tasks/AssignTask", { taskId: taskId, userId: userId })
+        .done(function (response) {
+            if (response.success) {
+                // Determine if we need to reload the whole board or just update UI
+                // For simplicity, reload current board to reflect all changes (audit log, etc)
+                const activeTeam = $(".task-link.active").data("url"); // e.g., /Tasks/TeamBoard?team=...
+                if (activeTeam) {
+                    $("#taskBoardContainer").load(activeTeam);
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert("Failed to assign task");
+            }
+        })
+        .fail(function () {
+            alert("Error assigning task");
+        });
+}

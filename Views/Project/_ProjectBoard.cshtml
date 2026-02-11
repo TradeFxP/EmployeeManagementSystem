@@ -1,0 +1,1255 @@
+@using UserRoles.ViewModels
+@model ProjectBoardViewModel
+
+<div class="project-board-header d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <button id="backToProjectsBtn" 
+                class="btn btn-sm btn-outline-secondary"
+                onclick="loadProjectList()">
+            ← Back
+        </button>
+        <h4 class="mb-0">
+            <i class="bi bi-diagram-3 me-2 text-primary"></i>
+            @Model.Project?.Name
+        </h4>
+    </div>
+
+    @if (User.IsInRole("Admin"))
+    {
+        <button class="btn btn-sm btn-primary" onclick="openCreateEpicModal()">
+            <i class="bi bi-plus-lg me-1"></i> Add Epic
+        </button>
+    }
+</div>
+
+<!-- SEARCH BAR -->
+<div class="mb-4">
+    <div class="input-group">
+        <span class="input-group-text bg-white">
+            <i class="bi bi-search"></i>
+        </span>
+        <input type="text" 
+               id="workItemSearch" 
+               class="form-control" 
+               placeholder="Search by ID (E1, E1F1, E1F1S1...) or title"
+               onkeyup="searchWorkItems(this.value)" />
+    </div>
+    <div id="searchResults" class="search-results-dropdown"></div>
+</div>
+
+<!-- PROJECT BOARD -->
+<div class="project-board" id="projectBoard">
+    <input type="hidden" id="currentProjectId" value="@Model.Project?.Id" />
+
+    @if (Model.Epics == null || !Model.Epics.Any())
+    {
+        <div class="text-muted text-center py-5">
+            <i class="bi bi-inbox display-4 d-block mb-3"></i>
+            No epics yet. Click "Add Epic" to get started.
+        </div>
+    }
+    else
+    {
+        <div class="epics-container" id="epicsContainer">
+            @foreach (var epic in Model.Epics)
+            {
+                <div class="work-item-card epic-card" 
+                     data-epic-id="@epic.Id"
+                     data-work-item-id="@epic.WorkItemId">
+                    
+                    <!-- EPIC HEADER -->
+                    <div class="work-item-header epic-header d-flex justify-content-between align-items-center"
+                         onclick="toggleEpicExpand(@epic.Id)">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="drag-handle epic-drag" title="Drag to reorder">⠿</span>
+                            <span class="work-item-badge epic-badge">@epic.WorkItemId</span>
+                            <span class="expand-arrow" id="epicArrow-@epic.Id">▼</span>
+                            <strong class="work-item-title">@epic.Title</strong>
+                        </div>
+                        <div class="work-item-actions" onclick="event.stopPropagation()">
+                            <button class="btn btn-sm btn-outline-primary" 
+                                    onclick="openCreateFeatureModal(@epic.Id, '@epic.WorkItemId')" 
+                                    title="Add Feature">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" 
+                                    data-id="@epic.Id"
+                                    data-title="@epic.Title"
+                                    data-description="@epic.Description"
+                                    onclick="openEditEpicModal(this)" 
+                                    title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        onclick="deleteEpic(@epic.Id)" 
+                                        title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- EPIC BODY (Features) -->
+                    <div class="work-item-body epic-body" id="epicBody-@epic.Id">
+                        @if (!string.IsNullOrEmpty(epic.Description))
+                        {
+                            <p class="work-item-description text-muted mb-3">@epic.Description</p>
+                        }
+
+                        <div class="features-container" data-epic-id="@epic.Id">
+                            @foreach (var feature in epic.Features)
+                            {
+                                <div class="work-item-card feature-card" 
+                                     data-feature-id="@feature.Id"
+                                     data-work-item-id="@feature.WorkItemId">
+                                    
+                                    <!-- FEATURE HEADER -->
+                                    <div class="work-item-header feature-header d-flex justify-content-between align-items-center"
+                                         onclick="toggleFeatureExpand(@feature.Id)">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="drag-handle feature-drag">⠿</span>
+                                            <span class="work-item-badge feature-badge">@feature.WorkItemId</span>
+                                            <span class="expand-arrow" id="featureArrow-@feature.Id">▼</span>
+                                            <strong class="work-item-title">@feature.Title</strong>
+                                        </div>
+                                        <div class="work-item-actions" onclick="event.stopPropagation()">
+                                            <button class="btn btn-sm btn-outline-success" 
+                                                    onclick="openCreateStoryModal(@feature.Id, '@feature.WorkItemId')" 
+                                                    title="Add Story">
+                                                <i class="bi bi-plus-lg"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                    data-id="@feature.Id"
+                                                    data-title="@feature.Title"
+                                                    data-description="@feature.Description"
+                                                    onclick="openEditFeatureModal(this)" 
+                                                    title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            @if (User.IsInRole("Admin"))
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger" 
+                                                        onclick="deleteFeature(@feature.Id)" 
+                                                        title="Delete">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <!-- FEATURE BODY (Stories) -->
+                                    <div class="work-item-body feature-body" id="featureBody-@feature.Id">
+                                        @if (!string.IsNullOrEmpty(feature.Description))
+                                        {
+                                            <p class="work-item-description text-muted mb-2">@feature.Description</p>
+                                        }
+
+                                        <div class="stories-container" data-feature-id="@feature.Id">
+                                            @foreach (var story in feature.Stories)
+                                            {
+                                                <div class="work-item-card story-card" 
+                                                     data-story-id="@story.Id"
+                                                     data-work-item-id="@story.WorkItemId">
+                                                    
+                                                    <!-- STORY HEADER -->
+                                                    <div class="work-item-header story-header d-flex justify-content-between align-items-center"
+                                                         onclick="toggleStoryExpand(@story.Id)">
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <span class="drag-handle story-drag">⠿</span>
+                                                            <span class="work-item-badge story-badge">@story.WorkItemId</span>
+                                                            <span class="expand-arrow" id="storyArrow-@story.Id">▼</span>
+                                                            <strong class="work-item-title">@story.Title</strong>
+                                                        </div>
+                                                        <div class="work-item-actions" onclick="event.stopPropagation()">
+                                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                                    onclick="openCreateProjectTaskModal(@story.Id, '@story.WorkItemId')" 
+                                                                    title="Add Task">
+                                                                <i class="bi bi-plus-lg"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                                    data-id="@story.Id"
+                                                                    data-title="@story.Title"
+                                                                    data-description="@story.Description"
+                                                                    onclick="openEditStoryModal(this)" 
+                                                                    title="Edit">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                            @if (User.IsInRole("Admin"))
+                                                            {
+                                                                <button class="btn btn-sm btn-outline-danger" 
+                                                                        onclick="deleteStory(@story.Id)" 
+                                                                        title="Delete">
+                                                                    <i class="bi bi-trash"></i>
+                                                                </button>
+                                                            }
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- STORY BODY (Tasks) -->
+                                                    <div class="work-item-body story-body" id="storyBody-@story.Id">
+                                                        @if (!string.IsNullOrEmpty(story.Description))
+                                                        {
+                                                            <p class="work-item-description text-muted mb-2">@story.Description</p>
+                                                        }
+
+                                                        <div class="tasks-container" data-story-id="@story.Id">
+                                                            @foreach (var task in story.Tasks)
+                                                            {
+                                                                <div class="work-item-card task-card-project" 
+                                                                     data-task-id="@task.Id"
+                                                                     data-work-item-id="@task.WorkItemId">
+                                                                    
+                                                                    <div class="work-item-header task-header d-flex justify-content-between align-items-center">
+                                                                        <div class="d-flex align-items-center gap-2">
+                                                                            <span class="drag-handle task-drag">⠿</span>
+                                                                            <span class="work-item-badge task-badge">@task.WorkItemId</span>
+                                                                            <span class="work-item-title">@task.Title</span>
+                                                                        </div>
+                                                                        <div class="work-item-actions">
+                                                                            <button class="btn btn-sm btn-outline-warning me-2" 
+                                                                                    onclick="openAssignTaskToTeamModal(@task.Id, '@task.Title')" 
+                                                                                    title="Assign to Team">
+                                                                                <i class="bi bi-arrow-right-circle"></i>
+                                                                            </button>
+                                                                            <span class="badge bg-@(task.Status.ToString().ToLower() == "complete" ? "success" : task.Status.ToString().ToLower() == "doing" ? "warning" : "secondary")">
+                                                                                @task.Status
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- CREATE EPIC MODAL -->
+<div class="modal fade" id="createEpicModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-purple text-white">
+                <h5 class="modal-title"><i class="bi bi-lightning-charge me-2"></i>Create Epic</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                    <input type="text" id="epicTitle" class="form-control form-control-lg" placeholder="Enter epic title" maxlength="200" />
+                    <div class="form-text">Max 200 characters</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="epicDescription" class="form-control description-textarea" rows="5" placeholder="Optional description (supports long text)" maxlength="2000"></textarea>
+                    <div class="form-text"><span id="epicDescChars">0</span>/2000 characters</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-purple" onclick="createEpic()">Create Epic</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT EPIC MODAL -->
+<div class="modal fade" id="editEpicModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-purple text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Epic</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editEpicId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                    <input type="text" id="editEpicTitle" class="form-control form-control-lg" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="editEpicDescription" class="form-control description-textarea" rows="5" maxlength="2000"></textarea>
+                    <div class="form-text"><span id="editEpicDescChars">0</span>/2000 characters</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-purple" onclick="updateEpic()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CREATE FEATURE MODAL -->
+<div class="modal fade" id="createFeatureModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-box me-2"></i>Create Feature</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="featureEpicId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Parent Epic</label>
+                    <input type="text" id="featureParentDisplay" class="form-control bg-light" readonly />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                    <input type="text" id="featureTitle" class="form-control form-control-lg" placeholder="Enter feature title" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="featureDescription" class="form-control description-textarea" rows="5" placeholder="Optional description" maxlength="2000"></textarea>
+                    <div class="form-text"><span id="featureDescChars">0</span>/2000 characters</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" onclick="createFeature()">Create Feature</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT FEATURE MODAL -->
+<div class="modal fade" id="editFeatureModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Feature</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editFeatureId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                    <input type="text" id="editFeatureTitle" class="form-control form-control-lg" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="editFeatureDescription" class="form-control description-textarea" rows="5" maxlength="2000"></textarea>
+                    <div class="form-text"><span id="editFeatureDescChars">0</span>/2000 characters</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" onclick="updateFeature()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CREATE STORY MODAL -->
+<div class="modal fade" id="createStoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-book me-2"></i>Create Story</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="storyFeatureId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Parent Feature</label>
+                    <input type="text" id="storyParentDisplay" class="form-control bg-light" readonly />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                    <input type="text" id="storyTitle" class="form-control form-control-lg" placeholder="Enter story title" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="storyDescription" class="form-control description-textarea" rows="5" placeholder="Optional description" maxlength="2000"></textarea>
+                    <div class="form-text"><span id="storyDescChars">0</span>/2000 characters</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" onclick="createStory()">Create Story</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT STORY MODAL -->
+<div class="modal fade" id="editStoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Story</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editStoryId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                    <input type="text" id="editStoryTitle" class="form-control form-control-lg" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="editStoryDescription" class="form-control description-textarea" rows="5" maxlength="2000"></textarea>
+                    <div class="form-text"><span id="editStoryDescChars">0</span>/2000 characters</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" onclick="updateStory()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CREATE TASK MODAL (PROJECT) -->
+<div class="modal fade" id="createProjectTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title"><i class="bi bi-check2-square me-2"></i>Create Task</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="taskStoryId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Parent Story</label>
+                    <input type="text" id="taskParentDisplay" class="form-control bg-light" readonly />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                    <input type="text" id="projectTaskTitle" class="form-control form-control-lg" placeholder="Enter task title" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="projectTaskDescription" class="form-control description-textarea" rows="5" placeholder="Optional description" maxlength="2000"></textarea>
+                    <div class="form-text"><span id="taskDescChars">0</span>/2000 characters</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-dark" onclick="createProjectTask()">Create Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ASSIGN TASK TO TEAM MODAL -->
+<div class="modal fade" id="assignTaskToTeamModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-arrow-right-circle me-2"></i>Assign to Team</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assignTaskId" />
+                <p>Assigning task: <strong id="assignTaskTitleDisplay"></strong></p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Team</label>
+                    <select id="assignTeamSelect" class="form-select form-select-lg">
+                        <option value="">Loading teams...</option>
+                    </select>
+                </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    This task will be moved to the selected team's board (first column).
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-warning" onclick="submitAssignTaskToTeam()">Assign Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ===== COLOR SCHEME ===== */
+.bg-purple { background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%) !important; }
+.btn-purple { background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%); color: white; border: none; }
+.btn-purple:hover { background: linear-gradient(135deg, #5a32a3 0%, #7c3aed 100%); color: white; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(111, 66, 193, 0.4); }
+
+/* ===== PROJECT BOARD ===== */
+.project-board {
+    padding: 10px 0;
+}
+
+/* ===== WORK ITEM CARDS ===== */
+.work-item-card {
+    background: #ffffff;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.work-item-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.work-item-header {
+    padding: 14px 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.work-item-header:hover {
+    filter: brightness(0.97);
+}
+
+.work-item-body {
+    padding: 14px 18px 18px 36px;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    background: rgba(0,0,0,0.01);
+}
+
+.work-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.work-item-description {
+    font-size: 13px;
+    margin-bottom: 10px;
+    line-height: 1.6;
+    color: #555;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    max-height: 120px;
+    overflow-y: auto;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.02);
+    border-radius: 6px;
+    border-left: 3px solid rgba(0,0,0,0.1);
+}
+
+/* ===== BADGES ===== */
+.work-item-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    letter-spacing: 0.5px;
+}
+
+.epic-badge { background: linear-gradient(135deg, #6f42c1, #8b5cf6); color: white; }
+.feature-badge { background: linear-gradient(135deg, #0d6efd, #3b82f6); color: white; }
+.story-badge { background: linear-gradient(135deg, #198754, #22c55e); color: white; }
+.task-badge { background: linear-gradient(135deg, #6c757d, #9ca3af); color: white; }
+
+/* ===== HEADERS ===== */
+.epic-header {
+    background: linear-gradient(135deg, #f8f0ff 0%, #f3e8ff 100%);
+    border-left: 5px solid #6f42c1;
+}
+.feature-header {
+    background: linear-gradient(135deg, #e8f4ff 0%, #dbeafe 100%);
+    border-left: 5px solid #0d6efd;
+}
+.story-header {
+    background: linear-gradient(135deg, #e8fff0 0%, #d1fae5 100%);
+    border-left: 5px solid #198754;
+}
+.task-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 5px solid #6c757d;
+}
+
+/* ===== DRAG HANDLE ===== */
+.drag-handle {
+    cursor: grab;
+    opacity: 0.4;
+    user-select: none;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+
+.drag-handle:hover {
+    opacity: 1;
+    color: #6f42c1;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* ===== EXPAND ARROW ===== */
+.expand-arrow {
+    font-size: 10px;
+    opacity: 0.6;
+    transition: transform 0.25s ease;
+}
+
+.expand-arrow.collapsed {
+    transform: rotate(-90deg);
+}
+
+/* ===== ACTIONS ===== */
+.work-item-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.work-item-actions .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.work-item-actions .btn:hover {
+    transform: translateY(-1px);
+}
+
+/* ===== NESTED CARDS ===== */
+.features-container { margin-left: 0; }
+.stories-container { margin-left: 0; }
+.tasks-container { margin-left: 0; }
+
+.feature-card { margin-left: 10px; }
+.story-card { margin-left: 10px; }
+.task-card-project { margin-left: 10px; }
+
+/* ===== SEARCH ===== */
+.search-results-dropdown {
+    position: absolute;
+    z-index: 1000;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    width: calc(100% - 32px);
+    display: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.search-result-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background 0.15s;
+}
+
+.search-result-item:hover {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-breadcrumb {
+    font-size: 11px;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+/* ===== MODAL IMPROVEMENTS ===== */
+.modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+}
+
+.modal-footer {
+    border-top: 1px solid #eee;
+    padding: 16px 24px;
+}
+
+.description-textarea {
+    resize: vertical;
+    min-height: 120px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.form-control-lg {
+    font-size: 16px;
+    padding: 12px 16px;
+}
+
+/* ===== HIGHLIGHT ANIMATION ===== */
+.highlight-pulse {
+    animation: highlightPulse 2s ease-out;
+}
+
+@@keyframes highlightPulse {
+    0% { box-shadow: 0 0 0 0 rgba(111, 66, 193, 0.7); }
+    50% { box-shadow: 0 0 0 15px rgba(111, 66, 193, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(111, 66, 193, 0); }
+}
+</style>
+
+<script>
+(function() {
+    // ===== EXPAND/COLLAPSE =====
+    window.toggleEpicExpand = function(epicId) {
+        const body = document.getElementById(`epicBody-${epicId}`);
+        const arrow = document.getElementById(`epicArrow-${epicId}`);
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            arrow.classList.remove('collapsed');
+        } else {
+            body.style.display = 'none';
+            arrow.classList.add('collapsed');
+        }
+    };
+
+    window.toggleFeatureExpand = function(featureId) {
+        const body = document.getElementById(`featureBody-${featureId}`);
+        const arrow = document.getElementById(`featureArrow-${featureId}`);
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            arrow.classList.remove('collapsed');
+        } else {
+            body.style.display = 'none';
+            arrow.classList.add('collapsed');
+        }
+    };
+
+    window.toggleStoryExpand = function(storyId) {
+        const body = document.getElementById(`storyBody-${storyId}`);
+        const arrow = document.getElementById(`storyArrow-${storyId}`);
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            arrow.classList.remove('collapsed');
+        } else {
+            body.style.display = 'none';
+            arrow.classList.add('collapsed');
+        }
+    };
+
+    // ===== CREATE MODALS =====
+    window.openCreateEpicModal = function() {
+        document.getElementById('epicTitle').value = '';
+        document.getElementById('epicDescription').value = '';
+        updateCharCount('epicDescription', 'epicDescChars');
+        new bootstrap.Modal(document.getElementById('createEpicModal')).show();
+    };
+
+    window.openCreateFeatureModal = function(epicId, epicWorkItemId) {
+        document.getElementById('featureEpicId').value = epicId;
+        document.getElementById('featureParentDisplay').value = epicWorkItemId;
+        document.getElementById('featureTitle').value = '';
+        document.getElementById('featureDescription').value = '';
+        updateCharCount('featureDescription', 'featureDescChars');
+        new bootstrap.Modal(document.getElementById('createFeatureModal')).show();
+    };
+
+    window.openCreateStoryModal = function(featureId, featureWorkItemId) {
+        document.getElementById('storyFeatureId').value = featureId;
+        document.getElementById('storyParentDisplay').value = featureWorkItemId;
+        document.getElementById('storyTitle').value = '';
+        document.getElementById('storyDescription').value = '';
+        updateCharCount('storyDescription', 'storyDescChars');
+        new bootstrap.Modal(document.getElementById('createStoryModal')).show();
+    };
+
+    window.openCreateProjectTaskModal = function(storyId, storyWorkItemId) {
+        document.getElementById('taskStoryId').value = storyId;
+        document.getElementById('taskParentDisplay').value = storyWorkItemId;
+        document.getElementById('projectTaskTitle').value = '';
+        document.getElementById('projectTaskDescription').value = '';
+        updateCharCount('projectTaskDescription', 'taskDescChars');
+        new bootstrap.Modal(document.getElementById('createProjectTaskModal')).show();
+    };
+
+    // ===== EDIT MODALS =====
+    window.openEditEpicModal = function(id, title, description) {
+        document.getElementById('editEpicId').value = id;
+        document.getElementById('editEpicTitle').value = title;
+        document.getElementById('editEpicDescription').value = description;
+        updateCharCount('editEpicDescription', 'editEpicDescChars');
+        new bootstrap.Modal(document.getElementById('editEpicModal')).show();
+    };
+
+    window.openEditFeatureModal = function(id, title, description) {
+        document.getElementById('editFeatureId').value = id;
+        document.getElementById('editFeatureTitle').value = title;
+        document.getElementById('editFeatureDescription').value = description;
+        updateCharCount('editFeatureDescription', 'editFeatureDescChars');
+        new bootstrap.Modal(document.getElementById('editFeatureModal')).show();
+    };
+
+    window.openEditStoryModal = function(id, title, description) {
+        document.getElementById('editStoryId').value = id;
+        document.getElementById('editStoryTitle').value = title;
+        document.getElementById('editStoryDescription').value = description;
+        updateCharCount('editStoryDescription', 'editStoryDescChars');
+        new bootstrap.Modal(document.getElementById('editStoryModal')).show();
+    };
+
+    // ===== CHARACTER COUNT =====
+    function updateCharCount(textareaId, counterId) {
+        const textarea = document.getElementById(textareaId);
+        const counter = document.getElementById(counterId);
+        if (textarea && counter) {
+            counter.textContent = textarea.value.length;
+        }
+    }
+
+    // Add char count listeners
+    ['epicDescription', 'editEpicDescription', 'featureDescription', 'editFeatureDescription', 
+     'storyDescription', 'editStoryDescription', 'projectTaskDescription'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', function() {
+                const counterId = id.replace('Description', 'DescChars')
+                    .replace('projectTask', 'task')
+                    .replace('edit', 'edit');
+                const counter = document.getElementById(counterId) || 
+                               document.getElementById(id.includes('edit') ? 'edit' + id.charAt(4).toUpperCase() + id.slice(5).replace('Description', 'DescChars') : id.replace('Description', 'DescChars'));
+                if (counter) counter.textContent = this.value.length;
+            });
+        }
+    });
+
+    // ===== CREATE OPERATIONS =====
+    window.createEpic = function() {
+        const projectId = document.getElementById('currentProjectId').value;
+        const title = document.getElementById('epicTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            projectId: parseInt(projectId),
+            title: title,
+            description: document.getElementById('epicDescription').value.trim()
+        };
+
+        fetch('/Project/CreateEpic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to create epic'); });
+            return res.json();
+        })
+        .then(() => {
+            bootstrap.Modal.getInstance(document.getElementById('createEpicModal'))?.hide();
+            loadProjectBoard(projectId);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    window.createFeature = function() {
+        const title = document.getElementById('featureTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            epicId: parseInt(document.getElementById('featureEpicId').value),
+            title: title,
+            description: document.getElementById('featureDescription').value.trim()
+        };
+
+        fetch('/Project/CreateFeature', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to create feature'); });
+            return res.json();
+        })
+        .then(() => {
+            bootstrap.Modal.getInstance(document.getElementById('createFeatureModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    window.createStory = function() {
+        const title = document.getElementById('storyTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            featureId: parseInt(document.getElementById('storyFeatureId').value),
+            title: title,
+            description: document.getElementById('storyDescription').value.trim()
+        };
+
+        fetch('/Project/CreateStory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to create story'); });
+            return res.json();
+        })
+        .then(() => {
+            bootstrap.Modal.getInstance(document.getElementById('createStoryModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    window.createProjectTask = function() {
+        const title = document.getElementById('projectTaskTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            storyId: parseInt(document.getElementById('taskStoryId').value),
+            title: title,
+            description: document.getElementById('projectTaskDescription').value.trim()
+        };
+
+        fetch('/Project/CreateProjectTask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to create task'); });
+            return res.json();
+        })
+        .then(() => {
+            bootstrap.Modal.getInstance(document.getElementById('createProjectTaskModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    // ===== EDIT MODALS =====
+    window.openEditEpicModal = function(btn) {
+        const id = btn.getAttribute('data-id');
+        const title = btn.getAttribute('data-title');
+        const description = btn.getAttribute('data-description');
+        
+        document.getElementById('editEpicId').value = id;
+        document.getElementById('editEpicTitle').value = title;
+        document.getElementById('editEpicDescription').value = description;
+        updateCharCount('editEpicDescription', 'editEpicDescChars');
+        new bootstrap.Modal(document.getElementById('editEpicModal')).show();
+    };
+
+    window.openEditFeatureModal = function(btn) {
+        const id = btn.getAttribute('data-id');
+        const title = btn.getAttribute('data-title');
+        const description = btn.getAttribute('data-description');
+
+        document.getElementById('editFeatureId').value = id;
+        document.getElementById('editFeatureTitle').value = title;
+        document.getElementById('editFeatureDescription').value = description;
+        updateCharCount('editFeatureDescription', 'editFeatureDescChars');
+        new bootstrap.Modal(document.getElementById('editFeatureModal')).show();
+    };
+
+    window.openEditStoryModal = function(btn) {
+        const id = btn.getAttribute('data-id');
+        const title = btn.getAttribute('data-title');
+        const description = btn.getAttribute('data-description');
+
+        document.getElementById('editStoryId').value = id;
+        document.getElementById('editStoryTitle').value = title;
+        document.getElementById('editStoryDescription').value = description;
+        updateCharCount('editStoryDescription', 'editStoryDescChars');
+        new bootstrap.Modal(document.getElementById('editStoryModal')).show();
+    };
+
+    // ===== UPDATE OPERATIONS =====
+    window.updateEpic = function() {
+        const id = document.getElementById('editEpicId').value;
+        const title = document.getElementById('editEpicTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            projectId: parseInt(id), // Using projectId field to pass epic id (reusing DTO)
+            title: title,
+            description: document.getElementById('editEpicDescription').value.trim()
+        };
+
+        fetch('/Project/UpdateEpic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to update epic'); });
+            bootstrap.Modal.getInstance(document.getElementById('editEpicModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    window.updateFeature = function() {
+        const id = document.getElementById('editFeatureId').value;
+        const title = document.getElementById('editFeatureTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            epicId: parseInt(id), // Using epicId field to pass feature id (reusing DTO)
+            title: title,
+            description: document.getElementById('editFeatureDescription').value.trim()
+        };
+
+        fetch('/Project/UpdateFeature', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to update feature'); });
+            bootstrap.Modal.getInstance(document.getElementById('editFeatureModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    window.updateStory = function() {
+        const id = document.getElementById('editStoryId').value;
+        const title = document.getElementById('editStoryTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            featureId: parseInt(id), // Using featureId field to pass story id (reusing DTO)
+            title: title,
+            description: document.getElementById('editStoryDescription').value.trim()
+        };
+
+        fetch('/Project/UpdateStory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to update story'); });
+            bootstrap.Modal.getInstance(document.getElementById('editStoryModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    // ===== DELETE OPERATIONS =====
+    window.deleteEpic = function(epicId) {
+        if (!confirm('Delete this epic? All children (features, stories, tasks) must be deleted first.')) return;
+        fetch('/Project/DeleteEpic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(epicId)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t); });
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    window.deleteFeature = function(featureId) {
+        if (!confirm('Delete this feature? All children (stories, tasks) must be deleted first.')) return;
+        fetch('/Project/DeleteFeature', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(featureId)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t); });
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    window.deleteStory = function(storyId) {
+        if (!confirm('Delete this story? All tasks must be deleted first.')) return;
+        fetch('/Project/DeleteStory', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(storyId)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t); });
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
+    // ===== SEARCH =====
+    let searchTimeoutVar = null;
+    window.searchWorkItems = function(query) {
+        clearTimeout(searchTimeoutVar);
+        const dropdown = document.getElementById('searchResults');
+
+        if (!query || query.length < 2) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        searchTimeoutVar = setTimeout(() => {
+            fetch(`/Project/Search?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(results => {
+                    if (results.length === 0) {
+                        dropdown.style.display = 'none';
+                        return;
+                    }
+
+                    dropdown.innerHTML = results.map(r => `
+                        <div class="search-result-item" onclick="navigateToWorkItem('${r.type}', ${r.id})">
+                            <span class="work-item-badge ${r.type.toLowerCase()}-badge">${r.workItemId}</span>
+                            <strong class="ms-2">${r.title}</strong>
+                            <div class="search-result-breadcrumb">${r.breadcrumb}</div>
+                        </div>
+                    `).join('');
+
+                    dropdown.style.display = 'block';
+                })
+                .catch(() => { dropdown.style.display = 'none'; });
+        }, 300);
+    };
+
+    window.navigateToWorkItem = function(type, id) {
+        document.getElementById('searchResults').style.display = 'none';
+        document.getElementById('workItemSearch').value = '';
+        const selector = `[data-${type.toLowerCase()}-id="${id}"]`;
+        const element = document.querySelector(selector);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('highlight-pulse');
+            setTimeout(() => element.classList.remove('highlight-pulse'), 2000);
+        }
+    };
+
+    // ===== ASSIGN TO TEAM =====
+    window.openAssignTaskToTeamModal = function(taskId, taskTitle) {
+        document.getElementById('assignTaskId').value = taskId;
+        document.getElementById('assignTaskTitleDisplay').textContent = taskTitle;
+        
+        const select = document.getElementById('assignTeamSelect');
+        select.innerHTML = '<option value="">Loading...</option>';
+        
+        new bootstrap.Modal(document.getElementById('assignTaskToTeamModal')).show();
+        
+        fetch('/Tasks/GetAllTeams')
+            .then(res => res.json())
+            .then(teams => {
+                select.innerHTML = '<option value="">-- Select Team --</option>';
+                teams.forEach(team => {
+                    const opt = document.createElement('option');
+                    opt.value = team;
+                    opt.textContent = team;
+                    select.appendChild(opt);
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                select.innerHTML = '<option value="">Error loading teams</option>';
+            });
+    };
+
+    window.submitAssignTaskToTeam = function() {
+        const taskId = document.getElementById('assignTaskId').value;
+        const teamName = document.getElementById('assignTeamSelect').value;
+        
+        if (!teamName) { alert('Please select a team'); return; }
+        
+        const btn = document.querySelector('#assignTaskToTeamModal .btn-warning');
+        const orgText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Assigning...';
+
+        fetch('/Tasks/AssignTaskToTeam', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ taskId: parseInt(taskId), teamName: teamName })
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to assign'); });
+            return res.json();
+        })
+        .then(data => {
+            bootstrap.Modal.getInstance(document.getElementById('assignTaskToTeamModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => {
+            alert(err.message);
+            btn.disabled = false;
+            btn.textContent = orgText;
+        });
+    };
+
+    // ===== DRAG & DROP (SortableJS) =====
+    function enableProjectDragDrop() {
+        if (typeof Sortable === 'undefined') return;
+
+        const epicsContainer = document.getElementById('epicsContainer');
+        if (epicsContainer) {
+            new Sortable(epicsContainer, {
+                animation: 150,
+                handle: '.epic-drag',
+                ghostClass: 'sortable-ghost',
+                onEnd: function() {
+                    const ids = Array.from(epicsContainer.querySelectorAll('.epic-card'))
+                        .map(c => parseInt(c.dataset.epicId));
+                    fetch('/Project/ReorderEpics', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(ids)
+                    });
+                }
+            });
+        }
+
+        document.querySelectorAll('.features-container').forEach(container => {
+            new Sortable(container, {
+                animation: 150,
+                handle: '.feature-drag',
+                ghostClass: 'sortable-ghost',
+                onEnd: function() {
+                    const ids = Array.from(container.querySelectorAll('.feature-card'))
+                        .map(c => parseInt(c.dataset.featureId));
+                    fetch('/Project/ReorderFeatures', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(ids)
+                    });
+                }
+            });
+        });
+
+        document.querySelectorAll('.stories-container').forEach(container => {
+            new Sortable(container, {
+                animation: 150,
+                handle: '.story-drag',
+                ghostClass: 'sortable-ghost',
+                onEnd: function() {
+                    const ids = Array.from(container.querySelectorAll('.story-card'))
+                        .map(c => parseInt(c.dataset.storyId));
+                    fetch('/Project/ReorderStories', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(ids)
+                    });
+                }
+            });
+        });
+    }
+
+    // Initialize drag & drop
+    enableProjectDragDrop();
+})();
+</script>
