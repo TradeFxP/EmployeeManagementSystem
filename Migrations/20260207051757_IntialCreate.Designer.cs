@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260207051757_IntialCreate")]
+    partial class IntialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -243,109 +246,12 @@ namespace UserRoles.Migrations
                 });
 
             modelBuilder.Entity("UserRoles.Models.EMSHierarchy", b =>
-            modelBuilder.Entity("UserRoles.Models.Epic", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("WorkItemId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("Epics");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Feature", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<int>("EpicId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("WorkItemId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("EpicId");
-
-                    b.ToTable("Features");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Project", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedByUserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -361,182 +267,6 @@ namespace UserRoles.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("EMSHierarchy");
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.ToTable("Projects");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Story", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<int>("FeatureId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("WorkItemId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("FeatureId");
-
-                    b.ToTable("Stories");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskCustomField", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedByUserId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FieldName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("FieldType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("Order")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.ToTable("TaskCustomFields");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskFieldValue", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("FieldId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TaskId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Value")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FieldId");
-
-                    b.HasIndex("TaskId");
-
-                    b.ToTable("TaskFieldValues");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ChangeType")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ChangedByUserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Details")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FieldChanged")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("FromColumnId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("text");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("text");
-
-                    b.Property<int>("TaskId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("TimeSpentInSeconds")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ToColumnId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChangedByUserId");
-
-                    b.HasIndex("FromColumnId");
-
-                    b.HasIndex("ToColumnId");
-
-                    b.HasIndex("TaskId", "ChangedAt");
-
-                    b.ToTable("TaskHistories");
                 });
 
             modelBuilder.Entity("UserRoles.Models.TaskItem", b =>
@@ -567,23 +297,11 @@ namespace UserRoles.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("CurrentColumnEntryAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("Priority")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ProjectId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("StoryId")
                         .HasColumnType("integer");
 
                     b.Property<string>("TeamName")
@@ -597,9 +315,6 @@ namespace UserRoles.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("WorkItemId")
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedByUserId");
@@ -610,31 +325,7 @@ namespace UserRoles.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("ProjectId");
-
-                    b.HasIndex("StoryId");
-
                     b.ToTable("TaskItems");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Team", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Teams");
                 });
 
             modelBuilder.Entity("UserRoles.Models.TeamColumn", b =>
@@ -691,18 +382,6 @@ namespace UserRoles.Migrations
 
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
-
-                    b.Property<string>("Address")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("CanAddUsers")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanDeleteUsers")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanEditUsers")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -859,127 +538,6 @@ namespace UserRoles.Migrations
                     b.Navigation("AssignedTo");
                 });
 
-            modelBuilder.Entity("UserRoles.Models.Epic", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.HasOne("UserRoles.Models.Project", "Project")
-                        .WithMany("Epics")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Feature", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.HasOne("UserRoles.Models.Epic", "Epic")
-                        .WithMany("Features")
-                        .HasForeignKey("EpicId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Epic");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Project", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Story", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.HasOne("UserRoles.Models.Feature", "Feature")
-                        .WithMany("Stories")
-                        .HasForeignKey("FeatureId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Feature");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskCustomField", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.Navigation("CreatedByUser");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskFieldValue", b =>
-                {
-                    b.HasOne("UserRoles.Models.TaskCustomField", "Field")
-                        .WithMany("FieldValues")
-                        .HasForeignKey("FieldId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("UserRoles.Models.TaskItem", "Task")
-                        .WithMany("CustomFieldValues")
-                        .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Field");
-
-                    b.Navigation("Task");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskHistory", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "ChangedByUser")
-                        .WithMany()
-                        .HasForeignKey("ChangedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("UserRoles.Models.TeamColumn", "FromColumn")
-                        .WithMany()
-                        .HasForeignKey("FromColumnId");
-
-                    b.HasOne("UserRoles.Models.TaskItem", "Task")
-                        .WithMany("History")
-                        .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("UserRoles.Models.TeamColumn", "ToColumn")
-                        .WithMany()
-                        .HasForeignKey("ToColumnId");
-
-                    b.Navigation("ChangedByUser");
-
-                    b.Navigation("FromColumn");
-
-                    b.Navigation("Task");
-
-                    b.Navigation("ToColumn");
-                });
-
             modelBuilder.Entity("UserRoles.Models.TaskItem", b =>
                 {
                     b.HasOne("UserRoles.Models.Users", "AssignedByUser")
@@ -1004,14 +562,6 @@ namespace UserRoles.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("UserRoles.Models.Project", "Project")
-                        .WithMany("Tasks")
-                        .HasForeignKey("ProjectId");
-
-                    b.HasOne("UserRoles.Models.Story", "Story")
-                        .WithMany("Tasks")
-                        .HasForeignKey("StoryId");
-
                     b.Navigation("AssignedByUser");
 
                     b.Navigation("AssignedToUser");
@@ -1019,10 +569,6 @@ namespace UserRoles.Migrations
                     b.Navigation("Column");
 
                     b.Navigation("CreatedByUser");
-
-                    b.Navigation("Project");
-
-                    b.Navigation("Story");
                 });
 
             modelBuilder.Entity("UserRoles.Models.UserTeam", b =>
@@ -1043,40 +589,6 @@ namespace UserRoles.Migrations
                         .HasForeignKey("ManagerId");
 
                     b.Navigation("Manager");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Epic", b =>
-                {
-                    b.Navigation("Features");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Feature", b =>
-                {
-                    b.Navigation("Stories");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Project", b =>
-                {
-                    b.Navigation("Epics");
-
-                    b.Navigation("Tasks");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.Story", b =>
-                {
-                    b.Navigation("Tasks");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskCustomField", b =>
-                {
-                    b.Navigation("FieldValues");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.TaskItem", b =>
-                {
-                    b.Navigation("CustomFieldValues");
-
-                    b.Navigation("History");
                 });
 
             modelBuilder.Entity("UserRoles.Models.TeamColumn", b =>

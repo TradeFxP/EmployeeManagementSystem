@@ -10,16 +10,24 @@ function getCsrfToken() {
 }
 
 window.drag = function (ev) {
-    if (!window.__isAdmin) return;
+    console.log("🖱️ DRAG ATTEMPT START");
+    if (!window.__isAdmin && !window.__isManager) {
+        console.warn("🚫 DRAG BLOCKED: User is not Admin/Manager");
+        return;
+    }
 
-    const node = ev.target.closest(".org-node");
-    if (!node) return;
+    // Use data-id selector instead of .org-node
+    const node = ev.target.closest("[data-id]");
+    if (!node) {
+        console.warn("🚫 DRAG BLOCKED: No [data-id] parent found");
+        return;
+    }
 
     const draggedNode = {
         id: node.dataset.id,
         role: node.dataset.role,
         fromParent: node.dataset.parentId || "ADMIN",
-        name: node.querySelector(".node-title")?.innerText?.trim()
+        name: node.querySelector(".node-name")?.innerText?.trim() // Fixed selector to .node-name
     };
 
     console.log("✅ DRAG STARTED:", draggedNode);
@@ -32,19 +40,26 @@ window.drag = function (ev) {
 };
 
 window.allowDrop = function (ev) {
-    if (!window.__isAdmin) return;
+    if (!window.__isAdmin && !window.__isManager) return;
     ev.preventDefault(); // REQUIRED
 };
 
 window.drop = function (event, newParentId) {
+    console.log("🖱️ DROP ATTEMPT START on target:", newParentId);
     event.preventDefault();
-    if (!window.__isAdmin) return;
+    if (!window.__isAdmin && !window.__isManager) {
+        console.warn("🚫 DROP BLOCKED: User is not Admin/Manager");
+        return;
+    }
 
     const data = event.dataTransfer.getData("application/json");
-    if (!data) return;
+    if (!data) {
+        console.warn("🚫 DROP BLOCKED: No data in dataTransfer");
+        return;
+    }
 
     const dragged = JSON.parse(data);
-    console.log("⬇️ DROP:", dragged, "→", newParentId);
+    console.log("⬇️ DROP PROCEEDING:", dragged, "→", newParentId);
 
     // ❌ prevent self-drop
     if (dragged.id === newParentId) return;

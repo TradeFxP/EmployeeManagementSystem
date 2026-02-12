@@ -39,6 +39,12 @@ namespace UserRoles.Controllers
                 Address = user.Address,
                 Email = user.Email,
                 MobileNumber = user.MobileNumber,
+                //AlternativeMobileNumber = user.AlternativeMobileNumber,
+                ////Address = user.Address,
+                //UserRole = user.UserRole,
+                //BloodGroup = user.BloodGroup,
+                //DateOfJoing = user.DateOfJoing,
+                //DateOfBirth = user.DateOfBirth,
                 IsEditMode = false,
                 CanEditEmail = User.IsInRole("Admin")
             };
@@ -60,6 +66,13 @@ namespace UserRoles.Controllers
                 Email = user.Email,
                 Address = user.Address,
                 MobileNumber = user.MobileNumber,
+                //AlternativeMobileNumber = user.AlternativeMobileNumber,
+                //Address = user.Address,
+                //UserRole = user.UserRole,
+                //BloodGroup = user.BloodGroup,
+                //DateOfJoing = user.DateOfJoing,
+                //DateOfBirth = user.DateOfBirth,
+
                 IsEditMode = true,               // 🔑 THIS ENABLES EDIT
                 CanEditEmail = User.IsInRole("Admin")
             };

@@ -525,155 +525,155 @@ namespace UserRoles.Controllers
             return PartialView("_UserSearchResults", result);
         }
 
-//        /* ================= CREATE USER ================= */
-//        [Authorize(Roles = "Admin")]
-//        public async Task<IActionResult> Create()
-//        {
-//            ViewBag.Managers = await _userManager.GetUsersInRoleAsync("Manager");
-//            return View();
-//        }
+        //        /* ================= CREATE USER ================= */
+        //        [Authorize(Roles = "Admin")]
+        //        public async Task<IActionResult> Create()
+        //        {
+        //            ViewBag.Managers = await _userManager.GetUsersInRoleAsync("Manager");
+        //            return View();
+        //        }
 
-//        [Authorize(Roles = "Admin")]
-//        [HttpPost]
-//        [ValidateAntiForgeryToken]
-//        public async Task<IActionResult> Create(
-//            string name,
-//            string email,
-//            string role,
-//            string managerId) // 🔹      THIS
-//        {
-//            /* ================= NAME VALIDATION ================= */
-//            if (string.IsNullOrWhiteSpace(name))
-//            {
-//                ModelState.AddModelError("Name", "Name is required.");
-//                return View();
-//            }
-                    
-//            name = name.Trim();
+        //        [Authorize(Roles = "Admin")]
+        //        [HttpPost]
+        //        [ValidateAntiForgeryToken]
+        //        public async Task<IActionResult> Create(
+        //            string name,
+        //            string email,
+        //            string role,
+        //            string managerId) // 🔹      THIS
+        //        {
+        //            /* ================= NAME VALIDATION ================= */
+        //            if (string.IsNullOrWhiteSpace(name))
+        //            {
+        //                ModelState.AddModelError("Name", "Name is required.");
+        //                return View();
+        //            }
 
-//            if (name.Length > 20)
-//            {
-//                ModelState.AddModelError("Name", "Name must be maximum 20 characters.");
-//                return View();      
-//            }
+        //            name = name.Trim();
 
-//            if (!Regex.IsMatch(name, @"^[A-Za-z\s]+$"))
-//            {
-//                ModelState.AddModelError("Name", "Name must contain only letters.");
-//                return View();
-//            }
+        //            if (name.Length > 20)
+        //            {
+        //                ModelState.AddModelError("Name", "Name must be maximum 20 characters.");
+        //                return View();      
+        //            }
 
-//            /* ================= EMAIL VALIDATION ================= */
-//            if (string.IsNullOrWhiteSpace(email))
-//            {
-//                ModelState.AddModelError("Email", "Email is required.");
-//                return View();      
-//            }
+        //            if (!Regex.IsMatch(name, @"^[A-Za-z\s]+$"))
+        //            {
+        //                ModelState.AddModelError("Name", "Name must contain only letters.");
+        //                return View();
+        //            }
 
-//            email = email.Trim();
+        //            /* ================= EMAIL VALIDATION ================= */
+        //            if (string.IsNullOrWhiteSpace(email))
+        //            {
+        //                ModelState.AddModelError("Email", "Email is required.");
+        //                return View();      
+        //            }
 
-//            if (!Regex.IsMatch(
-//                    email,
-//                    @"^(?!.*\.\.)[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}$"))
-//            {
-//                ModelState.AddModelError("Email", "Enter a valid email address.");
-//                return View();
-//            }
+        //            email = email.Trim();
 
-//            if (await _userManager.FindByEmailAsync(email) != null)
-//            {
-//                ModelState.AddModelError("Email", "Email already exists.");
-//                return View();
-//            }
+        //            if (!Regex.IsMatch(
+        //                    email,
+        //                    @"^(?!.*\.\.)[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}$"))
+        //            {
+        //                ModelState.AddModelError("Email", "Enter a valid email address.");
+        //                return View();
+        //            }
 
-//            bool isAdmin = User.IsInRole("Admin");
-//            bool isManager = User.IsInRole("Manager");
+        //            if (await _userManager.FindByEmailAsync(email) != null)
+        //            {
+        //                ModelState.AddModelError("Email", "Email already exists.");
+        //                return View();
+        //            }
 
-//            // Manager can create only Users under himself
-//            if (isManager)
-//            {
-//                role = "User";
-//                managerId = _userManager.GetUserId(User);
-//            }
+        //            bool isAdmin = User.IsInRole("Admin");
+        //            bool isManager = User.IsInRole("Manager");
 
-//            // Admin must select manager for User
-//            if (isAdmin && role == "User")
-//            {
-//                if (string.IsNullOrEmpty(managerId))
-//                {
-//                    ModelState.AddModelError("ManagerId", "Please select Admin or a Manager.");
-//                    ViewBag.Managers = await _userManager.GetUsersInRoleAsync("Manager");
-//                    return View();
-//                }
-//            }
+        //            // Manager can create only Users under himself
+        //            if (isManager)
+        //            {
+        //                role = "User";
+        //                managerId = _userManager.GetUserId(User);
+        //            }
 
-//            if (!isAdmin && role == "Admin")
-//                return Forbid();
+        //            // Admin must select manager for User
+        //            if (isAdmin && role == "User")
+        //            {
+        //                if (string.IsNullOrEmpty(managerId))
+        //                {
+        //                    ModelState.AddModelError("ManagerId", "Please select Admin or a Manager.");
+        //                    ViewBag.Managers = await _userManager.GetUsersInRoleAsync("Manager");
+        //                    return View();
+        //                }
+        //            }
 
-//            role ??= "User";
+        //            if (!isAdmin && role == "Admin")
+        //                return Forbid();
 
-//            /* ================= PASSWORD ================= */
-//            string generatedPassword = PasswordHelper.GeneratePassword();
+        //            role ??= "User";
 
-//            /* ================= USER CREATION ================= */
-//            var user = new Users
-//            {
-//                Name = name,
-//                Email = email,
-//                UserName = email,
-//                EmailConfirmed = true,
-//                ParentUserId =
-//                    role == "Admin"
-//                    ? null
-//                    : managerId == "ADMIN"
-//                        ? null
-//                        : managerId,
-//                ManagerId =
-//                    role == "Admin"
-//                    ? null
-//                    : managerId == "ADMIN"
-//                        ? null
-//                        : managerId
-//            };
+        //            /* ================= PASSWORD ================= */
+        //            string generatedPassword = PasswordHelper.GeneratePassword();
 
-//            var result = await _userManager.CreateAsync(user, generatedPassword);
+        //            /* ================= USER CREATION ================= */
+        //            var user = new Users
+        //            {
+        //                Name = name,
+        //                Email = email,
+        //                UserName = email,
+        //                EmailConfirmed = true,
+        //                ParentUserId =
+        //                    role == "Admin"
+        //                    ? null
+        //                    : managerId == "ADMIN"
+        //                        ? null
+        //                        : managerId,
+        //                ManagerId =
+        //                    role == "Admin"
+        //                    ? null
+        //                    : managerId == "ADMIN"
+        //                        ? null
+        //                        : managerId
+        //            };
 
-//            if (!result.Succeeded)
-//            {
-//                foreach (var error in result.Errors)
-//                    ModelState.AddModelError("", error.Description);
+        //            var result = await _userManager.CreateAsync(user, generatedPassword);
 
-//                return View();
-//            }
+        //            if (!result.Succeeded)
+        //            {
+        //                foreach (var error in result.Errors)
+        //                    ModelState.AddModelError("", error.Description);
 
-//            /* ================= ROLE ASSIGN ================= */
-//            if (!await _roleManager.RoleExistsAsync(role))
-//                await _roleManager.CreateAsync(new IdentityRole(role));
+        //                return View();
+        //            }
 
-//            await _userManager.AddToRoleAsync(user, role);
+        //            /* ================= ROLE ASSIGN ================= */
+        //            if (!await _roleManager.RoleExistsAsync(role))
+        //                await _roleManager.CreateAsync(new IdentityRole(role));
 
-//            /* ================= EMAIL SEND ================= */
-//            string loginUrl = Url.Action("Login", "Account", null, Request.Scheme)!;
+        //            await _userManager.AddToRoleAsync(user, role);
 
-//            string body = $@"
-//Hello {name},
+        //            /* ================= EMAIL SEND ================= */
+        //            string loginUrl = Url.Action("Login", "Account", null, Request.Scheme)!;
 
-//Your account has been created.
+        //            string body = $@"
+        //Hello {name},
 
-//Login Email: {email}
-//Temporary Password: {generatedPassword}
+        //Your account has been created.
 
-//Login URL:
-//{loginUrl}
+        //Login Email: {email}
+        //Temporary Password: {generatedPassword}
 
-//Please change your password after login.
-//";
+        //Login URL:
+        //{loginUrl}
 
-//            await _emailService.SendEmailAsync(email, "Your Account Credentials", body);
+        //Please change your password after login.
+        //";
 
-//            TempData["Success"] = "User created successfully.";
-//            return RedirectToAction(nameof(Index));
-//        }
+        //            await _emailService.SendEmailAsync(email, "Your Account Credentials", body);
+
+        //            TempData["Success"] = "User created successfully.";
+        //            return RedirectToAction(nameof(Index));
+        //        }
 
         [Authorize(Roles = "Admin")]
         [HttpPost]
@@ -725,16 +725,18 @@ namespace UserRoles.Controllers
                 }
 
                 // Role adjustments
-                if (targetRole == "Manager")
-                {
-                    if (!await _userManager.IsInRoleAsync(existing, "Manager"))
-                    {
-                        if (!await _roleManager.RoleExistsAsync("Manager"))
-                            await _roleManager.CreateAsync(new IdentityRole("Manager"));
+                const string roleName = "Manager";
 
-                        await _userManager.AddToRoleAsync(existing, "Manager");
-                    }
+                if (!await _roleManager.RoleExistsAsync(roleName))
+                {
+                    await _roleManager.CreateAsync(new IdentityRole(roleName));
                 }
+
+                if (!await _userManager.IsInRoleAsync(existing, roleName))
+                {
+                    await _userManager.AddToRoleAsync(existing, roleName);
+                }
+
                 else // targetRole == "User"
                 {
                     if (await _userManager.IsInRoleAsync(existing, "Manager"))
@@ -855,7 +857,7 @@ namespace UserRoles.Controllers
             }
 
 
-           
+
 
 
 
@@ -962,7 +964,7 @@ namespace UserRoles.Controllers
             }
 
             await _userManager.DeleteAsync(user);
-            return Ok();            
+            return Ok();
         }
 
         //// ================= REASSIGN USER =================
@@ -1024,8 +1026,9 @@ namespace UserRoles.Controllers
 
 
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Manager")]
         [HttpPost]
+        [IgnoreAntiforgeryToken]
         public async Task<IActionResult> MoveOrgNode([FromBody] MoveOrgNodeRequest model)
         {
             if (string.IsNullOrEmpty(model.UserId))
@@ -1224,7 +1227,7 @@ namespace UserRoles.Controllers
                 result.Add(child);
                 result.AddRange(GetDescendantManagers(child.Id, allManagers));
             }
-                    
+
             return result;
         }
     }
