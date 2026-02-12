@@ -5,12 +5,12 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <title>@ViewData["Title"] - EMS</title>
 
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -36,60 +36,61 @@
     <style>
         .nav-username {
             font-weight: 600;
-            color: rgba(0,0,0,.85);
+            color: rgba(255,255,255,.9) !important;
         }
-
-        header nav.navbar {
-            background-color: #0d6efd !important; /* Bootstrap primary blue */
-        }
-
-            header nav.navbar * {
-                color: #ffffff !important;
-            }
-
-
     </style>
 </head>
 
-<body>
-
+@{
+    string userRole = "";
+    if (User.Identity.IsAuthenticated)
+    {
+        if (User.IsInRole("Admin")) { userRole = "Admin"; }
+        else if (User.IsInRole("Manager")) { userRole = "Manager"; }
+        else if (User.IsInRole("User")) { userRole = "User"; }
+    }
+}
+<body data-role="@userRole">
 
     <header>
-        <nav class="navbar navbar-expand-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-md navbar-dark top-navbar">
             <div class="container-fluid">
 
-                <span class="navbar-brand">EmployeeManagementSystem</span>
+                <span class="navbar-brand fw-bold">
+                    <i class="bi bi-building me-1"></i> EMS
+                </span>
 
-                <button class="navbar-toggler" type="button"
+                <button class="navbar-toggler border-0" type="button"
                         data-bs-toggle="collapse"
-                        data-bs-target=".navbar-collapse">
+                        data-bs-target="#mainNavbar"
+                        aria-controls="mainNavbar"
+                        aria-expanded="false"
+                        aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
-                <div class="navbar-collapse collapse d-sm-inline-flex">
+                <div class="collapse navbar-collapse" id="mainNavbar">
 
-                    <!-- LEFT -->
+                    <!-- LEFT NAV ITEMS -->
                     <ul class="navbar-nav me-auto align-items-center">
 
-                        @* Show Profile to Admin, Manager and User *@
                         @if (User.Identity.IsAuthenticated &&
-                                                (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("Admin")))
+                                        (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("Admin")))
                         {
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Profile" asp-action="Index">
-                                    👤 Profile
+                                    <i class="bi bi-person-circle me-1"></i> Profile
                                 </a>
-                            </li>           
+                            </li>
                         }
 
-                        @* Organization Chart visible to Admin and Manager *@
                         @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                         {
                             <li class="nav-item">
                                 <a class="nav-link"
                                    asp-controller="Users"
                                    asp-action="OrgChart">
-                                    Organization Chart
+                                    <i class="bi bi-diagram-3 me-1"></i> Organization Chart
                                 </a>
                             </li>
                         }
@@ -98,60 +99,29 @@
                         {
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Reports" asp-action="Index">
-                                    Reports
+                                    <i class="bi bi-bar-chart me-1"></i> Reports
                                 </a>
                             </li>
-                        } 
-
-
-                        @* @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager"))
-                        {
-                            
-                        } *@
-
+                        }
 
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Tasks" asp-action="Index">Tasks</a>
+                            <a class="nav-link" asp-controller="Tasks" asp-action="Index">
+                                <i class="bi bi-kanban me-1"></i> Tasks
+                            </a>
                         </li>
-
-
-                        @*  @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Tasks" asp-action="Create">
-                                    Assign Tasks
-                                </a>
-                            </li>
-                        }  *@
-
-                        
-
-                        @* @if (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("SubManager"))
-                        {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Tasks" asp-action="Index">
-                                   view  Tasks
-                                </a>
-                            </li>
-                        } *@
-
                     </ul>
 
-                    <!-- RIGHT -->
+                    <!-- RIGHT NAV ITEMS -->
                     <ul class="navbar-nav align-items-center">
-
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             var currentUser = await UserManager.GetUserAsync(User);
-
-                            // ✅ Display Name (Name → Email fallback)
                             var displayName =
                             currentUser?.FirstName
                             ??currentUser?.LastName 
                             ?? currentUser?.Email
                             ?? User.Identity.Name;
 
-                            // ✅ Role detection (single role system)
                             string role =
                             User.IsInRole("Admin") ? "Admin" :
                             User.IsInRole("Manager") ? "Manager" :
@@ -160,15 +130,15 @@
 
                             <li class="nav-item">
                                 <span class="nav-link nav-username">
+                                    <i class="bi bi-person-fill me-1"></i>
                                     @displayName
                                     @if (!string.IsNullOrEmpty(role))
                                     {
-                                        <span class="text-muted">(@role)</span>
+                                        <span class="badge bg-light text-primary ms-1" style="font-size: 0.7rem;">@role</span>
                                     }
                                 </span>
                             </li>
                         }
-
 
                         <li class="nav-item">
                             <partial name="_LoginPartial" />
@@ -180,17 +150,16 @@
         </nav>
     </header>
 
-    <div class="container-lg mt-3">
+    <main class="main-content">
         @RenderBody()
-    </div>
+    </main>
 
     <script src="~/js/reports-inline.js" asp-append-version="true"></script>
-
 
     <!-- Include org-related modals globally so JS can always find them -->
     @await Html.PartialAsync("_OrgModals")
 
-    <!-- Bootstrap JS (ONLY ONCE – REQUIRED FOR MODALS) -->
+    <!-- Bootstrap JS (SINGLE INCLUDE) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Site JS -->
@@ -202,6 +171,104 @@
     <!-- Page-specific scripts -->
     @await RenderSectionAsync("Scripts", required: false)
 
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <!-- Session Timeout Warning Modal -->
+        <div class="modal fade" id="sessionTimeoutModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg">
+                    <div class="modal-header bg-warning text-dark border-0">
+                        <h5 class="modal-title">
+                            <i class="bi bi-clock-history me-2"></i> Session Expiring
+                        </h5>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3">
+                            <i class="bi bi-hourglass-split text-warning" style="font-size: 3rem;"></i>
+                        </div>
+                        <p class="mb-2 fs-5">Your session will expire due to inactivity.</p>
+                        <p class="text-muted">You will be logged out in <strong id="timeoutCountdown">60</strong> seconds.</p>
+                    </div>
+                    <div class="modal-footer border-0 justify-content-center">
+                        <button type="button" class="btn btn-primary px-4" id="stayLoggedInBtn">
+                            <i class="bi bi-arrow-repeat me-1"></i> Stay Logged In
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary px-4" id="logoutNowBtn">
+                            <i class="bi bi-box-arrow-right me-1"></i> Logout Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Timeout Script -->
+        <script>
+            (function () {
+                const IDLE_TIMEOUT_MS = 30 * 60 * 1000;  // 30 minutes
+                const WARNING_DURATION_MS = 60 * 1000;    // 60 second warning
+                let idleTimer = null;
+                let countdownTimer = null;
+                let countdownSeconds = 60;
+
+                const activityEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
+
+                function resetIdleTimer() {
+                    clearTimeout(idleTimer);
+                    idleTimer = setTimeout(showWarning, IDLE_TIMEOUT_MS);
+                }
+
+                function showWarning() {
+                    countdownSeconds = 60;
+                    document.getElementById('timeoutCountdown').textContent = countdownSeconds;
+
+                    const modal = new bootstrap.Modal(document.getElementById('sessionTimeoutModal'));
+                    modal.show();
+
+                    countdownTimer = setInterval(function () {
+                        countdownSeconds--;
+                        document.getElementById('timeoutCountdown').textContent = countdownSeconds;
+
+                        if (countdownSeconds <= 0) {
+                            clearInterval(countdownTimer);
+                            performLogout();
+                        }
+                    }, 1000);
+                }
+
+                function performLogout() {
+                    const logoutForm = document.getElementById('logoutForm');
+                    if (logoutForm) {
+                        logoutForm.submit();
+                    } else {
+                        window.location.href = '/Account/Login';
+                    }
+                }
+
+                function stayLoggedIn() {
+                    clearInterval(countdownTimer);
+                    const modalEl = document.getElementById('sessionTimeoutModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    resetIdleTimer();
+
+                    // Ping the server to keep the session alive
+                    fetch('/Account/Login', { method: 'HEAD' }).catch(() => {});
+                }
+
+                // Wire up buttons
+                document.getElementById('stayLoggedInBtn')?.addEventListener('click', stayLoggedIn);
+                document.getElementById('logoutNowBtn')?.addEventListener('click', performLogout);
+
+                // Wire up activity events
+                activityEvents.forEach(function (evt) {
+                    document.addEventListener(evt, resetIdleTimer, { passive: true });
+                });
+
+                // Start the timer
+                resetIdleTimer();
+            })();
+        </script>
+    }
 
 </body>
 </html>

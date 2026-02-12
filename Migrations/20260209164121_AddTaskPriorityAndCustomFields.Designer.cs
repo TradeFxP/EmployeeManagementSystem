@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260209164121_AddTaskPriorityAndCustomFields")]
+    partial class AddTaskPriorityAndCustomFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -233,9 +236,6 @@ namespace UserRoles.Migrations
                     b.Property<string>("Task")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -476,61 +476,6 @@ namespace UserRoles.Migrations
                     b.ToTable("TaskFieldValues");
                 });
 
-            modelBuilder.Entity("UserRoles.Models.TaskHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ChangeType")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ChangedByUserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Details")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FieldChanged")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("FromColumnId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("text");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("text");
-
-                    b.Property<int>("TaskId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("TimeSpentInSeconds")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ToColumnId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChangedByUserId");
-
-                    b.HasIndex("FromColumnId");
-
-                    b.HasIndex("ToColumnId");
-
-                    b.HasIndex("TaskId", "ChangedAt");
-
-                    b.ToTable("TaskHistories");
-                });
-
             modelBuilder.Entity("UserRoles.Models.TaskItem", b =>
                 {
                     b.Property<int>("Id")
@@ -558,9 +503,6 @@ namespace UserRoles.Migrations
                     b.Property<string>("CreatedByUserId")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<DateTime>("CurrentColumnEntryAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -684,21 +626,12 @@ namespace UserRoles.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
-                    b.Property<string>("AlternateMobileNumber")
-                        .HasColumnType("text");
-
-                    b.Property<string>("BloodGroup")
+                    b.Property<string>("Address")
                         .HasColumnType("text");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
-
-                    b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime?>("DateOfJoining")
-                        .HasColumnType("date");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -713,15 +646,6 @@ namespace UserRoles.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("FirstName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Gender")
-                        .HasColumnType("text");
-
-                    b.Property<string>("LastName")
-                        .HasColumnType("text");
-
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 
@@ -732,6 +656,9 @@ namespace UserRoles.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("MobileNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
                         .HasColumnType("text");
 
                     b.Property<string>("NormalizedEmail")
@@ -947,37 +874,6 @@ namespace UserRoles.Migrations
                     b.Navigation("Task");
                 });
 
-            modelBuilder.Entity("UserRoles.Models.TaskHistory", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "ChangedByUser")
-                        .WithMany()
-                        .HasForeignKey("ChangedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("UserRoles.Models.TeamColumn", "FromColumn")
-                        .WithMany()
-                        .HasForeignKey("FromColumnId");
-
-                    b.HasOne("UserRoles.Models.TaskItem", "Task")
-                        .WithMany("History")
-                        .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("UserRoles.Models.TeamColumn", "ToColumn")
-                        .WithMany()
-                        .HasForeignKey("ToColumnId");
-
-                    b.Navigation("ChangedByUser");
-
-                    b.Navigation("FromColumn");
-
-                    b.Navigation("Task");
-
-                    b.Navigation("ToColumn");
-                });
-
             modelBuilder.Entity("UserRoles.Models.TaskItem", b =>
                 {
                     b.HasOne("UserRoles.Models.Users", "AssignedByUser")
@@ -1073,8 +969,6 @@ namespace UserRoles.Migrations
             modelBuilder.Entity("UserRoles.Models.TaskItem", b =>
                 {
                     b.Navigation("CustomFieldValues");
-
-                    b.Navigation("History");
                 });
 
             modelBuilder.Entity("UserRoles.Models.TeamColumn", b =>

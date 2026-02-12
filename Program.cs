@@ -47,6 +47,7 @@ builder.Services.AddTransient<IEmailService, EmailService>();
 
 // ================= EMAIL SERVICE =================
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ITaskHistoryService, TaskHistoryService>();
 
 // ================= COOKIE =================
 builder.Services.ConfigureApplicationCookie(options =>

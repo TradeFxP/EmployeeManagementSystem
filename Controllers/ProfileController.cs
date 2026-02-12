@@ -34,8 +34,9 @@ namespace UserRoles.Controllers
 
             var model = new ProfileViewModel
             {
-                FirstName = user.FirstName,
-                LastName = user.LastName,
+                FirstName = user.Name,
+
+                Address = user.Address,
                 Email = user.Email,
                 MobileNumber = user.MobileNumber,
                 AlternateMobileNumber = user.AlternateMobileNumber,
@@ -63,12 +64,8 @@ namespace UserRoles.Controllers
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 Email = user.Email,
+                Address = user.Address,
                 MobileNumber = user.MobileNumber,
-                AlternateMobileNumber = user.AlternateMobileNumber,
-                Gender = user.Gender,
-                BloodGroup = user.BloodGroup,
-                DateOfBirth = user.DateOfBirth,
-                DateOfJoining = user.DateOfJoining,
                 IsEditMode = true,               // 🔑 THIS ENABLES EDIT
                 CanEditEmail = User.IsInRole("Admin")
             };
@@ -94,22 +91,8 @@ namespace UserRoles.Controllers
                 return RedirectToAction("Login", "Account");
 
             // ✅ Update common fields
-            user.FirstName = model.FirstName?.Trim();
-            user.LastName = model.LastName?.Trim();   
-            user.MobileNumber = model.MobileNumber?.Trim();
-            user.AlternateMobileNumber = model.AlternateMobileNumber?.Trim();
-            user.Gender = model.Gender?.Trim();
-            user.BloodGroup = model.BloodGroup;
-            user.DateOfBirth = model.DateOfBirth.HasValue
-                ? DateTime.SpecifyKind(model.DateOfBirth.Value, DateTimeKind.Utc)
-                : null;
-            user.DateOfJoining = model.DateOfJoining.HasValue
-                ? DateTime.SpecifyKind(model.DateOfJoining.Value, DateTimeKind.Utc)
-                : null;
-
-            await _userManager.UpdateAsync(user);
-
-
+            user.Name = model.FirstName.Trim();
+            user.MobileNumber = model.MobileNumber.Trim();
 
             // ================= ADMIN EMAIL CHANGE =================
             if (User.IsInRole("Admin") && !string.Equals(user.Email, model.Email, StringComparison.OrdinalIgnoreCase))

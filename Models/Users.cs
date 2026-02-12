@@ -33,6 +33,9 @@ namespace UserRoles.Models
         [Phone]
         public string? MobileNumber { get; set; }
 
+
+        public string? Address { get; set; }
+
         public string? AlternateMobileNumber { get; set; }
 
         // ================= ADMIN EMAIL CHANGE (NEW) =================
