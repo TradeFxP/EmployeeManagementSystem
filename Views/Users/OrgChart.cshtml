@@ -1,293 +1,253 @@
-﻿@using UserRoles.Models;
+﻿@using UserRoles.Models
+
 @{
     var admin = ViewBag.Admin as Users;
-    var managers = ViewBag.Managers as List<Users> ?? new List<Users>();
-    var subManagers = ViewBag.SubManagers as Dictionary<string, List<Users>> ?? new Dictionary<string, List<Users>>();
-    var subManagerUsers = ViewBag.SubManagerUsers as Dictionary<string, List<Users>> ?? new Dictionary<string, List<Users>>();
-    var adminUsers = ViewBag.AdminUsers as List<Users> ?? new List<Users>();
+
+    var managers = ViewBag.Managers as List<Users>
+                   ?? new List<Users>();
+
+    var subManagers = ViewBag.SubManagers as Dictionary<string, List<Users>>
+                      ?? new Dictionary<string, List<Users>>();
+
+    var subManagerUsers = ViewBag.SubManagerUsers as Dictionary<string, List<Users>>
+                          ?? new Dictionary<string, List<Users>>();
+
+    var adminUsers = ViewBag.AdminUsers as List<Users>
+                     ?? new List<Users>();
+
     var currentRole = (ViewBag.CurrentRole as string) ?? "User";
+
 }
 
 <script>
+    // expose simple client-side flag used by orgchart.js
     window.__isAdmin = @(currentRole == "Admin" ? "true" : "false");
-
-    function toggleNode(element, childrenId) {
-        if (event && event.target.closest('.node-actions')) return;
-
-        var children = document.getElementById(childrenId);
-        var toggleIcon = element.querySelector('.tree-toggle-icon');
-
-        if (children) {
-            if (children.style.display === "none") {
-                children.style.display = "block";
-                element.classList.add('expanded');
-                if(toggleIcon) toggleIcon.style.transform = "rotate(90deg)";
-            } else {
-                children.style.display = "none";
-                element.classList.remove('expanded');
-                if(toggleIcon) toggleIcon.style.transform = "rotate(0deg)";
-            }
-        }
-    }
 </script>
 
-<div class="org-layout-container">
-    <div class="org-sidebar">
-        <div class="tree-root">
-            @* ================= ADMIN NODE ================= *@
+
+
+
+
+<div class="org-wrapper-full">
+
+    @* Toasts *@
+    @if (TempData["Success"] != null)
+    {
+        <div class="toast-container-fixed">
+            <div class="alert alert-success toast-message auto-dismiss">
+                @TempData["Success"]
+            </div>
+        </div>
+    }
+    @if (TempData["Error"] != null)
+    {
+        <div class="toast-container-fixed">
+            <div class="alert alert-danger toast-message auto-dismiss">
+                @TempData["Error"]
+            </div>
+        </div>
+    }
+
+    <!-- LINE DOWN FROM ADMIN -->
+    @* <div class="org-line"></div> *@
+    <div class="org-layout-full">
+
+        <!-- ================= LEFT PANEL : TREE ================= -->
+        <div class="org-left-panel">
+
+            <!-- ================= ADMIN (show ONLY to Admin) ================= -->
             @if (currentRole == "Admin" && admin != null)
             {
-                <!-- 👇 ADD admin-root HERE -->
-                <div class="tree-item admin-root">
-                    <div class="tree-content role-admin"
-                         onclick="toggleNode(this, 'children-ADMIN')"
-                         ondragover="allowDrop(event)"
-                         ondrop="drop(event, 'ADMIN')">
+                
 
-                        <span class="tree-toggle-icon">▶</span>
+                <div class="org-admin org-node"
+                     data-id="ADMIN"
+                     data-role="Admin"
+                     ondragover="allowDrop(event)"
+                     ondrop="drop(event,'ADMIN')">
 
-                        <div class="node-info">
-                            <span class="node-name">@admin.Name</span>
-                            <span class="node-role">Administrator</span>
-                        </div>
-
- <div class="node-actions d-flex align-items-center">
-                            <button class="action-btn add-btn"
-                                    onclick="openAddModal('', 'ADMIN'); event.stopPropagation();"
-                                    title="Add Manager/User">
-                                +
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="children-ADMIN" class="tree-children" style="display: none;">
-                        @* Admin Users *@
-                        @foreach (var user in adminUsers)
-                        {
-                            <div class="tree-item leaf">
-                                <div class="tree-content role-user"
-                                     draggable="true"
-                                     ondragstart="drag(event)"
-                                     data-id="@user.Id"
-                                     data-role="User">
-                                    <div class="node-info">
-                                        <span class="node-name">@user.Name</span>
-                                    </div>
-
-                                    <div class="node-actions">
-                                        <button class="action-btn"
-                                                onclick="openEditModal('@user.Id','@user.Name','@user.Email','User'); event.stopPropagation();">
-                                            ✎
-                                        </button>
-                                        <button class="action-btn"
-                                                onclick="openDeleteModal('@user.Id','@user.Name','User'); event.stopPropagation();">
-                                            🗑
-                                        </button>
-                                        <button class="action-btn"
-                                                onclick="loadReports('@user.Id'); event.stopPropagation();">
-                                            📊
-                                        </button>
-                                    </div>
-                                </div>
+                    <div class="org-box admin">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>@admin?.Name</strong>
+                                <div class="role">Admin</div>
                             </div>
-                        }
+
+                            <a href="javascript:void(0)"
+                               class="org-plus"
+                               onclick="openAddModal('', 'ADMIN')">+</a>
+                        </div>
                     </div>
+
+
+
+                    @* Admin-held users (users with ParentUserId == null) *@
+                    @if (adminUsers != null && adminUsers.Any())
+                    {
+                        <div class="org-admin-users">
+                            @foreach (var auser in adminUsers)
+                            {
+                                <div class="org-box user org-node xsmall"
+                                     data-id="@auser.Id"
+                                     data-parent-id="ADMIN"
+                                     data-role="User"
+                                     draggable="true"
+                                     @* onmousedown="prepareDrag(event)" *@
+                                     ondragstart="drag(event)">
+
+
+
+                                    <div class="node-actions-top above-name">
+                                        @if (currentRole == "Admin" || currentRole == "Manager")
+                                        {
+                                            <a onclick="openEditModal('@auser.Id','@auser.Name','@auser.Email','User')">✏️</a>
+                                        }
+
+                                        @if (currentRole == "Admin")
+                                        {
+                                            <a onclick="openDeleteModal('@auser.Id','@auser.Name','User')">🗑</a>
+                                        }
+
+                                        @if (currentRole == "Admin" || currentRole == "Manager")
+                                        {
+                                            <a href="javascript:void(0)"
+                                               onclick="loadReports('@auser.Id')">📊</a>
+                                        }
+                                    </div>
+
+                                    <div class="node-title">@auser.Name</div>
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             }
 
-
-            @* ================= MANAGER NODES (SIBLINGS) ================= *@
             @foreach (var manager in managers)
             {
-                <div class="tree-item">
-                    <div class="tree-content role-manager"
-                         onclick="toggleNode(this, 'children-@manager.Id')"
-                         draggable="true"
-                         ondragstart="drag(event)"
+                <div class="tree-manager">
+
+                    <!-- MANAGER NODE -->
+                    <div class="org-box manager org-node"
                          data-id="@manager.Id"
                          data-role="Manager"
+                         draggable="true"
+                         ondragstart="drag(event)"
                          ondragover="allowDrop(event)"
-                         ondrop="drop(event, '@manager.Id')">
-                        <span class="tree-toggle-icon">▶</span>
-                        <div class="node-info">
-                            <span class="node-name">@manager.Name</span>
-                            <span class="node-role">Manager</span>
-                           
-                        </div>
-                      
-                        <div class="node-actions d-flex align-items-center">
-                            
-                            <!-- Hover actions FIRST -->
-                            <div class="hover-actions">
-                                <button class="action-btn" onclick="openEditModal('@manager.Id','@manager.Name','@manager.Email','Manager'); event.stopPropagation();">✎</button>
-                                @if (currentRole == "Admin")
-                                {
-                                    <button class="action-btn" onclick="openDeleteModal('@manager.Id','@manager.Name','Manager'); event.stopPropagation();">🗑</button>
-                                }
-                                <button class="action-btn" onclick="loadReports('@manager.Id'); event.stopPropagation();">📊</button>
-                            </div>
+                         ondrop="drop(event,'@manager.Id')">
 
-                            <!-- + ALWAYS VISIBLE, at the END -->
+
+
+
+                        @* ACTION ICONS: allow Admin and Manager to edit (delete Admin-only); reports available to both *@
+                        <div class="node-actions-top above-name">
+                            @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
+                            {
+                                <a onclick="openEditModal('@manager.Id','@manager.Name','@manager.Email','Manager')">✏️</a>
+                            }
                             @if (currentRole == "Admin")
                             {
-                                <button class="action-btn add-btn" onclick="openAddModal('User', '@manager.Id'); event.stopPropagation();" title="Add User/SubManager">+</button>
+                                <a onclick="openDeleteModal('@manager.Id','@manager.Name','Manager')">🗑</a>
                             }
-                            
+
+                            @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
+                            {
+                                <a href="javascript:void(0)"
+                                   onclick="loadReports('@manager.Id')">📊</a>
+                            }
+
                         </div>
-                        
+
+                        <div class="manager-header">
+                            <div>
+                                <div class="node-title">@manager.Name</div>
+                                <div class="role">Manager</div>
+                            </div>
+
+                            @* ADD USER button visible only to Admin *@
+                            @if (currentRole == "Admin")
+                            {
+                                <a class="org-plus"
+                                   onclick="openAddModal('User','@manager.Id')">+</a>
+                            }
+                        </div>
                     </div>
 
-                    <!-- MANAGER CHILDREN -->
-                    <div id="children-@manager.Id" class="tree-children" style="display: none;">
+                    <!-- 🔽 CHILDREN -->
+                    <div class="tree-users">
 
-                        <!-- 1. Users under Manager -->
+                        <!-- 👤 USERS (show users first under manager) -->       
                         @if (subManagerUsers.ContainsKey(manager.Id))
                         {
                             foreach (var user in subManagerUsers[manager.Id])
                             {
-                                <div class="tree-item leaf">
-                                    <div class="tree-content role-user"
-                                         draggable="true"
-                                         ondragstart="drag(event)"
-                                         data-id="@user.Id"
-                                         data-role="User">
-                                        <div class="node-info">
-                                            <span class="node-name">@user.Name</span>
-                                        </div>
-                                        <div class="node-actions">
-                                          
+                                <div class="org-box user org-node xsmall"
+                                     data-id="@user.Id"
+                                     data-parent-id="@manager.Id"
+                                     data-role="User"
+                                     draggable="true"
+                                     @* onmousedown="prepareDrag(event)" *@
+                                     ondragstart="drag(event)">
 
-                                            <!-- hover actions -->
-                                            <div class="hover-actions">
-                                                <button class="action-btn"
-                                                        onclick="openEditModal('@user.Id','@user.Name','@user.Email','User'); event.stopPropagation();">
-                                                    ✎
-                                                </button>
 
-                                                @if (currentRole == "Admin")
-                                                {
-                                                    <button class="action-btn"
-                                                            onclick="openDeleteModal('@user.Id','@user.Name','User'); event.stopPropagation();">
-                                                        🗑
-                                                    </button>
-                                                }
 
-                                                <button class="action-btn"
-                                                        onclick="loadReports('@user.Id'); event.stopPropagation();">
-                                                    📊
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                    </div>
-                                </div>
-                            }
-                        }
-
-                        <!-- 2. Sub-Managers under Manager -->
-                        @if (subManagers.ContainsKey(manager.Id))
-                        {
-                            foreach (var subMgr in subManagers[manager.Id])
-                            {
-                                <div class="tree-item">
-                                    <div class="tree-content role-submanager"
-                                         onclick="toggleNode(this, 'children-@subMgr.Id')"
-                                         draggable="true"
-                                         ondragstart="drag(event)"
-                                         data-id="@subMgr.Id"
-                                         data-role="SubManager"
-                                         ondragover="allowDrop(event)"
-                                         ondrop="drop(event, '@subMgr.Id')">
-                                        <span class="tree-toggle-icon">▶</span>
-                                        <div class="node-info">
-                                            <span class="node-name">@subMgr.Name</span>
-                                            <span class="node-role">Sub-Manager</span>
-                                        </div>
-                                        <div class="node-actions d-flex align-items-center">
-                                            
-                                            <!-- Hover Actions FIRST -->
-                                            <div class="hover-actions">
-                                                <button class="action-btn"
-                                                        onclick="openEditModal('@subMgr.Id','@subMgr.Name','@subMgr.Email','SubManager'); event.stopPropagation();">
-                                                    ✎
-                                                </button>
-
-                                                @if (currentRole == "Admin")
-                                                {
-                                                    <button class="action-btn"
-                                                            onclick="openDeleteModal('@subMgr.Id','@subMgr.Name','SubManager'); event.stopPropagation();">
-                                                        🗑
-                                                    </button>
-                                                }
-
-                                                <button class="action-btn"
-                                                        onclick="loadReports('@subMgr.Id'); event.stopPropagation();">
-                                                    📊
-                                                </button>
-                                            </div>
-
-                                            <!-- + Always Visible LAST -->
-                                            @if (currentRole == "Admin" || currentRole == "Manager")
-                                            {
-                                                <button class="action-btn add-btn"
-                                                        onclick="openAddModal('User', '@subMgr.Id'); event.stopPropagation();"
-                                                        title="Add User">
-                                                    +
-                                                </button>
-                                            }
-                                        </div>
-                                       
-
-                                    </div>
-
-                                    <!-- SUB-MANAGER CHILDREN -->
-                                    <div id="children-@subMgr.Id" class="tree-children" style="display: none;">
-                                        @if (subManagerUsers.ContainsKey(subMgr.Id))
+                                    <!-- NODE ACTIONS: Admin + Manager can edit; delete still Admin only -->
+                                    <div class="node-actions-top above-name">
+                                        @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
                                         {
-                                            foreach (var smUser in subManagerUsers[subMgr.Id])
-                                            {
-                                                <div class="tree-item leaf">
-                                                    <div class="tree-content role-user"
-                                                         draggable="true"
-                                                         ondragstart="drag(event)"
-                                                         data-id="@smUser.Id"
-                                                         data-role="User">
-                                                        <div class="node-info">
-                                                            <span class="node-name">@smUser.Name</span>
-                                                        </div>
-                                                        <div class="node-actions">
-                                                            <button class="action-btn" onclick="openEditModal('@smUser.Id','@smUser.Name','@smUser.Email','User'); event.stopPropagation();">✎</button>
-                                                            @if (currentRole == "Admin")
-                                                            {
-                                                                <button class="action-btn" onclick="openDeleteModal('@smUser.Id','@smUser.Name','User'); event.stopPropagation();">🗑</button>
-                                                            }
-                                                            <button class="action-btn" onclick="loadReports('@smUser.Id'); event.stopPropagation();">📊</button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            }
+                                            <a onclick="openEditModal('@user.Id','@user.Name','@user.Email','User')">✏️</a>
+                                        }
+
+                                        @if (currentRole == "Admin")
+                                        {
+                                            <a onclick="openDeleteModal('@user.Id','@user.Name','User')">🗑</a>
+                                        }
+
+                                        @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
+                                        {
+                                            <a href="javascript:void(0)"
+                                               onclick="loadReports('@user.Id')">📊</a>
                                         }
                                     </div>
+
+                                    <div class="node-title">@user.Name</div>                    
                                 </div>
+
                             }
                         }
+
+                        <!-- 🔁 SUB-MANAGERS (render after users) -->
+                        @if (manager != null && subManagers.ContainsKey(manager.Id))
+                        {
+                            foreach (var sub in subManagers[manager.Id])
+                            {
+                                if (sub != null)
+                                {
+                                    @await Html.PartialAsync("_TreeNode", sub)
+                                }
+                            }
+                        }
+
                     </div>
                 </div>
             }
+            
+
+
         </div>
+
+        <!-- ================= CENTER PANEL : DETAILS ================= -->
+        <div class="org-right-panel">
+            <h4 class="mb-2">Selected Details</h4>
+
+            <div id="detailsPanel" class="p-2">
+                Click a user or manager
+            </div>
+
+        </div>
+
     </div>
 
-    <!-- RIGHT PANEL PLACEHOLDER -->
-    <div class="org-right-panel" id="detailsPanel">
-        <div class="empty-state">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            <h3>Employee Details</h3>
-            <p>Select a person from the organization tree to view their reports.</p>
-        </div>
-    </div>
+    <!-- ================= ADD / EDIT / DELETE MODALS and scripts left unchanged; 
+         NOTE: removed duplicate inline drag/drop function definitions (orgchart.js is the single source) -->
 </div>
