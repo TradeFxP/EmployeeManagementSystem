@@ -7,7 +7,6 @@
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
@@ -16,19 +15,6 @@
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/account.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/orgchart-simple.css" asp-append-version="true" />
-    @* Scripts moved to bottom for better loading *@
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script src="~/js/tasks.js"></script>
-
-
-
-
-
     <link rel="stylesheet" href="~/css/orgchart-simple.css" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -41,17 +27,6 @@
     <style>
         .nav-username {
             font-weight: 600;
-            color: rgba(0, 0, 0, .85);
-        }
-
-        header nav.navbar {
-            background-color: #0d6efd !important;
-            /* Bootstrap primary blue */
-        }
-
-        header nav.navbar * {
-            color: #ffffff !important;
-        }
             color: rgba(255,255,255,.9) !important;
         }
     </style>
@@ -76,8 +51,6 @@
                     <i class="bi bi-building me-1"></i> EMS
                 </span>
 
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                    data-bs-target=".navbar-collapse">
                 <button class="navbar-toggler border-0" type="button"
                         data-bs-toggle="collapse"
                         data-bs-target="#mainNavbar"
@@ -92,9 +65,6 @@
                     <!-- LEFT NAV ITEMS -->
                     <ul class="navbar-nav me-auto align-items-center">
 
-                        @* Show Profile to Admin, Manager and User *@
-                        @if (User.Identity?.IsAuthenticated == true &&
-                        (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("Admin")))
                         @if (User.Identity.IsAuthenticated &&
                                         (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("Admin")))
                         {
@@ -108,8 +78,6 @@
                         @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="Users" asp-action="OrgChart">
-                                    Organization Chart
                                 <a class="nav-link"
                                    asp-controller="Users"
                                    asp-action="OrgChart">
@@ -127,40 +95,11 @@
                             </li>
                         }
 
-
-                        @* @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager"))
-                        {
-
-                        } *@
-
-
                         <li class="nav-item">
                             <a class="nav-link" asp-controller="Tasks" asp-action="Index">
                                 <i class="bi bi-kanban me-1"></i> Tasks
                             </a>
                         </li>
-
-
-                        @* @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
-                        {
-                        <li class="nav-item">
-                        <a class="nav-link" asp-controller="Tasks" asp-action="Create">
-                        Assign Tasks
-                        </a>
-                        </li>
-                        } *@
-
-
-
-                        @* @if (User.IsInRole("User") || User.IsInRole("Manager") || User.IsInRole("SubManager"))
-                        {
-                        <li class="nav-item">
-                        <a class="nav-link" asp-controller="Tasks" asp-action="Index">
-                        view Tasks
-                        </a>
-                        </li>
-                        } *@
-
                     </ul>
 
                     <!-- RIGHT NAV ITEMS -->
@@ -217,7 +156,6 @@
     <script src="~/js/site.js"></script>
 
     <!-- Org chart JS -->
-    <script src="~/js/reports-actions.js" asp-append-version="true"></script>
     <script src="~/js/orgchart.js" asp-append-version="true"></script>
 
     <!-- Page-specific scripts -->
@@ -323,5 +261,4 @@
     }
 
 </body>
-
 </html>
