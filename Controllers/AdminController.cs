@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+//using Microsoft.EntityFrameworkCore;
 using UserRoles.Models;
-using UserRoles.Data;
+//using UserRoles.Data;
 
 [Authorize(Roles = "Admin")]
 public class AdminController : Controller
@@ -33,22 +33,22 @@ public class AdminController : Controller
 
         return Content("User roles fixed. Logout and login again.");
     }
-    public IActionResult Index()
-    {
+    //public IActionResult Index()
+    //{
         
-        var topRoles = _userManager.Users
-            .Where(x => x.ParentUserId == null)
-            .ToList();
+    //    var topRoles = _userManager.Users
+    //        .Where(x => x.ParentUserId == null)
+    //        .ToList();
 
-        return View(topRoles);
-    }
-    public IActionResult GetChildren(int parentId)
-    {
-        var parentIds = parentId.ToString();
-        var children = _userManager.Users
-            .Where(x => x.ParentUserId == parentIds)
-            .ToList();
+    //    return View(topRoles);
+    //}
+    //public IActionResult GetChildren(int parentId)
+    //{
+    //    var parentIds = parentId.ToString();
+    //    var children = _userManager.Users
+    //        .Where(x => x.ParentUserId == parentIds)
+    //        .ToList();
 
-        return Json(children);
-    }
+    //    return Json(children);
+    //}
 }
