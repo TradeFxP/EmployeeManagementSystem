@@ -1,5 +1,6 @@
 ﻿@using System.Security.Claims
-@model IEnumerable<UserRoles.ViewModels.ReportViewModel>
+@model UserRoles.ViewModels.PagedResult<UserRoles.ViewModels.ReportViewModel>
+
 
 @{
     ViewData["Title"] = "Reports Dashboard";
@@ -149,9 +150,11 @@
                 </form>
             }
 
+            <!-- EDIT -->
 
                 <!-- ===================== EXISTING REPORTS ===================== -->
-                @if (!Model.Any())
+            @if (!Model.Items.Any())
+
                 {
                     <tr>
                         <td colspan="8" class="text-center">
@@ -163,59 +166,54 @@
                 {
                     int index = 0;
 
-                    foreach (var item in Model)
-                    {
-                        index++;
+                @foreach (var item in Model.Items)
+    {
+        index++;
 
-                        <tr>
-                            <td>@index</td>
+                    <tr>
+                        <td>@index</td>
+                        <td>@item.Date.ToString("yyyy-MM-dd")</td>
+                        <td style="min-width:220px;">@item.Task</td>
+                        <td style="min-width:260px; word-break:break-word;">@item.Note</td>
+                        <td style="min-width:220px;">@item.ReviewerComment ?? "—"</td>
+                        <td>
+                            @if (item.ReportedTo.Contains("Manager"))
+                            {
+                                <span class="badge bg-primary">Manager</span>
+                            }
+                            @if (item.ReportedTo.Contains("Admin"))
+                            {
+                                <span class="badge bg-warning text-dark ms-1">Admin</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge bg-info">@item.SubmittedByRole</span>
+                        </td>
 
-                            <td>
-                                @item.Date.ToString("yyyy-MM-dd")
-                            </td>
+                        <!-- ✅ Actions column -->
+                        <td class="text-center">
+                            <a asp-action="Details"
+                               asp-route-id="@item.Id"
+                               class="btn btn-sm btn-outline-info">
+                                Details
+                            </a>
 
-                            <td style="min-width:220px;">
-                                @item.Task
-                            </td>
-
-                            <td style="min-width:260px; word-break:break-word;">
-                                @item.Note
-                            </td>
-
-                            <td style="min-width:220px;">
-                                @item.ReviewerComment ?? "—"
-                            </td>
-
-                            <td>
-                                @if (item.ReportedTo.Contains("Manager"))
-                                {
-                                    <span class="badge bg-primary">Manager</span>
-                                }
-                                @if (item.ReportedTo.Contains("Admin"))
-                                {
-                                    <span class="badge bg-warning text-dark ms-1">Admin</span>
-                                }
-                            </td>
-
-                           <td>
-                                <span class="badge bg-info">
-                                    @item.SubmittedByRole
-                                </span>
-                            </td>
-
-                            <td class="text-center">
-                                <a asp-action="Details"
-                                   asp-route-id="@item.Id"
-                                   class="btn btn-sm btn-outline-info">
-                                    Details
+                            @if (isUser && item.Date.Date == DateTime.Today)
+                            {
+                                <a asp-action="EditReportPanel"
+                                   asp-route-reportId="@item.Id"
+                                   asp-route-userId="@targetUserId"
+                                   class="btn btn-sm btn-warning ms-2">
+                                    ✏ Edit
                                 </a>
-                            </td>
+                            }
 
 
-                        </tr>
-                    }
-                }
-            </tbody>
+                        </td>
+                    </tr>
+    }
+    }
+   
         </table>
 </div> <!-- ✅ END CONTAINER -->
 @section Scripts {

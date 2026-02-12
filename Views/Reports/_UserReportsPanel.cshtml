@@ -1,5 +1,6 @@
 ﻿@using System.Security.Claims
-@model UserRoles.ViewModels.PagedResult<UserRoles.Models.DailyReport>
+@model UserRoles.ViewModels.PagedResult<UserRoles.ViewModels.ReportViewModel>
+
 
 @{
     Layout = null;
@@ -17,6 +18,9 @@
 
     bool showAddReportForOthers =
         (isManager || isAdmin) && targetUserId != currentUserId;
+
+    bool isViewingOthers = targetUserId != currentUserId;
+    bool showReviewerColumn = true;
 }
 <style>
     /* ===== FORCE ACTION ICON VISIBILITY ===== */
@@ -118,10 +122,13 @@
                 <th>Date</th>
                 <th>Task</th>
                 <th>Note</th>
-                <th>Reviewer Comment</th>
+                @if (showReviewerColumn)
+                {
+                    <th>Reviewer Comment</th>
+                }
                 <th>Reported To</th>
                 <th>Submitted By</th>
-                <th>Actions</th>  @* New explicit actions column *@
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -148,14 +155,18 @@
                         data-report-id="@r.Id"
                         data-task="@r.Task"
                         data-note="@r.Note"
-                        data-reviewer="@r.ReviewerComment">
+                        data-reviewer="@r.ReviewerComment"
+                        data-userid="@r.ApplicationUserId">
 
                         <td>@r.Date.ToString("dd-MM-yyyy")</td>
                         <td class="report-task">@r.Task</td>
                         <td class="report-note">@r.Note</td>
-                        <td class="report-reviewer">
-                            @(string.IsNullOrWhiteSpace(r.ReviewerComment) ? "—" : r.ReviewerComment)
-                        </td>
+                        @if (showReviewerColumn)
+                        {
+                            <td class="report-reviewer">
+                                @(string.IsNullOrWhiteSpace(r.ReviewerComment) ? "—" : r.ReviewerComment)
+                            </td>
+                        }
 
                         <td>@r.ReportedTo</td>
                         <td class="text-center col-submitted">@r.SubmittedByRole</td>
@@ -215,6 +226,28 @@
     </table>
 </div>
 
+@if (Model.TotalPages > 1)
+{
+    <div class="d-flex justify-content-center align-items-center gap-3 mt-3" id="reportsPagination">
+        <button class="btn btn-outline-secondary btn-sm pagination-btn"
+                data-userid="@ViewBag.TargetUserId"
+                data-page="@(Model.Page - 1)"
+                @(Model.Page == 1 ? "disabled" : "")>
+            ← Previous
+        </button>
+
+        <span class="fw-semibold">
+            Page @Model.Page of @Model.TotalPages
+        </span>
+
+        <button class="btn btn-outline-secondary btn-sm pagination-btn"
+                data-userid="@ViewBag.TargetUserId"
+                data-page="@(Model.Page + 1)"
+                @(Model.Page == Model.TotalPages ? "disabled" : "")>
+            Next →
+        </button>
+    </div>
+}
 
 <script>
     window.__isAdmin = @User.IsInRole("Admin").ToString().ToLower();
@@ -269,15 +302,30 @@
       </small>
     `;
 
-    reviewerCell.innerHTML = `
-      <textarea class="form-control form-control-sm char-limit"
-                id="edit-reviewer-${reportId}"
-                maxlength="100"
-                data-counter="reviewer-counter-${reportId}">${originalReviewer}</textarea>
-      <small id="reviewer-counter-${reportId}" class="text-muted">
-          ${100 - originalReviewer.length} characters remaining
-      </small>
-    `;
+    if (reviewerCell) {
+        const reportUserId = row.dataset.userid || '';
+        const currentUserId = '@currentUserId';
+        const isOwnReport = (reportUserId === currentUserId);
+        const isAdminUser = window.__isAdmin;
+
+        if (isAdminUser || !isOwnReport) {
+            reviewerCell.innerHTML = `
+              <textarea class="form-control form-control-sm char-limit"
+                        id="edit-reviewer-${reportId}"
+                        maxlength="100"
+                        data-counter="reviewer-counter-${reportId}">${originalReviewer}</textarea>
+              <small id="reviewer-counter-${reportId}" class="text-muted">
+                  ${100 - originalReviewer.length} characters remaining
+              </small>
+            `;
+        } else {
+            // Read-only for own reports
+            reviewerCell.innerHTML = `
+              <div class="report-text text-muted fst-italic">${originalReviewer || '—'}</div>
+              <input type="hidden" id="edit-reviewer-${reportId}" value="${originalReviewer}" />
+            `;
+        }
+    }
 
 
             // Replace actions with Update / Cancel
@@ -301,8 +349,10 @@
 
             row.querySelector(".report-task").textContent = row.dataset.task;
             row.querySelector(".report-note").textContent = row.dataset.note;
-            row.querySelector(".report-reviewer").textContent =
-                row.dataset.reviewer || "—";
+            const reviewerCell = row.querySelector(".report-reviewer");
+            if (reviewerCell) {
+                reviewerCell.textContent = row.dataset.reviewer || "—";
+            }
 
             restoreRowActions(row, reportId);
             currentlyEditingRow = null;
@@ -316,8 +366,8 @@
 
             const task = document.getElementById(`edit-task-${reportId}`).value.trim();
             const note = document.getElementById(`edit-note-${reportId}`).value.trim();
-            const reviewerComment =
-                document.getElementById(`edit-reviewer-${reportId}`).value.trim();
+            const reviewInput = document.getElementById(`edit-reviewer-${reportId}`);
+            const reviewerComment = reviewInput ? reviewInput.value.trim() : row.dataset.reviewer;
 
             if (!task || !note) {
                 alert("Task and Note are required.");
@@ -352,8 +402,10 @@
 
             row.querySelector(".report-task").textContent = task;
             row.querySelector(".report-note").textContent = note;
-            row.querySelector(".report-reviewer").textContent =
-                reviewerComment || "—";
+            const reviewerCell = row.querySelector(".report-reviewer");
+            if (reviewerCell) {
+                reviewerCell.textContent = reviewerComment || "—";
+            }
 
             restoreRowActions(row, reportId);
             currentlyEditingRow = null;
@@ -369,7 +421,7 @@
         `;
 
         // ✅ Edit allowed for Admin, Manager, SubManager
-        if (window.__isAdmin || window.__isManager || window.__isSubManager) {
+        if (window.__isuser || window.__isAdmin || window.__isManager || window.__isSubManager) {
             actionsHtml += `
                 <a title="Edit"
                    href="javascript:void(0)"

@@ -1,6 +1,6 @@
 ﻿@using System.Security.Claims
 
-@model UserRoles.ViewModels.PagedResult<UserRoles.Models.DailyReport>
+@model UserRoles.ViewModels.PagedResult<UserRoles.ViewModels.ReportViewModel>
 
 @{
     ViewData["Title"] = "Reports";
@@ -11,6 +11,7 @@
     bool isUser = User.IsInRole("User");
     bool isManager = User.IsInRole("Manager");
     bool isAdmin = User.IsInRole("Admin");
+    bool isSubManager = User.IsInRole("SubManager");
 
     string currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
     string targetUserId = ViewBag.TargetUserId as string;
@@ -26,7 +27,11 @@
 
     bool showAddReportForOthers =
         (isManager || isAdmin) && targetUserId != currentUserId;
+
+    bool isViewingOthers = targetUserId != currentUserId;
+    bool showReviewerColumn = true;
 }
+
 
 @* ================= PAGE TITLE ================= *@
 @if (User.IsInRole("User"))
@@ -101,7 +106,10 @@ else
                 <th>Date</th>
                 <th>Task</th>
                 <th>Note</th>
-                <th>Reviewer Comment</th>
+                @if (showReviewerColumn)
+                {
+                    <th>Reviewer Comment</th>
+                }
                 <th>Reported To</th>
                 <th class="text-center align-middle text-nowrap">Submitted&nbsp;By</th>
                 <th>Actions</th>
@@ -142,7 +150,10 @@ else
                         <small id="noteToday" class="text-muted">100 characters remaining</small>
                     </td>
 
-                    <td class="text-muted">—</td>
+                    @if (showReviewerColumn)
+                    {
+                        <td class="text-muted">—</td>
+                    }
 
                     <td>
                         <!-- ✅ ADDED: Error message -->
@@ -208,7 +219,13 @@ else
 
                 bool isEditing = canEdit && editId == r.Id;
 
-                <tr class="report-row" data-report-id="@r.Id" id="report-row-@r.Id">
+                <tr class="report-row" 
+                    data-report-id="@r.Id" 
+                    id="report-row-@r.Id"
+                    data-task="@r.Task"
+                    data-note="@r.Note"
+                    data-reviewer="@r.ReviewerComment"
+                    data-userid="@r.ApplicationUserId">
                     <td class="col-date">@r.Date.ToString("dd-MM-yyyy")</td>
 
                     <td class="col-task">
@@ -257,28 +274,31 @@ else
                         }
                     </td>
 
-                    <td class="col-review">
-                        @if (isEditing)
+                        @if (showReviewerColumn)
                         {
-                            <textarea name="reviewerComment"
-                                      form="editForm-@r.Id"
-                                      rows="2"
-                                      maxlength="100"
-                                      class="form-control form-control-sm fixed-textarea char-limit"
-                                      data-counter="commentEdit-@r.Id">@r.ReviewerComment</textarea>
+                            <td class="col-review">
+                                @if (isEditing)
+                                {
+                                    <textarea name="reviewerComment"
+                                              form="editForm-@r.Id"
+                                              rows="2"
+                                              maxlength="100"
+                                              class="form-control form-control-sm fixed-textarea char-limit"
+                                              data-counter="commentEdit-@r.Id">@r.ReviewerComment</textarea>
 
-                            <small id="commentEdit-@r.Id" class="text-muted">
-                                @(100 - (r.ReviewerComment?.Length ?? 0)) characters remaining
-                            </small>
-                        }
-                        else
-                        {
-                            <div class="report-text" id="comment-text-@r.Id">@r.ReviewerComment</div>
-                            <textarea class="form-control d-none"
-                              id="comment-input-@r.Id">@r.ReviewerComment</textarea>
+                                    <small id="commentEdit-@r.Id" class="text-muted">
+                                        @(100 - (r.ReviewerComment?.Length ?? 0)) characters remaining
+                                    </small>
+                                }
+                                else
+                                {
+                                    <div class="report-text" id="comment-text-@r.Id">@r.ReviewerComment</div>
+                                    <textarea class="form-control d-none"
+                                      id="comment-input-@r.Id">@r.ReviewerComment</textarea>
 
+                                }
+                            </td>
                         }
-                    </td>
 
                     <td class="col-reported">@r.ReportedTo</td>
 
@@ -288,7 +308,7 @@ else
                     </td>
 
                     <!-- Action column (ICONS ONLY) -->
-                    <td class="text-center">
+                    <td class="actions-cell text-center">
 
                         <!-- 👁 VIEW : everyone -->
                         <a asp-action="Details"
@@ -298,23 +318,46 @@ else
                             <i class="bi bi-eye"></i>
                         </a>
 
-                        <!-- ✏️ EDIT : Admin / Manager / SubManager (under rules) -->
-                        @if (
-                                            isAdmin ||
-                                            (isManager &&
-                                            r.SubmittedByRole == "User" &&
-                                            r.ApplicationUserId != currentUserId) ||
-                                            (User.IsInRole("SubManager") &&
-                                            r.SubmittedByRole == "User")
-                                            )
+                        @{
+                             bool canEditFull = false;
+
+                             // Roles checks
+                             bool isOwnReport = string.Equals(r.ApplicationUserId, currentUserId, StringComparison.OrdinalIgnoreCase);
+                             bool isUserReport = string.Equals(r.SubmittedByRole, "User", StringComparison.OrdinalIgnoreCase);
+                             bool isSubmittedToday = r.Date.Date == DateTime.Today;
+
+                             if (isAdmin) 
+                             {
+                                 canEditFull = true;
+                             }
+                             else if (isManager || isSubManager) 
+                             {
+                                 // Can always edit User reports
+                                 if (isUserReport)
+                                 {
+                                     canEditFull = true;
+                                 }
+                                 // Can edit own reports ONLY if submitted today (before midnight)
+                                 else if (isOwnReport && isSubmittedToday)
+                                 {
+                                     canEditFull = true;
+                                 }
+                             }
+                             else if (isUser && isOwnReport && r.Date.AddHours(24) > DateTime.Now) 
+                             {
+                                 canEditFull = true;
+                             }
+                        }
+
+                        <!-- ✏️ EDIT : Inline Edit for authorized roles -->
+                        @if (canEditFull)
                         {
                             <button type="button"
-                                    class="btn btn-sm btn-outline-warning ms-1"
+                                    class="btn btn-sm btn-warning ms-1"
                                     title="Edit"
                                     onclick="enableInlineEdit(@r.Id)">
                                 <i class="bi bi-pencil"></i>
                             </button>
-
                         }
 
                         <!-- 🗑 DELETE : ADMIN ONLY -->
@@ -566,6 +609,149 @@ else
                 alert("Failed to submit report");
             }
         });
+    </script>
+    
+    <script>
+        // ================= INLINE EDIT (Admin/Manager) =================
+        let currentlyEditingId = null;
+
+        function enableInlineEdit(reportId) {
+            if (currentlyEditingId !== null) {
+                alert("Please finish editing the current row first.");
+                return;
+            }
+
+            const row = document.getElementById(`report-row-${reportId}`);
+            if (!row) return;
+
+            currentlyEditingId = reportId;
+
+            // Get current values
+            const originalTask = row.dataset.task;
+            const originalNote = row.dataset.note;
+            const originalReviewer = row.dataset.reviewer;
+
+            // Save original actions HTML to restore later
+            const actionsCell = row.querySelector(".actions-cell");
+            row.dataset.originalActions = actionsCell.innerHTML;
+
+            // Replace cells with inputs
+            row.querySelector(".col-task").innerHTML = `
+                <textarea id="edit-task-${reportId}" class="form-control form-control-sm" rows="3" maxlength="100">${originalTask}</textarea>
+            `;
+            row.querySelector(".col-note").innerHTML = `
+                <textarea id="edit-note-${reportId}" class="form-control form-control-sm" rows="3" maxlength="100">${originalNote}</textarea>
+            `;
+            
+            // Reviewer column handling
+            const reviewCell = row.querySelector(".col-review");
+            if (reviewCell) {
+                // Check if current user is viewing their own report
+                const reportUserId = row.dataset.userid || '@currentUserId';
+                const currentUserId = '@currentUserId';
+                const isOwnReport = (reportUserId === currentUserId);
+                const isAdmin = @(isAdmin ? "true" : "false");
+                
+                // Only Admin can edit reviewer comments
+                // User/Manager/SubManager viewing their own reports see read-only
+                if (isAdmin || !isOwnReport) {
+                    reviewCell.innerHTML = `
+                        <textarea id="edit-reviewer-${reportId}" class="form-control form-control-sm" rows="3" maxlength="100">${originalReviewer || ''}</textarea>
+                    `;
+                } else {
+                    // Read-only for own reports (User/Manager/SubManager)
+                    reviewCell.innerHTML = `
+                        <div class="report-text text-muted fst-italic">${originalReviewer || '(No comment)'}</div>
+                        <input type="hidden" id="edit-reviewer-${reportId}" value="${originalReviewer || ''}" />
+                    `;
+                }
+            }
+
+            // Replace actions with Save/Cancel
+            actionsCell.innerHTML = `
+                <div class="d-flex gap-1 justify-content-center">
+                    <button class="btn btn-sm btn-success" onclick="submitInlineEdit(${reportId})">Save</button>
+                    <button class="btn btn-sm btn-secondary" onclick="cancelInlineEdit(${reportId})">Cancel</button>
+                </div>
+            `;
+        }
+
+        function cancelInlineEdit(reportId) {
+            const row = document.getElementById(`report-row-${reportId}`);
+            if (!row) return;
+
+            // Restore text
+            row.querySelector(".col-task").textContent = row.dataset.task;
+            row.querySelector(".col-note").textContent = row.dataset.note;
+            const reviewCell = row.querySelector(".col-review");
+            if (reviewCell) {
+                reviewCell.textContent = row.dataset.reviewer || "";
+            }
+
+            // Restore actions
+            if (row.dataset.originalActions) {
+                row.querySelector(".actions-cell").innerHTML = row.dataset.originalActions;
+            }
+
+            currentlyEditingId = null;
+        }
+
+        async function submitInlineEdit(reportId) {
+            const task = document.getElementById(`edit-task-${reportId}`).value;
+            const note = document.getElementById(`edit-note-${reportId}`).value;
+            
+            const reviewInput = document.getElementById(`edit-reviewer-${reportId}`);
+            const reviewerComment = reviewInput ? reviewInput.value : row.dataset.reviewer;
+            
+            // Basic validation
+             if (!task || !note) {
+                alert("Task and Note are required.");
+                return;
+            }
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('id', reportId);
+                formData.append('task', task);
+                formData.append('note', note);
+                formData.append('reviewerComment', reviewerComment);
+
+                 // Get CSRF token
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                if (token) formData.append('__RequestVerificationToken', token);
+
+                const res = await fetch("/Reports/InlineUpdate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    alert("Failed to update report");
+                    return;
+                }
+
+                // Success
+                 const row = document.getElementById(`report-row-${reportId}`);
+                 // Update data attributes
+                 row.dataset.task = task;
+                 row.dataset.note = note;
+                 row.dataset.reviewer = reviewerComment;
+
+                 // Restore UI with new values
+                 cancelInlineEdit(reportId); 
+                 
+                 // Show toast
+                 showToast("Report updated successfully");
+
+
+            } catch (err) {
+                console.error(err);
+                alert("Error updating report");
+            }
+        }
     </script>
 
 }

@@ -132,10 +132,11 @@ window.drop = function (event, newParentId) {
         }
     }
 
-   
+
 
     // ---------------- Load reports ----------------
-    window.loadReports = function (userId) {
+    window.loadReports = function (userId, page) {
+        page = page || 1;
         try {
             const panel = document.getElementById("detailsPanel");
             if (!panel) {
@@ -146,7 +147,7 @@ window.drop = function (event, newParentId) {
             panel.dataset.userid = userId || "";
             panel.innerHTML = "<div class='text-muted'>Loading reports...</div>";
 
-            fetch(`/Reports/UserReportsPanel?userId=${encodeURIComponent(userId)}`)
+            fetch(`/Reports/UserReportsPanel?userId=${encodeURIComponent(userId)}&page=${page}`)
                 .then(r => { if (!r.ok) throw r; return r.text(); })
                 .then(html => {
                     injectHtmlWithScripts(panel, html);
@@ -438,7 +439,7 @@ window.drop = function (event, newParentId) {
                 }
 
 
-              
+
 
 
                 if (!name || !email) { alert('Name and Email required'); return; }
@@ -541,7 +542,7 @@ window.drop = function (event, newParentId) {
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        try { if (typeof window.__org_bind_modals === 'function') window.__org_bind_modals(); } catch {}
+        try { if (typeof window.__org_bind_modals === 'function') window.__org_bind_modals(); } catch { }
     });
 
 })();
@@ -615,5 +616,21 @@ document.addEventListener("click", async function (e) {
     catch (err) {
         console.error("❌ Submit error:", err);
         alert("Unexpected error submitting report");
+    }
+});
+
+// ===============================
+// PAGINATION CLICK HANDLER (DELEGATED)
+// ===============================
+document.addEventListener("click", function (e) {
+    const btn = e.target.closest(".pagination-btn");
+    if (!btn) return;
+
+    const userId = btn.dataset.userid;
+    const page = btn.dataset.page;
+
+    if (userId && page && typeof loadReports === "function") {
+        e.preventDefault(); // Prevent default button behavior
+        loadReports(userId, parseInt(page));
     }
 });

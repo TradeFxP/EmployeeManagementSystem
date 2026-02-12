@@ -5,31 +5,24 @@
 }
 
 <!-- ================= ORG NODE ================= -->
-<div class="org-box org-node xsmall"
-     data-id="@Model.User.Id">
+<div class="org-box submanager org-node"
+     data-id="@Model.User.Id"
+     data-role="SubManager"
+     draggable="true"
+     ondragstart="drag(event)"
+     ondragover="allowDrop(event)"
+     ondrop="drop(event,'@Model.User.Id')">
 
-       <!-- ACTION ICONS (admin & manager differences) -->
     <div class="node-actions-top above-name">
         @if (currentRole == "Admin")
         {
-            <a onclick="openEditModal(
-                '@Model.User.Id',
-                    '@Model.User.FirstName',
-                '@Model.User.Email',
-                'User')">✏️</a>
-
-            <a onclick="openDeleteModal(
-                '@Model.User.Id',
-                    '@Model.User.FirstName',
-                'User')">🗑</a>
+            <a onclick="openEditModal('@Model.User.Id','@Model.User.FirstName','@Model.User.Email','SubManager')">✏️</a>
+            <a onclick="openDeleteModal('@Model.User.Id','@Model.User.FirstName','SubManager')">🗑</a>
         }
 
-        @if (currentRole == "Admin" || currentRole == "Manager")
+        @if (currentRole == "Admin")
         {
-            <a href="@Url.Action(
-                           "UserReports",
-                           "Reports",
-                           new { userId = Model.User.Id })">📊</a>
+            <a href="javascript:void(0)" onclick="loadReports('@Model.User.Id')">📊</a>
         }
     </div>
 

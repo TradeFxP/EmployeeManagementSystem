@@ -53,7 +53,8 @@ function deleteReport(reportId) {
 
 // ================= LOAD REPORTS PANEL =================
 // Fetches the user reports partial and renders it into the #detailsPanel element.
-window.loadReports = function (userId) {
+window.loadReports = function (userId, page) {
+    page = page || 1;
     if (!userId) return;
 
     const panel = document.getElementById("detailsPanel");
@@ -61,7 +62,7 @@ window.loadReports = function (userId) {
 
     panel.innerHTML = "<div class='p-3 text-muted'>Loading reports...</div>";
 
-    fetch(`/Reports/UserReportsPanel?userId=${encodeURIComponent(userId)}`)
+    fetch(`/Reports/UserReportsPanel?userId=${encodeURIComponent(userId)}&page=${page}`)
         .then(res => {
             if (!res.ok) throw new Error();
             return res.text();

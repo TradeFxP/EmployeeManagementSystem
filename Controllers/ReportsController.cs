@@ -18,6 +18,7 @@ namespace UserRoles.Controllers
     {
         private readonly AppDbContext _context;
         private readonly UserManager<Users> _userManager;
+        private string currentUserId;
 
         public ReportsController(AppDbContext context, UserManager<Users> userManager)
         {
@@ -145,94 +146,79 @@ namespace UserRoles.Controllers
     int page = 1,
     int pageSize = 10,
     int? editId = null)
-
-
         {
             if (string.IsNullOrEmpty(userId))
                 return NotFound();
 
-            // ================= REPORT OWNER NAME =================
-            // ================= REPORT OWNER NAME =================
             string reportOwnerName = "User";
-
-            if (_userManager != null)
+            var reportOwner = await _userManager.FindByIdAsync(userId);
+            if (reportOwner != null)
             {
-                var reportOwner = await _userManager.FindByIdAsync(userId);
-
-                if (reportOwner != null)
-                {
-                    reportOwnerName =
-                        !string.IsNullOrWhiteSpace(reportOwner.FirstName)
-                            ? reportOwner.FirstName
-                            : reportOwner.Email ?? "User";
-                }
+                reportOwnerName = !string.IsNullOrWhiteSpace(reportOwner.FirstName)
+                    ? reportOwner.FirstName
+                    : reportOwner.Email ?? "User";
             }
-
             ViewBag.ReportOwnerName = reportOwnerName;
 
-
-
             DateTime? parsedAddDate = null;
-
             if (!string.IsNullOrEmpty(addDate))
             {
-                if (DateTime.TryParseExact(
-                    addDate,
-                    "dd-MM-yyyy",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.None,
-                    out DateTime temp))
+                if (DateTime.TryParseExact(addDate, "dd-MM-yyyy", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out DateTime temp))
                 {
                     parsedAddDate = temp;
                 }
             }
-
             ViewBag.AddDate = parsedAddDate?.ToString("dd-MM-yyyy");
-
-
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 10;
-            if (pageSize > 50) pageSize = 50;
 
             var baseQuery = _context.DailyReports
                 .Where(r => r.ApplicationUserId == userId);
 
-            // ✅ FIX: check TODAY from full dataset
-            bool hasToday = await baseQuery.AnyAsync(r =>
-                r.Date.Date == DateTime.Today);
-
-            int totalItems = await baseQuery.CountAsync();
+            // FIX: Calculate today's date BEFORE the query to avoid LINQ-to-SQL translation issues
+            var todayDate = DateTime.Today;
+            bool hasToday = await baseQuery.AnyAsync(r => r.Date.Date == todayDate);
 
             var reports = await baseQuery
-                .OrderByDescending(r => r.Date)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+    .OrderByDescending(r => r.Date)
+    .Skip((page - 1) * pageSize)
+    .Take(pageSize)
+    .ToListAsync();
 
-            var model = new PagedResult<DailyReport>
+            // Map DailyReport → ReportViewModel
+            var vmList = reports.Select(r => new ReportViewModel
             {
-                Items = reports,
-                Page = page,
-                PageSize = pageSize,
-                TotalItems = totalItems
-            };
+                Id = r.Id,
+                ApplicationUserId = r.ApplicationUserId,
+                Task = r.Task,
+                Note = r.Note,
+                ReviewerComment = r.ReviewerComment,
+                ReportedTo = r.ReportedTo, // ✅ include this
+                SubmittedByRole = r.SubmittedByRole,
+                Date = r.Date,
+                CreatedAt = r.CreatedAt,
+                DisplayName = reportOwnerName
+            }).ToList();
 
             ViewBag.TargetUserId = userId;
-            ViewBag.Today = DateTime.Today;
-            ViewBag.HasToday = hasToday;   // ✅ correct now
-
+            ViewBag.Today = todayDate;
+            ViewBag.HasToday = hasToday;
             ViewBag.EditId = editId;
-           
+
+            // ✅ Return the list directly
+            int totalItems = await baseQuery.CountAsync();
+
+            var pagedResult = new PagedResult<ReportViewModel>
+            {
+                Items = vmList,
+                TotalItems = totalItems,
+                Page = page,
+                PageSize = pageSize
+            };
+
+            return View(pagedResult);
 
 
-            return View(model);
         }
-
-
-
-
-
-
 
         [Authorize(Roles = "User,Manager,Admin")]
         public async Task<IActionResult> UserReportsPanel(
@@ -298,34 +284,42 @@ namespace UserRoles.Controllers
                 .ToListAsync();
 
             // ================= PAGED MODEL =================
-            var model = new PagedResult<DailyReport>
+            var vmList = reports.Select(r => new ReportViewModel
             {
-                Items = reports,
+                Id = r.Id,
+                ApplicationUserId = r.ApplicationUserId,
+                Task = r.Task,
+                Note = r.Note,
+                ReviewerComment = r.ReviewerComment,
+                ReportedTo = r.ReportedTo, // ✅ include this
+                SubmittedByRole = r.SubmittedByRole,
+                Date = r.Date,
+                CreatedAt = r.CreatedAt   // ✅ include this
+            }).ToList();
+
+            var pagedResult = new PagedResult<ReportViewModel>
+            {
+                Items = vmList,
+                TotalItems = totalItems,
                 Page = page,
-                PageSize = pageSize,
-                TotalItems = totalItems
+                PageSize = pageSize
             };
 
-            ViewBag.HasToday = hasToday;
-            ViewBag.Today = DateTime.Today;
+            return PartialView("_UserReportsPanel", pagedResult);
 
-            // 🔥 CRITICAL: PARTIAL VIEW ONLY (RIGHT PANEL)
-            return PartialView("_UserReportsPanel", model);
         }
 
+            /* ================= CREATE INLINE ================= */
 
-
-        /* ================= CREATE INLINE ================= */
-
-        // NOTE: many inline AJAX calls load this endpoint.
-        // Antiforgery token was previously used, to avoid silent failures caused by
-        // missing tokens when called from JS we ignore antiforgery here (consistent
-        // with other AJAX endpoints in the project).
+            // NOTE: many inline AJAX calls load this endpoint.
+            // Antiforgery token was previously used, to avoid silent failures caused by
+            // missing tokens when called from JS we ignore antiforgery here (consistent
+            // with other AJAX endpoints in the project).
 
 
 
 
-        [IgnoreAntiforgeryToken]
+            [IgnoreAntiforgeryToken]
         [Authorize(Roles = "User,Manager,Admin")]
         [HttpPost]
         public async Task<IActionResult> CreateInline(
@@ -360,7 +354,7 @@ namespace UserRoles.Controllers
             var report = new DailyReport
             {
                 ApplicationUserId = targetUserId,
-                Date = parsedDate,
+                Date = parsedDate.Date,
                 Task = task.Trim(),
                 Note = note.Trim(),
                 ReportedTo = string.Join(", ", reportedTo),
@@ -439,6 +433,153 @@ namespace UserRoles.Controllers
         }
 
 
+
+        /* ================= EDIT (FULL PAGE) ================= */
+        [Authorize(Roles = "User,Manager,Admin,SubManager")]
+        [HttpGet]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var report = await _context.DailyReports.FindAsync(id);
+            if (report == null)
+            {
+                return NotFound();
+            }
+
+            var currentUserId = _userManager.GetUserId(User);
+            bool isAdmin = User.IsInRole("Admin");
+            bool isManager = User.IsInRole("Manager");
+            bool isSubManager = User.IsInRole("SubManager");
+            bool isUser = User.IsInRole("User");
+
+            // Authorization logic
+            if (isUser && report.ApplicationUserId != currentUserId)
+            {
+                return Forbid();
+            }
+
+            if (isUser && report.CreatedAt.AddHours(24) < DateTime.UtcNow)
+            {
+                 TempData["Error"] = "You can only edit reports within 24 hours of submission.";
+                 return RedirectToAction(nameof(UserReports), new { userId = currentUserId });
+            }
+
+            // Manager/SubManager permission check (can edit user reports or own)
+            if ((isManager || isSubManager) && !isAdmin)
+            {
+                bool isUserReport = string.Equals(report.SubmittedByRole, "User", StringComparison.OrdinalIgnoreCase);
+                bool isOwnReport = report.ApplicationUserId == currentUserId;
+                bool isSubmittedToday = report.Date.Date == DateTime.Today;
+                
+                // Can always edit User reports
+                if (isUserReport)
+                {
+                    // Allow editing
+                }
+                // Can edit own reports ONLY if submitted today (before midnight)
+                else if (isOwnReport && isSubmittedToday)
+                {
+                    // Allow editing
+                }
+                else
+                {
+                    TempData["Error"] = "You can only edit your own reports on the day they were submitted.";
+                    return RedirectToAction(nameof(UserReports), new { userId = currentUserId });
+                }
+            }
+
+            var viewModel = new ReportViewModel
+            {
+                Id = report.Id,
+                ApplicationUserId = report.ApplicationUserId,
+                Date = report.Date,
+                Task = report.Task,
+                Note = report.Note,
+                ReviewerComment = report.ReviewerComment,
+                ReportedTo = report.ReportedTo ?? "Manager", // Default to Manager if null to avoid validation error on display
+                SubmittedByRole = report.SubmittedByRole
+            };
+            
+            return View(viewModel);
+        }
+
+        [Authorize(Roles = "User,Manager,Admin,SubManager")]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, ReportViewModel model)
+        {
+            if (id != model.Id)
+            {
+                return NotFound();
+            }
+
+            var report = await _context.DailyReports.FindAsync(id);
+            if (report == null)
+            {
+                return NotFound();
+            }
+
+            var currentUserId = _userManager.GetUserId(User);
+            bool isAdmin = User.IsInRole("Admin");
+            bool isManager = User.IsInRole("Manager");
+            bool isSubManager = User.IsInRole("SubManager");
+            bool isUser = User.IsInRole("User");
+
+            if (isUser && report.ApplicationUserId != currentUserId) return Forbid();
+            if (isUser && report.CreatedAt.AddHours(24) < DateTime.UtcNow) return Forbid();
+
+            if ((isManager || isSubManager) && !isAdmin)
+            {
+                bool isUserReport = string.Equals(report.SubmittedByRole, "User", StringComparison.OrdinalIgnoreCase);
+                bool isOwnReport = report.ApplicationUserId == currentUserId;
+                bool isSubmittedToday = report.Date.Date == DateTime.Today;
+                
+                // Can always edit User reports
+                if (isUserReport)
+                {
+                    // Allow editing
+                }
+                // Can edit own reports ONLY if submitted today (before midnight)
+                else if (isOwnReport && isSubmittedToday)
+                {
+                    // Allow editing
+                }
+                else
+                {
+                    TempData["Error"] = "You can only edit your own reports on the day they were submitted.";
+                    return RedirectToAction(nameof(UserReports), new { userId = currentUserId });
+                }
+            }
+
+            // Update fields
+            report.Task = model.Task;
+            report.Note = model.Note;
+
+            if (isAdmin || isManager || isSubManager)
+            {
+                report.ReviewerComment = model.ReviewerComment;
+            }
+
+            try
+            {
+                _context.Update(report);
+                await _context.SaveChangesAsync();
+                TempData["Success"] = "Report updated successfully.";
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.DailyReports.Any(e => e.Id == report.Id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+            return RedirectToAction(nameof(UserReports), new { userId = report.ApplicationUserId });
+        }
+
+
         /* ================= INLINE UPDATE ================= */
         /* ================= INLINE UPDATE ================= */
         /* ================= INLINE UPDATE ================= */
@@ -446,50 +587,35 @@ namespace UserRoles.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> InlineUpdate(
-            int id,
-            string task,
-            string note,
-            string reviewerComment)
+    int id,
+    string task,
+    string note,
+    string reviewerComment)
         {
             if (string.IsNullOrWhiteSpace(task) || string.IsNullOrWhiteSpace(note))
-            {
-                return BadRequest(new { message = "Task and Note are required." });
-            }
+                return BadRequest("Task and Note are required.");
 
-            var report = await _context.DailyReports.FirstOrDefaultAsync(r => r.Id == id);
+            var report = await _context.DailyReports
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (report == null)
-            {
-                return NotFound(new { message = "Report not found." });
-            }
+                return NotFound();
 
-            // ================= ROLE RULES =================
+            // Role rules
+            if (!(User.IsInRole("Admin") ||
+     (User.IsInRole("Manager") && report.ApplicationUserId != currentUserId) ||
+     (User.IsInRole("SubManager") && report.ApplicationUserId != currentUserId)))
 
-            // ✅ Admin → can edit everything
-            // 🔹 Authorization rules (FINAL)
-            if (User.IsInRole("Admin"))
             {
-                // Admin can edit anything
-            }
-            else if (User.IsInRole("Manager") || User.IsInRole("SubManager"))
-            {
-                // Manager / SubManager can edit ONLY User-owned reports
-                var reportOwner = await _userManager.FindByIdAsync(report.ApplicationUserId);
-                if (reportOwner == null)
-                    return NotFound();
-
-                var ownerRoles = await _userManager.GetRolesAsync(reportOwner);
+                var owner = await _userManager.FindByIdAsync(report.ApplicationUserId);
+                var ownerRoles = owner != null
+                    ? await _userManager.GetRolesAsync(owner)
+                    : new List<string>();
 
                 if (!ownerRoles.Contains("User"))
-                    return Forbid(); // ❌ cannot edit Admin/Manager/SubManager reports
-            }
-            else
-            {
-                return Forbid();
+                    return Forbid();
             }
 
-
-            // ================= UPDATE =================
             report.Task = task.Trim();
             report.Note = note.Trim();
             report.ReviewerComment = string.IsNullOrWhiteSpace(reviewerComment)
@@ -498,12 +624,10 @@ namespace UserRoles.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Json(new
-            {
-                success = true,
-                message = "Report updated successfully"
-            });
+            return Ok(new { success = true });
         }
+
+
 
         [Authorize(Roles = "Admin")]
         [HttpPost]
@@ -557,36 +681,47 @@ namespace UserRoles.Controllers
             var vm = new ReportViewModel
             {
                 Id = report.Id,
-                Task = report.Task ?? "",
-                Note = report.Note ?? "",
-                ReviewerComment = report.ReviewerComment ?? "",
-                Date = report.Date
+                ApplicationUserId = report.ApplicationUserId,
+                Task = report.Task,
+                Note = report.Note,
+                ReviewerComment = report.ReviewerComment,
+                SubmittedByRole = report.SubmittedByRole,
+                Date = report.Date,
+                CreatedAt = report.CreatedAt 
             };
+
 
             return PartialView("_EditReportPanel", vm);
         }
 
         /* ================= EDIT REPORT PANEL (INLINE) ================= */
-        [Authorize(Roles = "Admin,Manager")]
+        [Authorize(Roles = "Admin,Manager,User")]
         [HttpGet]
-        public async Task<IActionResult> EditReportPanel(int reportId, string userId)
+      
+        public async Task<IActionResult> EditReportPanel(int id, string userId)
         {
-            // 1. Load report
+            // Load report
             var report = await _context.DailyReports
                 .AsNoTracking()
-                .FirstOrDefaultAsync(r => r.Id == reportId);
+                .FirstOrDefaultAsync(r => r.Id == id);
 
             if (report == null)
-                return NotFound("Report not found");
+                return NotFound();
 
-            // 2. Authorization (extra safety)
+            // Manager can edit ONLY User reports
             if (User.IsInRole("Manager") &&
                 !string.Equals(report.SubmittedByRole, "User", StringComparison.OrdinalIgnoreCase))
             {
                 return Forbid();
             }
 
-            // 3. Build ViewModel
+            // User can edit only within 24 hours
+            if (User.IsInRole("User") &&
+                report.CreatedAt.AddHours(24) < DateTime.UtcNow)
+            {
+                return Forbid();
+            }
+
             var vm = new ReportViewModel
             {
                 Id = report.Id,
@@ -598,14 +733,13 @@ namespace UserRoles.Controllers
                 Date = report.Date
             };
 
-            // 4. Needed for Cancel → reload reports
             ViewBag.TargetUserId = string.IsNullOrEmpty(userId)
                 ? report.ApplicationUserId
                 : userId;
 
-            // 5. Return PARTIAL ONLY
             return PartialView("_EditReportPanel", vm);
         }
+
 
 
 

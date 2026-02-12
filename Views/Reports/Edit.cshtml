@@ -1,8 +1,8 @@
-﻿@* @model UserRoles.Models.DailyReport
+﻿@model UserRoles.ViewModels.ReportViewModel
 
 @{
     ViewData["Title"] = "Edit Report";
-    bool isAdminOrManager = User.IsInRole("Admin") || User.IsInRole("Manager");
+    bool isAdminOrManager = User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager");
 }
 
 <h3 class="mb-3">Edit Report</h3>
@@ -42,9 +42,10 @@
                           required></textarea>
             </div>
 
-            <!-- Reviewer Comment (ADMIN / MANAGER ONLY) -->
+            <!-- Reviewer Comment -->
             @if (isAdminOrManager)
             {
+                <!-- Editable for Admin/Manager -->
                 <div class="mb-4">
                     <label asp-for="ReviewerComment" class="form-label">
                         Reviewer Comment
@@ -53,6 +54,18 @@
                               class="form-control"
                               rows="4"
                               placeholder="Add comment for the user..."></textarea>
+                </div>
+            }
+            else
+            {
+                <!-- Readonly for regular users -->
+                <div class="mb-4">
+                    <label class="form-label">
+                        Reviewer Comment
+                    </label>
+                    <textarea class="form-control"
+                              rows="4"
+                              readonly>@(string.IsNullOrWhiteSpace(Model.ReviewerComment) ? "No comment yet" : Model.ReviewerComment)</textarea>
                 </div>
             }
 
@@ -77,4 +90,5 @@
         </form>
 
     </div>
-</div> *@
+</div>
+

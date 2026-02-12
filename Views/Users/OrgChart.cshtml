@@ -98,7 +98,7 @@
 
 
                                     <div class="node-actions-top above-name">
-                                        @if (currentRole == "Admin" || currentRole == "Manager")
+                                        @if (currentRole == "Admin")
                                         {
                                             <a onclick="openEditModal('@auser.Id','@auser.FirstName','@auser.Email','User')">✏️</a>
                                         }
@@ -108,7 +108,7 @@
                                             <a onclick="openDeleteModal('@auser.Id','@auser.FirstName','User')">🗑</a>
                                         }
 
-                                        @if (currentRole == "Admin" || currentRole == "Manager")
+                                        @if (currentRole == "Admin")
                                         {
                                             <a href="javascript:void(0)"
                                                onclick="loadReports('@auser.Id')">📊</a>
@@ -141,7 +141,7 @@
 
                         @* ACTION ICONS: allow Admin and Manager to edit (delete Admin-only); reports available to both *@
                         <div class="node-actions-top above-name">
-                            @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
+                            @if (currentRole == "Admin")
                             {
                                 <a onclick="openEditModal('@manager.Id','@manager.FirstName','@manager.Email','Manager')">✏️</a>
                             }
@@ -150,7 +150,7 @@
                                 <a onclick="openDeleteModal('@manager.Id','@manager.FirstName','Manager')">🗑</a>
                             }
 
-                            @if (currentRole == "Admin" || currentRole == "Manager" || currentRole == "SubManager")
+                            @if (currentRole == "Admin")
                             {
                                 <a href="javascript:void(0)"
                                    onclick="loadReports('@manager.Id')">📊</a>
@@ -210,10 +210,10 @@
                                         }
                                     </div>
 
-                                    <div class="node-title">@user.FirstName</div>
+                                    @* <div class="node-title">@user.FirstName</div> *@
                                 </div>
 
-                                 <div class="node-title">@user.LastName</div>
+                                 @* <div class="node-title">@user.LastName</div> *@
                             }
                         }
 

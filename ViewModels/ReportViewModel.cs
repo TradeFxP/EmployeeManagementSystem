@@ -22,6 +22,8 @@ namespace UserRoles.ViewModels
         public string Task { get; set; } = string.Empty;
 
         public string Note { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+
 
         [Required(ErrorMessage = "Please select who you are reporting to.")]
         public string ReportedTo { get; set; } = string.Empty;
@@ -31,6 +33,7 @@ namespace UserRoles.ViewModels
         public string SubmittedByRole { get; set; } = string.Empty;
 
         public string? ReviewerComment { get; set; }
+        public string? currentUserId { get; set; } 
 
        // public DateTime CreatedAt { get; set; }
 
