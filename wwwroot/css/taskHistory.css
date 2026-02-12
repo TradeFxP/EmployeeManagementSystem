@@ -1,0 +1,250 @@
+/* ========== CUSTOM FIELDS DISPLAY ========== */
+
+.custom-fields-display {
+    background-color: #f8f9fa;
+    padding: 8px 10px;
+    border-radius: 4px;
+}
+
+.field-value-item {
+    margin-bottom: 4px;
+    color: #495057;
+}
+
+.field-value-item strong {
+    color: #212529;
+    font-weight: 600;
+}
+
+/* ========== TASK HISTORY TIMELINE ========== */
+
+#historyTimeline {
+    position: relative;
+}
+
+.history-event {
+    display: flex;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+    position: relative;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.history-event:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.event-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    flex-shrink: 0;
+    font-size: 18px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.history-event:hover .event-icon {
+    transform: scale(1.1);
+}
+
+/* Event type colors */
+.event-created {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.event-updated {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+}
+
+.event-assigned {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+    color: #212529;
+}
+
+.event-status {
+    background: linear-gradient(135deg, #17a2b8 0%, #0dcaf0 100%);
+    color: white;
+}
+
+.event-moved {
+    background: linear-gradient(135deg, #0d6efd 0%, #6610f2 100%);
+    color: white;
+}
+
+.event-field {
+    background: linear-gradient(135deg, #6f42c1 0%, #d63384 100%);
+    color: white;
+}
+
+.event-priority {
+    background: linear-gradient(135deg, #fd7e14 0%, #dc3545 100%);
+    color: white;
+}
+
+.event-deleted {
+    background: linear-gradient(135deg, #dc3545 0%, #721c24 100%);
+    color: white;
+}
+
+.event-default {
+    background: linear-gradient(135deg, #6c757d 0%, #adb5bd 100%);
+    color: white;
+}
+
+.event-content {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.event-header strong {
+    font-size: 16px;
+    color: #212529;
+    font-weight: 600;
+}
+
+.event-details {
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.event-details strong {
+    color: #495057;
+    font-weight: 600;
+}
+
+.time-spent {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    padding: 4px 10px;
+    border: 1px solid #dee2e6;
+}
+
+/* Animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Modal styling */
+#taskHistoryModal .modal-header {
+    border-bottom: none;
+    padding: 16px 20px;
+}
+
+#taskHistoryModal .modal-body {
+    max-height: 600px;
+}
+
+/* Empty state */
+#historyTimeline p.text-muted {
+    font-style: italic;
+}
+
+/* Gradient accent line for timeline */
+#historyTimeline::before {
+    content: '';
+    position: absolute;
+    left: 21px;
+    top: 42px;
+    bottom: 20px;
+    width: 2px;
+    background: linear-gradient(to bottom, #e9ecef 0%, transparent 100%);
+}
+
+/* ========== TASK CARD ENHANCEMENTS ========== */
+
+.task-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.task-actions .btn-sm {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.task-actions .btn-sm:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.task-actions .btn-outline-info:hover {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+    color: white;
+}
+
+/* ========== RESPONSIVE ========== */
+
+@media (max-width: 768px) {
+    .event-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+        margin-right: 12px;
+    }
+
+    .event-header strong {
+        font-size: 14px;
+    }
+
+    #historyTimeline::before {
+        left: 18px;
+    }
+
+    .task-actions {
+        flex-direction: column;
+    }
+
+    .task-actions .btn-sm {
+        width: 100%;
+    }
+}
+
+/* ========== PROFESSIONAL POLISH ========== */
+
+.modal-content {
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.btn-close-white {
+    filter: brightness(0) invert(1);
+}
+
+/* Spinner styling */
+.spinner-border.text-primary {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-width: 0.3rem;
+}

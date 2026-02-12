@@ -41,6 +41,8 @@ namespace UserRoles.ViewModels
 
 
 
+        public string Address { get; set; }
+
         // View state
         public bool IsEditMode { get; set; }
 

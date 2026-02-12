@@ -24,6 +24,50 @@
     }
 </div>
 
+<!-- 🔍 SEARCH & FILTER BAR -->
+<div class="row g-2 mb-4 bg-white p-3 rounded border shadow-sm">
+    <div class="col-12 col-md-4">
+        <div class="input-group">
+            <span class="input-group-text bg-white border-end-0">
+                <i class="bi bi-search text-muted"></i>
+            </span>
+            <input type="text" 
+                   id="taskSearchInput" 
+                   class="form-control border-start-0" 
+                   placeholder="Search title, desc, fields..." 
+                   oninput="filterBoardTasks()">
+        </div>
+    </div>
+    
+    <div class="col-6 col-md-2">
+        <select id="priorityFilter" class="form-select" onchange="filterBoardTasks()">
+            <option value="">All Priorities</option>
+            <option value="0">Low</option>
+            <option value="1">Medium</option>
+            <option value="2">High</option>
+            <option value="3">Critical</option>
+        </select>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <select id="assigneeFilter" class="form-select" onchange="filterBoardTasks()">
+            <option value="">All Assignees</option>
+            @foreach (var u in Model.AssignableUsers)
+            {
+                <option value="@u.Id">@u.UserName</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-12 col-md-3">
+        <select id="adminAssignedFilter" class="form-select" onchange="filterBoardTasks()">
+            <option value="">Filter By Assignor</option>
+            <option value="Admin">Assigned by Admin</option>
+            <option value="All">Show All</option>
+        </select>
+    </div>
+</div>
+
 
 <!-- KANBAN BOARD -->
 <div class="kanban-board" id="kanbanBoard">
@@ -39,19 +83,19 @@
             <!-- TITLE -->
             <div class="mb-3">
                 <label class="form-label">Title</label>
-                <input id="editTaskTitle" class="form-control" />
+                <input id="focusedTaskTitle" class="form-control" />
             </div>
 
             <!-- DESCRIPTION -->
             <div class="mb-3">
                 <label class="form-label">Description</label>
-                <textarea id="editTaskDescription" class="form-control" rows="4"></textarea>
+                <textarea id="focusedTaskDescription" class="form-control" rows="4"></textarea>
             </div>
 
             <!-- ASSIGN USER -->
             <div class="mb-3">
                 <label class="form-label">Assign to</label>
-                <select id="assignUserSelect" class="form-select"></select>
+                <select id="focusedTaskAssignUser" class="form-select"></select>
             </div>
 
             <!-- CREATED INFO -->
@@ -80,20 +124,31 @@
         <div class="kanban-column" data-column-id="@column.Id">
 
             <!-- COLUMN HEADER --> 
-            <div class="kanban-column-header d-flex align-items-center justify-content-between"
-                 onclick="focusColumn(@column.Id)">
+            <div class="kanban-column-header d-flex align-items-center justify-content-between">
 
+                <!-- 🔥 DRAG HANDLE (ONLY THIS MOVES COLUMN) -->
+                <div class="column-drag-handle d-flex align-items-center"
+                     title="Drag column"
+                     style="cursor: grab;"
+                     onclick="event.stopPropagation();">
+                    ⠿
+                </div>
 
-
-                <!-- COLUMN TITLE -->
-                <div class="column-title-wrapper">
+                <!-- COLUMN TITLE (CLICK TO FOCUS) -->
+                <div class="column-title-wrapper flex-grow-1 ms-2"
+                     onclick="focusColumn(@column.Id)">
 
                     <span class="column-title"
                           id="column-title-@column.Id">
                         @column.ColumnName
                     </span>
 
-                    <div class="column-rename" id="column-rename-@column.Id" style="display:none;">
+                    <!-- RENAME MODE -->
+                    <div class="column-rename"
+                         id="column-rename-@column.Id"
+                         style="display:none;"
+                         onclick="event.stopPropagation();">
+
                         <input type="text"
                                class="column-title-input"
                                id="column-input-@column.Id"
@@ -111,16 +166,17 @@
                     </div>
                 </div>
 
+                <!-- ADD TASK -->
                 @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                 {
                     <button class="icon-btn"
                             title="Add task"
-                            onclick="openCreateTaskModal(@column.Id)">
+                            onclick="openCreateTaskModal(@column.Id); event.stopPropagation();">
                         ➕
                     </button>
                 }
 
-
+                <!-- ADMIN ACTIONS -->
                 @if (User.IsInRole("Admin"))
                 {
                     <div class="column-actions" onclick="event.stopPropagation();">
@@ -137,11 +193,8 @@
                         </button>
                     </div>
                 }
-
-
-
-
             </div>
+
 
 
             <!-- TASK CONTAINER (later drag tasks here) -->
@@ -155,14 +208,56 @@
                              draggable="true"
                              data-task-id="@task.Id"
                              data-column-id="@column.Id"
+                             data-priority="@((int)task.Priority)"
+                             data-assigned-to-id="@(task.AssignedToUserId ?? "")"
+                             data-assigned-by-admin="@(task.AssignedByUser != null && task.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                              onclick="focusTask(@task.Id)">
 
-                            <!-- ✏️ Editable Title -->
-                            <input class="form-control task-title-input d-none"
-                                   value="@task.Title"
-                                   data-task-id="@task.Id" />
 
-                            <strong class="task-title-text">@task.Title</strong>
+
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong class="task-title-text">@task.Title</strong>
+                                @{
+                                    var priorityClass = task.Priority switch
+                                    {
+                                        UserRoles.Models.Enums.TaskPriority.Low => "bg-secondary",
+                                        UserRoles.Models.Enums.TaskPriority.Medium => "bg-info",
+                                        UserRoles.Models.Enums.TaskPriority.High => "bg-warning text-dark",
+                                        UserRoles.Models.Enums.TaskPriority.Critical => "bg-danger",
+                                        _ => "bg-secondary"
+                                    };
+                                }
+                                <span class="badge @priorityClass">@task.Priority</span>
+                            </div>
+
+
+
+
+                            <div class="task-desc-text mt-2">
+                                @task.Description
+                            </div>
+                            
+                            @* 📋 CUSTOM FIELDS DISPLAY (SUMMARY) *@
+                            @if (task.CustomFieldValues != null && task.CustomFieldValues.Any())
+                            {
+                                <div class="custom-fields-summary mt-2">
+                                    @foreach (var fv in task.CustomFieldValues)
+                                    {
+                                        if (fv.Field == null) continue;
+                                        <div class="small mb-1">
+                                            <strong>@fv.Field.FieldName:</strong>
+                                            @if (fv.Field.FieldType == "Date" && DateTime.TryParse(fv.Value, out var sd))
+                                            {
+                                                <span> @sd.ToString("dd MMM yyyy")</span>
+                                            }
+                                            else
+                                            {
+                                                <span> @fv.Value</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
 
                             <!-- 🕒 Created -->
                             <div class="small text-muted mt-1">
@@ -180,28 +275,50 @@
                                 </div>
                             }
 
-                            @if (task.AssignedByUser != null && task.AssignedAt != null)
+                            @if (task.AssignedToUser != null && task.AssignedAt != null)
+                            {
+                                <div class="small text-muted mt-1 assigned-info"
+                                     data-task-id="@task.Id">
+
+                                    <div>
+                                        Assigned to:
+                                        <strong class="assigned-to-name">
+                                            @task.AssignedToUser.UserName
+                                        </strong>
+                                    </div>
+
+                                    @if (task.AssignedByUser != null)
+                                    {
+                                        <div>
+                                            Assigned by:
+                                            <strong>
+                                                @task.AssignedByUser.Email
+                                            </strong>
+                                        </div>
+                                    }
+
+                                    <div>
+                                        Assigned at:
+                                        @task.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                    </div>
+                                </div>
+                            }
+
+
+                            @* @if (task.AssignedByUser != null && task.AssignedAt != null)
                             {
                                 <div class="small text-muted mt-1">
                                     Assigned by: <strong>@task.AssignedByUser.UserName</strong>
                                 </div>
                                 <div class="small text-muted">
-                                    Assigned at: @task.AssignedAt.Value.ToLocalTime()
-                                    .ToString("dd MMM yyyy, hh:mm tt")
+                                    Assigned at: @task.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
                                 </div>
-                            }
+                            } *@
 
 
 
-                            <!-- ✏️ Editable Description -->
-                            <textarea class="form-control mt-2 task-desc-input d-none"
-                              data-task-id="@task.Id">@task.Description</textarea>
 
-                            <div class="task-desc-text mt-2">
-                                @task.Description
-                            </div>
-
-                            <!-- 🧑 Assign -->
+                            @* <!-- 🧑 Assign -->
                             <select class="form-select mt-2 task-assign-select"
                                     data-task-id="@task.Id">
                                 <option value="">Unassigned</option>
@@ -212,25 +329,75 @@
                                     </option>
                                 }
 
-                            </select>
+                            </select> *@
 
-                            <!-- 🗑 ADMIN DELETE -->
-                            @if (User.IsInRole("Admin"))
-                            {
-                                <button class="btn btn-sm btn-danger mt-3"
-                                        onclick="deleteTask(@task.Id); event.stopPropagation();">
-                                    Delete
+
+                            <!-- 🧑 Assign (HIDDEN BY DEFAULT) -->
+                            <div class="task-assign-container d-none"
+                                 data-task-id="@task.Id">
+
+                                <select class="form-select mt-2 task-assign-select"
+                                        data-task-id="@task.Id">
+                                    <option value="">Unassigned</option>
+                                    @foreach (var u in Model.AssignableUsers)
+                                    {
+                                        <option value="@u.Id">@u.UserName</option>
+                                    }
+                                </select>
+
+                                <div class="d-flex gap-2 mt-2">
+                                    <button class="btn btn-sm btn-success"
+                                            onclick="confirmAssignTask(@task.Id)">
+                                        Save
+                                    </button>
+
+                                    <button class="btn btn-sm btn-secondary"
+                                            onclick="cancelAssignTask(@task.Id)">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- ASSIGN BUTTON -->
+                            <!-- ⚙️ Actions -->
+                            <div class="task-actions mt-2 d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-info flex-fill"
+                                        onclick="openTaskHistoryModal(@task.Id); event.stopPropagation();">
+                                    <i class="bi bi-clock-history"></i> History
                                 </button>
-                            }
-                            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                                
+                                <button class="btn btn-sm btn-outline-secondary flex-fill"
+                                        data-task-id="@task.Id"
+                                        onclick="showAssignUI(@task.Id); event.stopPropagation();">
+                                    <i class="bi bi-person"></i> Assign
+                                </button>
+
+                                @if (User.IsInRole("Admin"))
+                                {
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            onclick="deleteTask(@task.Id); event.stopPropagation();">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                }
+                            </div>
+                            @* @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                             {
                                 <button class="btn btn-sm btn-outline-primary mt-2 me-2"
                                         onclick="openAssignTaskModal(@task.Id)">
                                     Assign
                                 </button>
-                            }
+                            } *@
+                                            
 
+                                <!-- Edit -->
+                                <i class="bi bi-pencil-square text-warning"
+                                   style="cursor: pointer;"
+                                   title="Edit Task"
+                                   onclick="openEditTaskModal(@task.Id); event.stopPropagation();"></i>
                         </div>
+
+
+                        
 
                     }
                 </div>
@@ -457,6 +624,33 @@
     .task-focused-view .task-card {
         display: none;
     }
+
+
+    .task-card.editing {
+        border: 2px solid #0d6efd;
+        background: #f8f9ff;
+    }
+
+    .task-actions i {
+        cursor: pointer;
+        margin-left: 8px;
+    }
+
+    .task-assign-container {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+    }
+
+    .column-drag-handle {
+        padding: 4px 6px;
+        font-size: 14px;
+        user-select: none;
+    }
+
+        .column-drag-handle:active {
+            cursor: grabbing;
+        }
 
     </style>
 

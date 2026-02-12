@@ -35,6 +35,8 @@ namespace UserRoles.Controllers
             var model = new ProfileViewModel
             {
                 FirstName = user.Name,
+
+                Address = user.Address,
                 Email = user.Email,
                 MobileNumber = user.MobileNumber,
                 //AlternativeMobileNumber = user.AlternativeMobileNumber,
@@ -62,6 +64,7 @@ namespace UserRoles.Controllers
             {
                 FirstName = user.Name,
                 Email = user.Email,
+                Address = user.Address,
                 MobileNumber = user.MobileNumber,
                 //AlternativeMobileNumber = user.AlternativeMobileNumber,
                 //Address = user.Address,
@@ -97,6 +100,7 @@ namespace UserRoles.Controllers
             // ✅ Update common fields
             user.Name = model.FirstName.Trim();
             user.MobileNumber = model.MobileNumber.Trim();
+            user.Address = model.Address.Trim();
 
             // ================= ADMIN EMAIL CHANGE =================
             if (User.IsInRole("Admin") && !string.Equals(user.Email, model.Email, StringComparison.OrdinalIgnoreCase))

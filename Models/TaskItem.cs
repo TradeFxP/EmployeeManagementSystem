@@ -4,8 +4,22 @@
     {
         public int Id { get; set; }
 
+        // Auto-generated ID: P1T1, P1T2 (for project-linked tasks) or E1F1S1T1 (for story-linked tasks)
+        public string? WorkItemId { get; set; }
+
         public string Title { get; set; }
         public string Description { get; set; }
+        
+        // Priority level
+        public UserRoles.Models.Enums.TaskPriority Priority { get; set; } = UserRoles.Models.Enums.TaskPriority.Medium;
+
+        // Optional: Direct link to Project (for team tasks with project context)
+        public int? ProjectId { get; set; }
+        public Project? Project { get; set; }
+
+        // Optional: Parent Story (for full hierarchy via Epic/Feature/Story)
+        public int? StoryId { get; set; }
+        public Story? Story { get; set; }
 
         public UserRoles.Models.Enums.TaskStatus Status { get; set; }
         public string AssignedToUserId { get; set; }
@@ -29,6 +43,15 @@
         // Column (FK)
         public int ColumnId { get; set; }
         public TeamColumn Column { get; set; }
+        
+        // Custom field values
+        public ICollection<TaskFieldValue> CustomFieldValues { get; set; } = new List<TaskFieldValue>();
+        
+        // Column tracking
+        public DateTime CurrentColumnEntryAt { get; set; } // When task entered current column
+        
+        // History tracking
+        public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();
     }
 
 }

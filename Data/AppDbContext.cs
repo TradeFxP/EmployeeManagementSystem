@@ -20,6 +20,21 @@ namespace UserRoles.Data
         public DbSet<UserTeam> UserTeams { get; set; }
 
        // public DbSet<EMSHierarchy> EMSHierarchy { get; set; }
+        // Project Management Hierarchy
+        public DbSet<Project> Projects { get; set; }
+        public DbSet<Epic> Epics { get; set; }
+        public DbSet<Feature> Features { get; set; }
+        public DbSet<Story> Stories { get; set; }
+
+        public DbSet<Team> Teams { get; set; }
+
+        // Custom Fields for Tasks
+        public DbSet<TaskCustomField> TaskCustomFields { get; set; }
+        public DbSet<TaskFieldValue> TaskFieldValues { get; set; }
+        
+        // Task History
+        public DbSet<TaskHistory> TaskHistories { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -31,6 +46,36 @@ namespace UserRoles.Data
             builder.Entity<DailyReport>()
                 .Property(r => r.Date)
                 .HasColumnType("date");
+
+            // Configure TaskFieldValue relationships with cascade delete
+            builder.Entity<TaskFieldValue>()
+                .HasOne(v => v.Field)
+                .WithMany(f => f.FieldValues)
+                .HasForeignKey(v => v.FieldId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<TaskFieldValue>()
+                .HasOne(v => v.Task)
+                .WithMany(t => t.CustomFieldValues)
+                .HasForeignKey(v => v.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            // Configure TaskHistory relationships
+            builder.Entity<TaskHistory>()
+                .HasOne(h => h.Task)
+                .WithMany(t => t.History)
+                .HasForeignKey(h => h.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<TaskHistory>()
+                .HasOne(h => h.ChangedByUser)
+                .WithMany()
+                .HasForeignKey(h => h.ChangedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Index for performance
+            builder.Entity<TaskHistory>()
+                .HasIndex(h => new { h.TaskId, h.ChangedAt });
         }
     }
 }

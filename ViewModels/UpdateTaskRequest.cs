@@ -1,4 +1,6 @@
-﻿namespace UserRoles.ViewModels
+﻿using UserRoles.Models.Enums;
+
+namespace UserRoles.ViewModels
 {
     public class UpdateTaskRequest
     {
@@ -8,5 +10,11 @@
 
 
         public string AssignedToUserId { get; set; } // optional
+        
+        // Priority
+        public TaskPriority? Priority { get; set; }
+        
+        // Custom field values
+        public Dictionary<int, string>? CustomFieldValues { get; set; }
     }
 }

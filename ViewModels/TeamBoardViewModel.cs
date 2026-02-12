@@ -19,5 +19,8 @@ namespace UserRoles.ViewModels
 
         // ✅ ADD THIS
         public List<Users> AssignableUsers { get; set; } = new();
+        
+        // Custom field definitions
+        public List<TaskCustomField> CustomFields { get; set; } = new();
     }
 }
