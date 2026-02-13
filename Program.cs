@@ -43,10 +43,7 @@ builder.Services.AddIdentity<Users, IdentityRole>(options =>
 builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));
 
-builder.Services.AddTransient<IEmailService, EmailService>();
-
-// ================= EMAIL SERVICE =================
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHttpClient<IEmailService, EmailService>();
 builder.Services.AddScoped<ITaskHistoryService, TaskHistoryService>();
 
 // ================= COOKIE =================

@@ -118,12 +118,18 @@ namespace UserRoles.Controllers
                     newEmail,
                     "Set your new admin password",
                     $@"
-<p>Your admin email has been updated successfully.</p>
-<p>For security reasons, please set a new password using the link below:</p>
-<p><a href='{resetLink}'>Set New Password</a></p>
-<p>This will permanently disable access from your old email.</p>
-"
-                );
+<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+  <h2 style='color: #2c3e50;'>Admin Email Updated</h2>
+  <p>Your admin email has been updated successfully.</p>
+  <p>For security reasons, please set a new password using the button below:</p>
+  <p style='margin: 24px 0;'>
+    <a href='{resetLink}' style='display: inline-block; background: #e67e22; color: #fff; padding: 12px 28px; text-decoration: none; border-radius: 4px; font-weight: bold;'>Set New Password</a>
+  </p>
+  <p style='color: #777;'>This will permanently disable access from your old email.</p>
+  <p style='color: #888; font-size: 12px; margin-top: 24px;'>This is an automated message. Please do not reply.</p>
+</div>",
+                    "AdminEmailChange",
+                    user.Id);
 
                 // 5️⃣ Force logout immediately
                 await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
