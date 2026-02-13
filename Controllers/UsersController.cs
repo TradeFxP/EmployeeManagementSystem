@@ -857,16 +857,48 @@ namespace UserRoles.Controllers
             }
 
 
+            // ================= SEND WELCOME EMAIL WITH CREDENTIALS =================
+            try
+            {
+                var loginUrl = Url.Action("Login", "Account", null, Request.Scheme)!;
+                var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var encodedToken = Uri.EscapeDataString(resetToken);
+                var resetLink = Url.Action(
+                    "ChangePassword", "Account",
+                    new { email = email, token = encodedToken },
+                    Request.Scheme)!;
 
+                var currentUserId = _userManager.GetUserId(User);
 
+                var htmlBody = $@"
+<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+  <h2 style='color: #2c3e50;'>Welcome to the Team!</h2>
+  <p>Hello <strong>{name}</strong>,</p>
+  <p>Your account has been created successfully. Here are your login credentials:</p>
+  <table style='border-collapse: collapse; margin: 16px 0;'>
+    <tr><td style='padding: 8px; font-weight: bold;'>Email:</td><td style='padding: 8px;'>{email}</td></tr>
+    <tr><td style='padding: 8px; font-weight: bold;'>Temporary Password:</td><td style='padding: 8px;'>{password}</td></tr>
+    <tr><td style='padding: 8px; font-weight: bold;'>Role:</td><td style='padding: 8px;'>{targetRole}</td></tr>
+  </table>
+  <p><a href='{loginUrl}' style='display: inline-block; background: #3498db; color: #fff; padding: 10px 24px; text-decoration: none; border-radius: 4px;'>Login Now</a></p>
+  <hr style='margin: 24px 0; border: none; border-top: 1px solid #e0e0e0;' />
+  <p>For security, we recommend changing your password immediately:</p>
+  <p><a href='{resetLink}' style='display: inline-block; background: #e67e22; color: #fff; padding: 10px 24px; text-decoration: none; border-radius: 4px;'>Set New Password</a></p>
+  <p style='color: #888; font-size: 12px; margin-top: 24px;'>This is an automated message. Please do not reply.</p>
+</div>";
 
-
-            await _emailService.SendEmailAsync(
-                email,
-                "Account Created",
-                $"Hii {name}   " +
-                $"  Using these credential you can login  \n Login Email: {email}\nPassword: {password}"
-            );
+                await _emailService.SendEmailAsync(
+                    email,
+                    "Your Account Has Been Created",
+                    htmlBody,
+                    "AccountCreated",
+                    currentUserId);
+            }
+            catch (Exception ex)
+            {
+                // Log but don't fail user creation if email fails
+                System.Diagnostics.Debug.WriteLine($"Email send failed: {ex.Message}");
+            }
 
             TempData["Success"] = "User added successfully.";
             return Ok();

@@ -35,6 +35,9 @@ namespace UserRoles.Data
         // Task History
         public DbSet<TaskHistory> TaskHistories { get; set; }
 
+        // Email Logs
+        public DbSet<EmailLog> EmailLogs { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
@@ -76,6 +79,16 @@ namespace UserRoles.Data
             // Index for performance
             builder.Entity<TaskHistory>()
                 .HasIndex(h => new { h.TaskId, h.ChangedAt });
+
+            // EmailLog configuration
+            builder.Entity<EmailLog>()
+                .HasOne(e => e.SentByUser)
+                .WithMany()
+                .HasForeignKey(e => e.SentByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<EmailLog>()
+                .HasIndex(e => new { e.ToEmail, e.SentAt });
         }
     }
 }
