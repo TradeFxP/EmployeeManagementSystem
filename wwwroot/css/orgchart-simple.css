@@ -1,11 +1,11 @@
 ﻿/* ================================================================
-   ORG CHART — ENTERPRISE TREE DESIGN V2
-   Refinements: L-Shape Connectors, Cleaner Actions
+   ORG CHART — ENTERPRISE TREE DESIGN
+   Clean, modern left-panel tree + right details panel
    ================================================================ */
 
-/* ... Core Layout (unchanged) ... */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* ================= BASE ================= */
 body,
 .org-wrapper-full {
     font-family: 'Inter', sans-serif;
@@ -15,6 +15,7 @@ body,
     padding: 0;
 }
 
+/* ================= MAIN LAYOUT ================= */
 .org-layout-container {
     display: flex;
     height: calc(100vh - 60px);
@@ -23,20 +24,41 @@ body,
     border-top: 1px solid #e2e8f0;
 }
 
+/* ================= LEFT SIDEBAR ================= */
 .org-sidebar {
-    width: 320px;
-    min-width: 320px;
-    background: #fff;
+    width: 260px;
+    min-width: 220px;
+    max-width: 320px;
+    background: #ffffff;
     border-right: 1px solid #e2e8f0;
     display: flex;
     flex-direction: column;
     height: 100%;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
 }
 
 .tree-root {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 0 16px 12px;
+    padding: 12px 8px 16px 8px;
+}
+
+/* Custom scrollbar for the sidebar */
+.tree-root::-webkit-scrollbar {
+    width: 5px;
+}
+
+.tree-root::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tree-root::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+.tree-root::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 /* ================= TREE ITEM & CONNECTORS ================= */
@@ -45,129 +67,154 @@ body,
     padding-left: 20px;
 }
 
-    /* Vertical Line */
-    .tree-item::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background-color: #1e293b;
-    }
-
-    /* Horizontal Line (L-shape) */
-    .tree-item::after {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 18px;
-        width: 20px;
-        height: 2px;
-        background-color: #1e293b;
-    }
-
-    /* Fix for Last Child: Stop vertical line halfway */
-    .tree-item:last-child::before {
-        height: 19px;
-    }
-
-/* Root Items (Admin/Manager): No connectors usually, unless nested. */
-
-.tree-root > .tree-item {
-    padding-left: 0;
+/* Vertical connector line */
+.tree-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #cbd5e1;
 }
 
-    .tree-root > .tree-item::before,
-    .tree-root > .tree-item::after {
-        display: none;
-    }
+/* Horizontal connector line (L-shape) */
+.tree-item::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 18px;
+    width: 20px;
+    height: 2px;
+    background-color: #cbd5e1;
+}
 
-/* ================= NODE CONTENT ================= */
+/* Last child: stop vertical line halfway */
+.tree-item:last-child::before {
+    height: 19px;
+}
+
+/* Top-level items: no connector lines */
+.tree-root>.tree-item {
+    padding-left: 0;
+    margin-bottom: 2px;
+}
+
+.tree-root>.tree-item::before,
+.tree-root>.tree-item::after {
+    display: none;
+}
+
+/* ================= NODE CONTENT (each row) ================= */
 .tree-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 8px;
+    padding: 8px 10px;
     margin-bottom: 2px;
     cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.15s ease;
-    min-height: 36px;
+    border-radius: 8px;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    min-height: 44px;
     background: #fff;
-    border: 1px solid transparent;
-    /* Role Indicator as simple left stripe */
-    border-left: 3px solid transparent;
+    border: 1px solid #e8ecf1;
 }
 
-    .tree-content:hover {
-        background-color: #f1f5f9;
-    }
+.tree-content:hover {
+    background-color: #eef3fb;
+    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.08);
+}
 
-    .tree-content.expanded {
-        background-color: #f8fafc;
-    }
+.tree-content.expanded {
+    background-color: #f0f5ff;
+}
 
-    /* Selected/Active state if needed */
-    .tree-content:active {
-        background-color: #e2e8f0;
-    }
+.tree-content:active {
+    background-color: #dbeafe;
+}
 
-    /* Role Colors & Styles */
-    .tree-content.role-admin {
-        border-left: none;
-        /* Removed side line */
-        background-color: lightgrey;
-        /* Lite Grey */
-    }
+/* ================= ROLE STYLING ================= */
 
-        .tree-content.role-admin .node-name {
-            font-weight: 700;
-            /* Extra Strong */
-        }
+/* Admin node */
+.tree-content.role-admin {
+    background: linear-gradient(135deg, #e0e7f1 0%, #d6e0f0 100%);
+    border: 1px solid #c7d2e0;
+}
 
-    .tree-content.role-manager {
-        border-left: none;
-        /* Removed side line */
-        background-color: #f0f7ff;
-        /* Minimal Blue */
-    }
+.tree-content.role-admin .node-name {
+    font-weight: 700;
+    color: #1e293b;
+}
 
-        .tree-content.role-manager .node-name {
-            font-weight: 700;
-            /* Extra Strong */
-        }
+.tree-content.role-admin .node-role {
+    color: #64748b;
+}
 
-    .tree-content.role-submanager {
-        border-left: none;
-        /* Removed side line */
-        background-color: #e2e8f0;
-        /* Water Blue */
-    }
+/* Manager nodes */
+.tree-content.role-manager {
+    background: linear-gradient(135deg, #e8f0fe 0%, #dceafd 100%);
+    border: 1px solid #c3d9f7;
+}
 
-    .tree-content.role-user {
-        /*border-left-color: #22c55e;*/
-        background-color: #f0fdf5;
-        /* Lite Green Background */
-    }
+.tree-content.role-manager .node-name {
+    font-weight: 700;
+    color: #1e3a5f;
+}
 
+.tree-content.role-manager .node-role {
+    color: #3b82f6;
+}
+
+/* Sub-manager nodes */
+.tree-content.role-submanager {
+    background: linear-gradient(135deg, #eef2f7 0%, #e2e8f0 100%);
+    border: 1px solid #d1d9e4;
+}
+
+.tree-content.role-submanager .node-name {
+    font-weight: 600;
+    color: #334155;
+}
+
+.tree-content.role-submanager .node-role {
+    color: #64748b;
+}
+
+/* User nodes */
+.tree-content.role-user {
+    background: #f8fafb;
+    border: 1px solid #e8ecf1;
+}
+
+.tree-content.role-user .node-name {
+    font-weight: 500;
+    color: #475569;
+}
+
+/* Selected / active node highlight */
+.tree-content.node-selected {
+    background: #dbeafe !important;
+    border-color: #93c5fd !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
 
 /* ================= TOGGLE ICON ================= */
 .tree-toggle-icon {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #94a3b8;
-    font-size: 10px;
-    margin-right: 4px;
+    font-size: 9px;
+    margin-right: 6px;
     transition: transform 0.2s ease;
+    flex-shrink: 0;
 }
 
-/* Leaf nodes - push content to align with toggles */
+/* Leaf nodes: push content to align with toggled items */
 .tree-item.leaf .tree-content {
-    padding-left: 32px;
+    padding-left: 34px;
 }
 
 .tree-item.leaf .tree-toggle-icon {
@@ -185,304 +232,55 @@ body,
 
 .node-name {
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     color: #334155;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 .node-role {
     font-size: 11px;
     color: #94a3b8;
-    margin-top: 0px;
+    margin-top: 1px;
+    line-height: 1.2;
 }
 
-/* ================= ACTIONS ================= */
+/* ================= NODE ACTIONS ================= */
 .node-actions {
     display: flex;
     align-items: center;
-    opacity: 1;
-    /* Visible by default (mostly for + button) */
-    transition: opacity 0.2s;
+    gap: 4px;
     margin-left: auto;
-    gap: 8px;
+    flex-shrink: 0;
 }
 
 /* For leaf nodes (Users), keep actions hidden by default */
 .tree-item.leaf .node-actions {
     opacity: 0;
+    transition: opacity 0.2s;
 }
 
 .tree-item.leaf .tree-content:hover .node-actions {
     opacity: 1;
 }
 
-/* Hover Actions Group (Edit/Delete/Report) */
-.hover-actions {
-    display: flex;
-    gap: 4px;
-    opacity: 0;
-    /* Hidden by default */
-    transition: opacity 0.2s;
-    pointer-events: none;
-    /* Prevent clicks when hidden */
-}
-
-/* Show hover actions when row is hovered */
-.tree-content:hover .hover-actions {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.action-btn {
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: transparent;
-    color: #94a3b8;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 4px 8px;
-}
-
-    .action-btn:hover {
-        background: #e2e8f0;
-        color: #0f172a;
-    }
-
-    .action-btn.add-btn {
-        font-size: 16px;
-        font-weight: 600;
-        color: #64748b;
-        margin-left: 4px;
-        /* separation from hover actions */
-    }
-
-/* ================= CHILDREN CONTAINER ================= */
-.tree-children {
-    display: block;
-    margin-left: 10px;
-}
-
-/* ================= AVATAR (Users) ================= */
-/*.user-avatar {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-    background: #f1f5f9;
-    color: #64748b;
-    font-size: 10px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 8px;
-    border: 1px solid #e2e8f0;
-}*/
-
-/* ================= RIGHT PANEL ================= */
-.org-right-panel {
-    flex: 1;
-    background: #fff;
-    padding: 40px;
-    overflow-y: auto;
-    /* Allow scrolling for long lists */
-}
-
-.empty-state {
-    text-align: center;
-    color: #cbd5e1;
-    /* Centering logic specifically for empty state */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-}
-
-    .empty-state svg {
-        width: 48px;
-        height: 48px;
-        margin-bottom: 12px;
-    }
-
-    .empty-state h3 {
-        font-size: 16px;
-        color: #334155;
-        margin: 0 0 4px 0;
-    }
-
-    .empty-state p {
-        font-size: 13px;
-    }
-
-/* Responsive */
-@media (max-width: 768px) {
-    .org-layout-container {
-        flex-direction: column;
-    }
-
-    .org-sidebar {
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px solid #e2e8f0;
-    }
-}
-
-/* Toast/Report styles preservation */
-.report-task,
-.report-note,
-.report-reviewer {
-    white-space: normal;
-    max-width: 250px;
-    word-break: break-word;
-}
-
-/* =========================
-   REMOVE ADMIN → MANAGER LINE
-========================= */
-
-/* Kill vertical line under ADMIN */
-#children-ADMIN {
-    border-left: none !important;
-    margin-left: 0 !important;
-    padding-left: 0 !important;
-}
-
-    /* Kill horizontal connectors */
-    /*#children-ADMIN > .tree-item::before {
-        display: none !important;
-    }*/
-
-    /* =========================
-   ADMIN → USERS CONNECTOR
-========================= */
-
-    #children-ADMIN > .leaf {
-        position: relative;
-        margin-left: 28px;
-    }
-
-        #children-ADMIN > .leaf::before {
-            content: '';
-            position: absolute;
-            left: 0px;
-            top: 0px;
-            width: 2px;
-            border-top: 2px solid #22c55e;
-            /* green */
-        }
-
-/* =====================================================
-   NODE ACTIONS – FINAL FIX (NO OVERLAP, NO CLICK BUG)
-===================================================== */
-
-/* Node actions container */
-.node-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    /* SPACE between + and hover icons */
-    margin-left: auto;
-    position: relative;
-}
-
-/* + button (always visible, safe click area) */
-.action-btn.add-btn {
-    position: relative;
-    z-index: 3;
-    pointer-events: auto;
-}
-
-/* Hover actions wrapper */
+/* Hover actions group (Edit / Delete / Report) */
 .hover-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 2px;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    /* 🔑 KEY: no click when hidden */
-    transition: opacity 0.2s ease;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 
-/* Show hover actions only when node is hovered */
+/* Show hover actions on row hover */
 .tree-content:hover .hover-actions {
     opacity: 1;
     visibility: visible;
-    pointer-events: auto;
-    /* enable click ONLY when visible */
-}
-
-/* Action buttons (icons) */
-.action-btn {
-    width: 26px;
-    height: 26px;
-    border: none;
-    background: transparent;
-    color: #64748b;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-    .action-btn:hover {
-        background: #e2e8f0;
-        color: #0f172a;
-    }
-
-/* Prevent hover icons from shrinking node */
-.hover-actions .action-btn {
-    flex-shrink: 0;
-}
-
-/* REMOVE OLD BUGGY RULE (IMPORTANT) */
-.tree-content:hover .node-actions {
-    opacity: 1 !important;
-    /* override old behavior safely */
-}
-
-/* ===============================
-   INLINE ACTIONS – FINAL FIX
-================================ */
-
-/* Actions container */
-.node-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-left: auto;
-}
-
-/* + button always visible */
-.action-btn.add-btn {
-    flex-shrink: 0;
-}
-
-/* Hover actions wrapper
-   👉 space is RESERVED */
-.hover-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 90px;
-    /* 🔑 reserves space */
-    justify-content: flex-end;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease;
-}
-
-/* Show hover icons */
-.tree-content:hover .hover-actions {
-    opacity: 1;
     pointer-events: auto;
 }
 
@@ -492,12 +290,326 @@ body,
     height: 26px;
     border: none;
     background: transparent;
-    color: #64748b;
-    border-radius: 4px;
+    color: #94a3b8;
+    border-radius: 6px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
 }
 
-    .action-btn:hover {
-        background: #e2e8f0;
-        color: #0f172a;
+.action-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+/* + button: always visible */
+.action-btn.add-btn {
+    font-size: 18px;
+    font-weight: 700;
+    color: #64748b;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.08);
+    transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.action-btn.add-btn:hover {
+    background: rgba(59, 130, 246, 0.18);
+    color: #2563eb;
+    transform: scale(1.08);
+}
+
+/* ================= CHILDREN CONTAINER ================= */
+.tree-children {
+    display: block;
+    margin-left: 10px;
+}
+
+/* ================= RIGHT PANEL ================= */
+.org-right-panel {
+    flex: 1;
+    background: #fafbfc;
+    padding: 40px;
+    overflow-y: auto;
+}
+
+/* Empty state (no person selected) */
+.empty-state {
+    text-align: center;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.empty-state svg {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 16px;
+    opacity: 0.7;
+}
+
+.empty-state h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #334155;
+    margin: 0 0 6px 0;
+}
+
+.empty-state p {
+    font-size: 13px;
+    color: #94a3b8;
+    max-width: 280px;
+}
+
+/* ================= ADMIN CHILDREN CONNECTOR ================= */
+#children-ADMIN {
+    border-left: none !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+#children-ADMIN>.leaf {
+    position: relative;
+    margin-left: 28px;
+}
+
+#children-ADMIN>.leaf::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2px;
+    border-top: 2px solid #22c55e;
+}
+
+/* ================= REPORT STYLES ================= */
+.report-task,
+.report-note,
+.report-reviewer {
+    white-space: normal;
+    max-width: 250px;
+    word-break: break-word;
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 768px) {
+    .org-layout-container {
+        flex-direction: column;
+        height: auto;
     }
+
+    .org-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #e2e8f0;
+        max-height: 45vh;
+    }
+
+    .org-right-panel {
+        padding: 20px;
+    }
+}
+
+/* ================= DRAG & DROP VISUAL FEEDBACK ================= */
+
+/* Item being dragged */
+.tree-content.dragging {
+    opacity: 0.5;
+    transform: scale(0.98);
+    box-shadow: 0 2px 12px rgba(59, 130, 246, 0.2);
+}
+
+.tree-content.dragging-active {
+    border: 2px dashed #93c5fd;
+    background: #eff6ff !important;
+}
+
+/* Drop target highlight */
+.tree-content.drag-over {
+    border: 2px dashed #3b82f6 !important;
+    background: #dbeafe !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12), 0 4px 12px rgba(59, 130, 246, 0.15);
+    animation: dragPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes dragPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    }
+
+    50% {
+        box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.2);
+    }
+}
+
+/* ================= TOAST NOTIFICATION SYSTEM ================= */
+
+.org-toast-container {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 420px;
+    pointer-events: none;
+}
+
+.org-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 14px 16px 14px 14px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+    border-left: 4px solid #10b981;
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+}
+
+.org-toast-show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.org-toast-hide {
+    transform: translateX(120%);
+    opacity: 0;
+}
+
+/* Toast types */
+.org-toast-success {
+    border-left-color: #10b981;
+}
+
+.org-toast-error {
+    border-left-color: #ef4444;
+}
+
+.org-toast-info {
+    border-left-color: #3b82f6;
+}
+
+/* Toast icon */
+.org-toast-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.org-toast-success .org-toast-icon {
+    background: #d1fae5;
+    color: #059669;
+}
+
+.org-toast-error .org-toast-icon {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.org-toast-info .org-toast-icon {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+/* Toast message */
+.org-toast-message {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1e293b;
+    line-height: 1.5;
+    padding-top: 3px;
+}
+
+/* Toast close button */
+.org-toast-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+
+.org-toast-close:hover {
+    color: #334155;
+}
+
+/* Progress bar (counts down the toast duration) */
+.org-toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #f1f5f9;
+}
+
+.org-toast-progress-bar {
+    height: 100%;
+    width: 100%;
+    transform-origin: left;
+    animation: toastCountdown linear forwards;
+}
+
+.org-toast-success .org-toast-progress-bar {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.org-toast-error .org-toast-progress-bar {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.org-toast-info .org-toast-progress-bar {
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+@keyframes toastCountdown {
+    from {
+        transform: scaleX(1);
+    }
+
+    to {
+        transform: scaleX(0);
+    }
+}
+
+/* Toast responsive */
+@media (max-width: 480px) {
+    .org-toast-container {
+        top: auto;
+        bottom: 16px;
+        right: 12px;
+        left: 12px;
+        max-width: 100%;
+    }
+}
