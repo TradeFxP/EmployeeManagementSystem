@@ -172,16 +172,29 @@ namespace UserRoles.Controllers
 
             try
             {
+                var htmlBody = $@"
+<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+  <h2 style='color: #2c3e50;'>Password Reset Request</h2>
+  <p>Hello,</p>
+  <p>We received a request to reset your password. Click the button below to set a new password:</p>
+  <p style='margin: 24px 0;'>
+    <a href='{resetLink}' style='display: inline-block; background: #3498db; color: #fff; padding: 12px 28px; text-decoration: none; border-radius: 4px; font-weight: bold;'>Reset Password</a>
+  </p>
+  <p style='color: #777;'>If you did not request this, you can safely ignore this email.</p>
+  <p style='color: #888; font-size: 12px; margin-top: 24px;'>This is an automated message. Please do not reply.</p>
+</div>";
+
                 await emailService.SendEmailAsync(
                     user.Email!,
                     "Reset your password",
-                    $"Click the link below to reset your password:\n\n{resetLink}"
-                );
+                    htmlBody,
+                    "PasswordReset",
+                    user.Id);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "SMTP FAILED while sending password reset email to {Email}", user.Email);
-                throw; // 🔥 THIS MAKES RENDER SHOW THE REAL ERROR
+                logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
+                throw;
             }
 
 
