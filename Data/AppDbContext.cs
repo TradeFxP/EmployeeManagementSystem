@@ -19,7 +19,6 @@ namespace UserRoles.Data
 
         public DbSet<UserTeam> UserTeams { get; set; }
 
-       // public DbSet<EMSHierarchy> EMSHierarchy { get; set; }
         // Project Management Hierarchy
         public DbSet<Project> Projects { get; set; }
         public DbSet<Epic> Epics { get; set; }
