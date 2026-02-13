@@ -108,8 +108,7 @@
                         @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
                         {
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="Users" asp-action="OrgChart">
-                                    Organization Chart
+                             
                                 <a class="nav-link"
                                    asp-controller="Users"
                                    asp-action="OrgChart">
@@ -185,7 +184,7 @@
                                     @displayName
                                     @if (!string.IsNullOrEmpty(role))
                                     {
-                                        <span class="badge bg-light text-primary ms-1" style="font-size: 0.7rem;">@role</span>
+                                            <span class="badge bg-primary text-primary ms-1" style="font-size: 0.7rem;">@role</span>
                                     }
                                 </span>
                             </li>
