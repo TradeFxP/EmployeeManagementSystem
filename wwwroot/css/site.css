@@ -186,7 +186,7 @@ body {
     width: 240px;
     min-width: 240px;
     max-width: 240px;
-    background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+    background: linear-gradient(180deg, #6c757d 0%, #1a1a2e 100%);
     color: #e0e0e0;
     padding: 20px 0;
     overflow-y: auto;
@@ -212,7 +212,7 @@ body {
 
 .left-sidebar h5 {
     padding: 0 16px;
-    font-size: 0.8rem;
+    font-size: 1.2rem;
     text-transform: uppercase;
     letter-spacing: 1.5px;
     color: rgba(255, 255, 255, 0.4);
