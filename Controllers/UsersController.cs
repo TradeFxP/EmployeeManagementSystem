@@ -326,6 +326,17 @@ namespace UserRoles.Controllers
                 return RedirectToAction(nameof(ConfirmDeleteManager), new { managerId });
             }
 
+            // ✅ CLEANUP TASK HISTORY (Set ChangedByUser to NULL)
+            var historyRecords = await _context.TaskHistories.Where(h => h.ChangedByUserId == managerId).ToListAsync();
+            foreach (var record in historyRecords)
+            {
+                record.ChangedByUserId = null;
+            }
+            if (historyRecords.Any())
+            {
+                await _context.SaveChangesAsync();
+            }
+
             // ✅ NOW SAFE TO DELETE
             await _userManager.DeleteAsync(manager);
 

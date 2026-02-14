@@ -28,29 +28,142 @@
         (isManager || isAdmin) && targetUserId != currentUserId;
 }
 
-@* ================= PAGE TITLE ================= *@
-@if (User.IsInRole("User"))
-{
-    <h2>Reports</h2>
-}
-else
-{
-    <h2>@ViewBag.ReportOwnerName Reports</h2>
-}
+<div class="row mb-4 animate__animated animate__fadeIn">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px;">
+            <div class="card-body p-4 bg-white d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+                
+                <div>
+                    <h2 class="fw-bold mb-1" style="color: #2c3e50;">
+                        @if (User.IsInRole("User"))
+                        {
+                            <span>My Reports</span>
+                        }
+                        else
+                        {
+                            <span>@ViewBag.ReportOwnerName's Reports</span>
+                        }
+                    </h2>
+                    <p class="text-muted mb-0 small">
+                        Track daily progress and task updates
+                    </p>
+                </div>
 
+                <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex flex-column align-items-end">
+                        <span class="fw-bold text-dark fs-5">@Model.TotalItems</span>
+                        <span class="text-muted small text-uppercase">Total Reports</span>
+                    </div>
+                    <div class="vr h-100 mx-2 text-muted"></div>
+                    <div class="d-flex flex-column align-items-end">
+                        <span class="fw-bold text-primary fs-5">@Model.Items.Count</span>
+                        <span class="text-muted small text-uppercase">Showing</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
-    /* small legacy helpers kept local for compatibility (most styling moved to site.css) */
-    .report-text {
-        white-space: normal;
-        word-break: break-word;
-        max-width: 480px;
+    /* Custom Table Styling */
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0 8px; /* Gap between rows */
+        width: 100%;
     }
 
-    /* last cell must allow overflow and be the containing block for actions */
-    .fixed-table td.actions-cell {
+    .table-modern thead th {
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 0 16px 8px;
+    }
+
+    .report-card-row {
+        background: #fff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .report-card-row td {
+        border: none;
+        padding: 16px;
+        vertical-align: top; /* Align to top for multiline text */
+    }
+
+    .report-card-row td:first-child {
+        border-top-left-radius: 10px;
+        border-bottom-left-radius: 10px;
+    }
+
+    .report-card-row td:last-child {
+        border-top-right-radius: 10px;
+        border-bottom-right-radius: 10px;
+    }
+
+    .report-card-row:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.06);
+        z-index: 1;
         position: relative;
-        overflow: visible !important;
+    }
+
+    /* Input Card for 'Today' */
+    .today-submit-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        border: 2px dashed #dee2e6;
+    }
+
+    .today-submit-card:hover {
+        border-color: #adb5bd;
+    }
+
+    .report-date {
+        font-weight: 700;
+        color: #0d6efd; /* Bootstrap primary */
+        font-size: 0.95rem;
+        display: block;
+        margin-bottom: 4px;
+    }
+    
+    .report-text-content {
+        color: #495057;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        white-space: pre-wrap; /* Preserve line breaks */
+    }
+
+    .badge-soft-primary {
+        background-color: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+    }
+    
+    .badge-soft-success {
+        background-color: rgba(25, 135, 84, 0.1);
+        color: #198754;
+    }
+
+    .badge-soft-info {
+        background-color: rgba(13, 202, 240, 0.1);
+        color: #0dcaf0;
+    }
+
+    .avatar-circle {
+        width: 32px;
+        height: 32px;
+        background-color: #e9ecef;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: #495057;
+        font-size: 12px;
     }
 </style>
 
@@ -59,7 +172,7 @@ else
 {
     <div class="toast-container-fixed">
         <div class="alert alert-success toast-message auto-dismiss">
-            @TempData["Success"]
+            <i class="bi bi-check-circle-fill me-2"></i> @TempData["Success"]
         </div>
     </div>
 }
@@ -67,134 +180,127 @@ else
 {
     <div class="toast-container-fixed">
         <div class="alert alert-danger toast-message auto-dismiss">
-            @TempData["Error"]
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> @TempData["Error"]
         </div>
     </div>
 }
 
-
-<div class="d-flex justify-content-between align-items-center mb-2">
-    <div class="mt-2 text-muted">
-        Total Reports: <strong>@Model.TotalItems</strong>
-    </div>
-
-    <span class="text-muted">
-        Showing @Model.Items.Count of @Model.TotalItems reports
-    </span>
-</div>
-
-<!-- ================= REPORTS TABLE ================= -->
-<div class="table-responsive">
-    <table class="table table-bordered table-hover align-middle fixed-table">
-
+<div class="table-responsive" style="overflow-x: visible;"> <!-- Allow dropdowns to overflow if needed, but managing via layout -->
+    <table class="table-modern">
         <colgroup>
-            <col style="width: 5%" />   <!-- Date -->
-            <col style="width: 11%" />  <!-- Task -->
-            <col style="width: 11%" />  <!-- Note -->
-            <col style="width: 11%" />  <!-- Reviewer Comment -->
-            <col style="width: 6%" />   <!-- Reported To -->
-            <col style="width: 5%" />
-            <col style="width: 5%" /><!-- Submitted By (holds actions on hover) -->
+            <col style="width: 10%" />  <!-- Date -->
+            <col style="width: 25%" />  <!-- Task -->
+            <col style="width: 25%" />  <!-- Note -->
+            <col style="width: 15%" />  <!-- Reviewer Comment -->
+            <col style="width: 15%" />  <!-- Reported To -->
+            <col style="width: 10%" />  <!-- Actions -->
         </colgroup>
-        <thead class="table-light">
-            <tr class="text-center align-middle">       
+        
+        <thead>
+            <tr>       
                 <th>Date</th>
-                <th>Task</th>
-                <th>Note</th>
-                <th>Reviewer Comment</th>
+                <th>Task Done</th>
+                <th>Notes / Details</th>
+                <th>Reviewer Comments</th>
                 <th>Reported To</th>
-                <th class="text-center align-middle text-nowrap">Submitted&nbsp;By</th>
-                <th>Actions</th>
+                <th class="text-end">Actions</th>
             </tr>
         </thead>
 
         <tbody>
             <!-- USER / MANAGER TODAY SUBMIT -->
-            <!-- Find the TODAY SUBMIT section in UserReports.cshtml and update it: -->
             @if (showTodaySubmit)
             {
-                <tr class="table-success report-row">
-                    <form id="todayReportForm" onsubmit="return false;">
-
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="targetUserId" value="@currentUserId" />
-                        <input type="hidden" name="date" value="@today.ToString("dd-MM-yyyy")" />
-
-                    <td>@today.ToString("dd-MM-yyyy")</td>
-
-                    <td>
-                        <textarea name="task"
-                              rows="2"
-                              maxlength="100"
-                              class="form-control form-control-sm fixed-textarea char-limit"
-                              data-counter="taskToday"
-                              required></textarea>
-                        <small id="taskToday" class="text-muted">100 characters remaining</small>
+                 <tr class="report-card-row today-submit-card">
+                    <!-- WRAPPING FORM AROUND TD CONTENT IS INVALID HTML. 
+                         Must use form generic or handle via JS. 
+                         Using a single form for the row is tricky with tr/td. 
+                         Best approach: Form outside table or inputs with 'form' attribute.
+                         Here, we'll use 'form' attribute on inputs pointing to a form outside or just JS submission which we already have.
+                    -->
+                    
+                    <!-- Form Container (Invisible) -->
+                    <td style="display:none;">
+                        <form id="todayReportForm">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="targetUserId" value="@currentUserId" />
+                            <input type="hidden" name="date" value="@today.ToString("dd-MM-yyyy")" />
+                        </form>
                     </td>
 
+                    <!-- DATE -->
                     <td>
-                        <textarea name="note"
-                              rows="2"
-                              maxlength="100"
-                              class="form-control form-control-sm fixed-textarea char-limit"
-                              data-counter="noteToday"
-                              required></textarea>
-                        <small id="noteToday" class="text-muted">100 characters remaining</small>
+                        <div class="report-date">@today.ToString("MMM dd")</div>
+                        <span class="badge bg-success">Today</span>
                     </td>
 
-                    <td class="text-muted">—</td>
-
+                    <!-- TASK INPUT -->
                     <td>
-                        <!-- ✅ ADDED: Error message -->
-                        <div class="text-danger small mb-1 d-none" id="todayReportedToError">
-                            select Admin or Manager.
+                        <textarea name="task" form="todayReportForm"
+                                  rows="3"
+                                  maxlength="100"
+                                  class="form-control shadow-none char-limit"
+                                  data-counter="taskToday"
+                                  placeholder="What did you work on today?"
+                                  required></textarea>
+                        <div class="d-flex justify-content-end">
+                            <small id="taskToday" class="text-muted" style="font-size: 10px;">100 chars remaining</small>
                         </div>
-
-                        @if (isUser)
-                        {
-                            <div class="form-check">
-                                <input class="form-check-input today-checkbox"
-                                       type="checkbox"
-                                       name="reportedTo"
-                                       value="Manager"
-                                       checked />
-                                <label class="form-check-label">Manager</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input today-checkbox"
-                                       type="checkbox"
-                                       name="reportedTo"
-                                       value="Admin" />
-                                <label class="form-check-label">Admin</label>
-                            </div>
-                        }
-                        else if (isManager)
-                        {
-                            <div class="form-check">
-                                <input class="form-check-input today-checkbox"
-                                       type="checkbox"
-                                       name="reportedTo"
-                                       value="Admin"
-                                       checked />
-                                <label class="form-check-label">Admin</label>
-                            </div>
-                        }
                     </td>
 
-                    <!-- Submitted By (TEXT ONLY) -->
-                    <td class="text-center">
-                        @(isManager ? "Manager" : "User")
+                    <!-- NOTE INPUT -->
+                    <td>
+                        <textarea name="note" form="todayReportForm"
+                                  rows="3"
+                                  maxlength="100"
+                                  class="form-control shadow-none char-limit"
+                                  data-counter="noteToday"
+                                  placeholder="Any blockers or notes?"
+                                  required></textarea>
+                        <div class="d-flex justify-content-end">
+                            <small id="noteToday" class="text-muted" style="font-size: 10px;">100 chars remaining</small>
+                        </div>
                     </td>
 
-                    <!-- Action column -->
-                    <td class="text-center">
-                        <button type="button" class="btn btn-success" id="todaySubmitBtn">
-                            Submit
+                    <!-- REVIEWER (Empty) -->
+                    <td>
+                        <span class="text-muted small fst-italic">—</span>
+                    </td>
+
+                    <!-- REPORTED TO CHECKBOXES -->
+                    <td>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="text-danger small d-none" id="todayReportedToError">
+                                Select one required
+                            </div>
+                            
+                            @if (isUser)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input today-checkbox" type="checkbox" name="reportedTo" value="Manager" checked id="checkMgr" form="todayReportForm"/>
+                                    <label class="form-check-label small" for="checkMgr">Manager</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input today-checkbox" type="checkbox" name="reportedTo" value="Admin" id="checkAdm" form="todayReportForm"/>
+                                    <label class="form-check-label small" for="checkAdm">Admin</label>
+                                </div>
+                            }
+                            else if (isManager)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input today-checkbox" type="checkbox" name="reportedTo" value="Admin" checked id="checkAdmOnly" form="todayReportForm"/>
+                                    <label class="form-check-label small" for="checkAdmOnly">Admin</label>
+                                </div>
+                            }
+                        </div>
+                    </td>
+
+                    <!-- SUBMIT BUTTON -->
+                    <td class="text-end">
+                        <button type="button" class="btn btn-primary btn-sm d-flex align-items-center gap-2 justify-content-center w-100" id="todaySubmitBtn">
+                            <i class="bi bi-send-fill"></i> Submit
                         </button>
-
-
                     </td>
-                    </form>
                 </tr>
             }
 
@@ -208,129 +314,152 @@ else
 
                 bool isEditing = canEdit && editId == r.Id;
 
-                <tr class="report-row" data-report-id="@r.Id" id="report-row-@r.Id">
-                    <td class="col-date">@r.Date.ToString("dd-MM-yyyy")</td>
+                <tr class="report-card-row" data-report-id="@r.Id" id="report-row-@r.Id">
+                    
+                    <!-- DATE -->
+                    <td>
+                        <div class="report-date">@r.Date.ToString("MMM dd")</div>
+                        <div class="text-muted small">@r.Date.ToString("yyyy")</div>
+                    </td>
 
-                    <td class="col-task">
+                    <!-- TASK -->
+                    <td>
                         @if (isEditing)
                         {
                             <textarea name="task"
                                       form="editForm-@r.Id"
-                                      rows="2"
+                                      rows="3"
                                       maxlength="100"
-                                      class="form-control form-control-sm fixed-textarea char-limit"
+                                      class="form-control form-control-sm char-limit"
                                       data-counter="taskEdit-@r.Id">@r.Task</textarea>
 
-                            <small id="taskEdit-@r.Id" class="text-muted">
-                                @(100 - (r.Task?.Length ?? 0)) characters remaining
+                            <small id="taskEdit-@r.Id" class="text-muted d-block text-end mt-1" style="font-size: 10px;">
+                                @(100 - (r.Task?.Length ?? 0)) left
                             </small>
                         }
                         else
                         {
-                            <div class="report-text" id="task-text-@r.Id">@r.Task</div>
-                            <textarea class="form-control d-none"
-                              id="task-input-@r.Id">@r.Task</textarea>
-
+                            <div class="report-text-content" id="task-text-@r.Id">@r.Task</div>
+                            <textarea class="form-control d-none" id="task-input-@r.Id">@r.Task</textarea>
                         }
                     </td>
 
-                    <td class="col-note">
+                    <!-- NOTE -->
+                    <td>
                         @if (isEditing)
                         {
                             <textarea name="note"
                                       form="editForm-@r.Id"
-                                      rows="2"
+                                      rows="3"
                                       maxlength="100"
-                                      class="form-control form-control-sm fixed-textarea char-limit"
+                                      class="form-control form-control-sm char-limit"
                                       data-counter="noteEdit-@r.Id">@r.Note</textarea>
 
-                            <small id="noteEdit-@r.Id" class="text-muted">
-                                @(100 - (r.Note?.Length ?? 0)) characters remaining
+                            <small id="noteEdit-@r.Id" class="text-muted d-block text-end mt-1" style="font-size: 10px;">
+                                @(100 - (r.Note?.Length ?? 0)) left
                             </small>
                         }
                         else
                         {
-                            <div class="report-text" id="note-text-@r.Id">@r.Note</div>
-                            <textarea class="form-control d-none"
-                              id="note-input-@r.Id">@r.Note</textarea>
-
+                            <div class="report-text-content" id="note-text-@r.Id">@r.Note</div>
+                            <textarea class="form-control d-none" id="note-input-@r.Id">@r.Note</textarea>
                         }
                     </td>
 
-                    <td class="col-review">
+                    <!-- REVIEWER COMMENT -->
+                    <td>
                         @if (isEditing)
                         {
                             <textarea name="reviewerComment"
                                       form="editForm-@r.Id"
-                                      rows="2"
+                                      rows="3"
                                       maxlength="100"
-                                      class="form-control form-control-sm fixed-textarea char-limit"
+                                      class="form-control form-control-sm char-limit bg-light"
+                                      placeholder="Add comment..."
                                       data-counter="commentEdit-@r.Id">@r.ReviewerComment</textarea>
 
-                            <small id="commentEdit-@r.Id" class="text-muted">
-                                @(100 - (r.ReviewerComment?.Length ?? 0)) characters remaining
+                            <small id="commentEdit-@r.Id" class="text-muted d-block text-end mt-1" style="font-size: 10px;">
+                                @(100 - (r.ReviewerComment?.Length ?? 0)) left
                             </small>
                         }
                         else
                         {
-                            <div class="report-text" id="comment-text-@r.Id">@r.ReviewerComment</div>
-                            <textarea class="form-control d-none"
-                              id="comment-input-@r.Id">@r.ReviewerComment</textarea>
-
+                            if (string.IsNullOrWhiteSpace(r.ReviewerComment))
+                            {
+                                <span class="text-muted small fst-italic">— No comments —</span>
+                            }
+                            else
+                            {
+                                <div class="report-text-content text-primary" id="comment-text-@r.Id">
+                                    <i class="bi bi-chat-quote-fill me-1 opacity-50"></i> @r.ReviewerComment
+                                </div>
+                            }
+                            <textarea class="form-control d-none" id="comment-input-@r.Id">@r.ReviewerComment</textarea>
                         }
                     </td>
 
-                    <td class="col-reported">@r.ReportedTo</td>
-
-                    <!-- Submitted By (TEXT ONLY) -->
-                    <td class="text-center">
-                        @r.SubmittedByRole
-                    </td>
-
-                    <!-- Action column (ICONS ONLY) -->
-                    <td class="text-center">
-
-                        <!-- 👁 VIEW : everyone -->
-                        <a asp-action="Details"
-                           asp-route-id="@r.Id"
-                           class="btn btn-sm btn-outline-primary"
-                           title="View">
-                            <i class="bi bi-eye"></i>
-                        </a>
-
-                        <!-- ✏️ EDIT : Admin / Manager / SubManager (under rules) -->
-                        @if (
-                                            isAdmin ||
-                                            (isManager &&
-                                            r.SubmittedByRole == "User" &&
-                                            r.ApplicationUserId != currentUserId) ||
-                                            (User.IsInRole("SubManager") &&
-                                            r.SubmittedByRole == "User")
-                                            )
+                    <!-- REPORTED TO -->
+                    <td>
+                        <div class="d-flex flex-column gap-1">
+                             @if (r.ReportedTo?.Contains("Admin") == true)
+                            {
+                                <span class="badge badge-soft-primary">Admin</span>
+                            }
+                            @if (r.ReportedTo?.Contains("Manager") == true)
+                            {
+                                <span class="badge badge-soft-info">Manager</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrEmpty(r.SubmittedByRole) && r.SubmittedByRole != "User")
                         {
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-warning ms-1"
-                                    title="Edit"
-                                    onclick="enableInlineEdit(@r.Id)">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-
+                             <div class="mt-2 text-muted small" style="font-size: 10px;">
+                                By @r.SubmittedByRole
+                            </div>
                         }
-
-                        <!-- 🗑 DELETE : ADMIN ONLY -->
-                        @if (isAdmin)
-                        {
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-danger ms-1"
-                                    title="Delete"
-                                    onclick="deleteReport(@r.Id, '@targetUserId')">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        }
-
                     </td>
 
+                    <!-- ACTIONS -->
+                    <td class="text-end">
+                        <div class="d-flex justify-content-end gap-2">
+                             <!-- 👁 VIEW : everyone -->
+                            <a asp-action="Details"
+                               asp-route-id="@r.Id"
+                               class="btn btn-light btn-sm text-primary"
+                               data-bs-toggle="tooltip"
+                               title="View Details">
+                                <i class="bi bi-eye-fill"></i>
+                            </a>
 
+                            <!-- ✏️ EDIT -->
+                            @if (
+                                isAdmin ||
+                                (isManager &&
+                                r.SubmittedByRole == "User" &&
+                                r.ApplicationUserId != currentUserId) ||
+                                (User.IsInRole("SubManager") &&
+                                r.SubmittedByRole == "User")
+                                )
+                            {
+                                <button type="button"
+                                        class="btn btn-light btn-sm text-warning"
+                                        title="Edit"
+                                        onclick="enableInlineEdit(@r.Id)">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                            }
+
+                            <!-- 🗑 DELETE -->
+                            @if (isAdmin)
+                            {
+                                <button type="button"
+                                        class="btn btn-light btn-sm text-danger"
+                                        title="Delete"
+                                        onclick="deleteReport(@r.Id, '@targetUserId')">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
+                            }
+                        </div>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -339,34 +468,43 @@ else
 
 @if (Model.TotalPages > 1)
 {
-    <div class="d-flex justify-content-center align-items-center gap-3 mt-3">
-        <a class="btn btn-outline-secondary btn-sm @(Model.Page == 1 ? "disabled" : "")"
-           asp-action="UserReports"
-           asp-route-userId="@targetUserId"
-           asp-route-page="@(Model.Page - 1)"
-           asp-route-pageSize="@Model.PageSize"
-           asp-route-editId="@editId">
-            ← Previous
-        </a>
+    <nav class="mt-4 d-flex justify-content-center">
+        <ul class="pagination pagination-sm shadow-sm">
+            <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                <a class="page-link border-0" asp-action="UserReports"
+                   asp-route-userId="@targetUserId"
+                   asp-route-page="@(Model.Page - 1)"
+                   asp-route-pageSize="@Model.PageSize"
+                   asp-route-editId="@editId">
+                    <i class="bi bi-chevron-left"></i> Prev
+                </a>
+            </li>
+            
+            <li class="page-item disabled">
+                <span class="page-link border-0 fw-bold px-3">@Model.Page / @Model.TotalPages</span>
+            </li>
 
-        <span class="fw-semibold">
-            Page @Model.Page of @Model.TotalPages
-        </span>
-
-        <a class="btn btn-outline-secondary btn-sm @(Model.Page == Model.TotalPages ? "disabled" : "")"
-           asp-action="UserReports"
-           asp-route-userId="@targetUserId"
-           asp-route-page="@(Model.Page + 1)"
-           asp-route-pageSize="@Model.PageSize"
-           asp-route-editId="@editId">
-            Next →
-        </a>
-    </div>
+            <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                <a class="page-link border-0" asp-action="UserReports"
+                   asp-route-userId="@targetUserId"
+                   asp-route-page="@(Model.Page + 1)"
+                   asp-route-pageSize="@Model.PageSize"
+                   asp-route-editId="@editId">
+                    Next <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
 }
 
 @section Scripts {
-
     <script>
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+
         // Auto-dismiss alerts
         document.querySelectorAll('.auto-dismiss').forEach(alert => {
             const timeout = parseInt(alert.dataset.timeout || 5000);
@@ -375,26 +513,8 @@ else
                 setTimeout(() => alert.remove(), 800);
             }, timeout);
         });
-    </script>
-    <script>
-        // Existing function - keep it
-        function validateReportedTo(form) {
-            const checked = form.querySelectorAll(
-                'input[name="reportedTo"]:checked'
-            );
 
-            const error = form.querySelector(".reportedToError");
-
-            if (checked.length === 0) {
-                error.classList.remove("d-none");
-                return false; // ❌ stop submit
-            }
-
-            error.classList.add("d-none");
-            return true; // ✅ allow submit
-        }
-
-        // ================= NEW FUNCTIONS =================
+        // Validation helpers
         function validateTodayReportForm() {
             const checkboxes = document.querySelectorAll('.today-checkbox:checked');
             const errorDiv = document.getElementById('todayReportedToError');
@@ -408,25 +528,7 @@ else
             return true;
         }
 
-        function validateAddReportPanel() {
-            const container = document.getElementById("addReportFormContainer");
-            if (!container) return false;
-
-            const checkboxes = container.querySelectorAll('.add-panel-checkbox:checked');
-            const errorDiv = document.getElementById('addReportPanelError');
-
-            if (checkboxes.length === 0) {
-                if (errorDiv) errorDiv.classList.remove("d-none");
-                return false;
-            }
-
-            if (errorDiv) errorDiv.classList.add("d-none");
-            return true;
-        }
-
-        // ================= SETUP EVENT LISTENERS =================
         document.addEventListener("DOMContentLoaded", function() {
-            // Today's report checkboxes
             document.querySelectorAll('.today-checkbox').forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
                     const errorDiv = document.getElementById('todayReportedToError');
@@ -435,51 +537,29 @@ else
                     }
                 });
             });
-
-            // Add panel checkboxes (will be added dynamically)
-            document.addEventListener('click', function(e) {
-                if (e.target && e.target.classList.contains('add-panel-checkbox')) {
-                    const errorDiv = document.getElementById('addReportPanelError');
-                    if (errorDiv && e.target.checked) {
-                        errorDiv.classList.add("d-none");
-                    }
-                }
-            });
         });
 
-        // ================= CHARACTER COUNTER =================
+        // Character Counter
         document.addEventListener("input", function (e) {
             if (!e.target.classList.contains("char-limit")) return;
-
             const max = e.target.getAttribute("maxlength");
             const counterId = e.target.dataset.counter;
             const counter = document.getElementById(counterId);
-
             if (!counter) return;           
-
-            counter.textContent =
-                (max - e.target.value.length) + " characters remaining";
+            counter.textContent = (max - e.target.value.length) + " chars remaining"; // Shortened text
         });
 
-        // ================= AUTO DISMISS =================
-        document.querySelectorAll('.auto-dismiss').forEach(alert => {
-            setTimeout(() => {
-                alert.classList.add('fade');
-                setTimeout(() => alert.remove(), 400);
-            }, 5000);
-        });
-
-        // small toast helper
-        function showToast(text, type = 'success', timeout = 3000) {
+        // Toast Helper
+         function showToast(text, type = 'success', timeout = 3000) {
             let container = document.querySelector('.toast-container-fixed');
             if (!container) {
                 container = document.createElement('div');
                 container.className = 'toast-container-fixed';
-                document.body.appendChild(container);
+                document.body.appendChild(container); // Ensure it's in body
             }
             const toast = document.createElement('div');
-            toast.className = 'alert alert-' + type + ' toast-message';
-            toast.textContent = text;
+            toast.className = 'alert alert-' + type + ' toast-message shadow-lg border-0 d-flex align-items-center gap-2';
+            toast.innerHTML = (type === 'success' ? '<i class="bi bi-check-circle-fill"></i> ' : '<i class="bi bi-exclamation-triangle-fill"></i> ') + text;
             container.appendChild(toast);
             setTimeout(() => {
                 toast.classList.add('fade');
@@ -487,9 +567,9 @@ else
             }, timeout);
         }
 
-        // AJAX delete (Admin only)
+        // AJAX Delete
         async function deleteReport(id, userId) {
-            if (!confirm('Delete this report?')) return;
+            if (!confirm('Are you sure you want to delete this report?')) return;
 
             try {
                 const res = await fetch('/Reports/DeleteInline', {
@@ -508,13 +588,16 @@ else
                 let data;
                 try { data = await res.json(); } catch { data = null; }
 
-                // remove row from DOM
                 const row = document.getElementById('report-row-' + id);
-                if (row) row.remove();
+                if (row) {
+                    row.style.transition = 'all 0.3s';
+                    row.style.opacity = '0';
+                    row.style.transform = 'translateX(20px)';
+                    setTimeout(() => row.remove(), 300);
+                }
 
-                showToast(data && data.message ? data.message : 'Report deleted', 'success', 2200);
+                showToast(data && data.message ? data.message : 'Report deleted successfully', 'success', 2500);
 
-                // refresh right panel counts
                 if (typeof loadReports === 'function') {
                     setTimeout(() => loadReports(userId), 700);
                 }
@@ -523,26 +606,25 @@ else
                 alert('Failed to delete report');
             }
         }
-    </script>
 
-    <script>
+        // Submit Handler
         document.getElementById("todaySubmitBtn")?.addEventListener("click", async function () {
-
-            const form = document.getElementById("todayReportForm");
+            const form = document.getElementById("todayReportedForm") || document.getElementById("todayReportForm");
             if (!form) return;
 
-            // validation
-                    // 🔴 STEP 1: Trigger browser validation UI
-        if (!form.checkValidity()) {
-            form.reportValidity(); // shows "Please fill out this field" on task/note
-            return;
-        }
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
 
-        // 🔴 STEP 2: Keep your existing reportedTo validation
-        if (!validateTodayReportForm()) return;
+            if (!validateTodayReportForm()) return;
 
-        const formData = new FormData(form);
+            const btn = document.getElementById("todaySubmitBtn");
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
 
+            const formData = new FormData(form);
 
             try {
                 const res = await fetch("/Reports/CreateInline", {
@@ -554,18 +636,21 @@ else
                 const text = await res.text();
 
                 if (!res.ok) {
-                    alert(text);
+                    showToast(text || "Error submitting report", 'danger');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
                     return;
                 }
 
-                // SUCCESS → reload reports list
-                location.reload();
+                showToast("Report submitted successfully!", "success");
+                setTimeout(() => location.reload(), 1000);
 
             } catch (err) {
                 console.error(err);
-                alert("Failed to submit report");
+                showToast("Failed to submit report", "danger");
+                btn.disabled = false;
+                btn.innerHTML = originalText;
             }
         });
     </script>
-
 }

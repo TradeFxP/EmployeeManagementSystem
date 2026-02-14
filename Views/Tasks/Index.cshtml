@@ -135,6 +135,81 @@
     </div>
 
 
+    <!-- ═══════ JS: EXPOSE USER ROLE ═══════ -->
+    <script>
+        var currentUserRole = '@(User.IsInRole("Admin") ? "Admin" : User.IsInRole("Manager") ? "Manager" : User.IsInRole("Sub-Manager") ? "Sub-Manager" : "User")';
+    </script>
+
+    <!-- ═══════ REVIEW TASK MODAL (ADMIN ONLY) ═══════ -->
+    <div class="modal fade" id="reviewTaskModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header" style="background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 16px 16px 0 0;">
+                    <h5 class="modal-title text-white">
+                        <i class="bi bi-clipboard-check me-2"></i>Review Task
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" id="reviewTaskId" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Task</label>
+                        <div id="reviewTaskTitle" class="form-control-plaintext fs-5 fw-semibold"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Decision</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check form-check-inline flex-fill">
+                                <input class="form-check-input" type="radio" name="reviewDecision" id="reviewPass" value="pass" checked>
+                                <label class="form-check-label w-100 text-center py-2 rounded border review-radio-pass" for="reviewPass">
+                                    <i class="bi bi-check-circle-fill text-success me-1"></i> Pass
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline flex-fill">
+                                <input class="form-check-input" type="radio" name="reviewDecision" id="reviewFail" value="fail">
+                                <label class="form-check-label w-100 text-center py-2 rounded border review-radio-fail" for="reviewFail">
+                                    <i class="bi bi-x-circle-fill text-danger me-1"></i> Fail
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Review Note <span class="text-muted fw-normal">(required for fail)</span></label>
+                        <textarea id="reviewNote" class="form-control" rows="3" placeholder="Add your review comments..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary px-4" id="submitReviewBtn" onclick="submitReview()">
+                        <i class="bi bi-send me-1"></i> Submit Review
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ ARCHIVED TASK DETAIL MODAL ═══════ -->
+    <div class="modal fade" id="archivedTaskModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header" style="background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 16px 16px 0 0;">
+                    <h5 class="modal-title text-white">
+                        <i class="bi bi-archive me-2"></i>Archived Task Overview
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4" id="archivedTaskBody">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ADD COLUMN MODAL -->
     <div class="modal fade" id="addColumnModal" tabindex="-1">
         <div class="modal-dialog">
@@ -642,6 +717,9 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script src="~/js/customFields.js"></script>
 <script src="~/js/taskHistory.js"></script>
+<script src="~/js/customFields.js"></script>
+<script src="~/js/taskHistory.js"></script>
+<script src="~/js/column_filter.js"></script>
 <script src="~/js/index_ui.js"></script>
 
     <script>
@@ -663,21 +741,30 @@
            board._sortableInstance = new Sortable(board, {
         animation: 150,
         direction: 'horizontal',
-        draggable: '.kanban-column',
-
-        // 🔥 THIS IS THE FIX
+        draggable: '.kanban-column:not(.col-history)',
         handle: '.column-drag-handle',
+        filter: '.col-history',
 
         onEnd: function () {
             const columnIds = Array.from(
-                board.querySelectorAll('.kanban-column')
-            ).map(c => parseInt(c.dataset.columnId));
+                board.querySelectorAll('.kanban-column:not(.col-history)')
+            ).map(c => parseInt(c.dataset.columnId)).filter(id => !isNaN(id));
+
+            if (columnIds.length === 0) return;
 
             fetch('/Tasks/ReorderColumns', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(columnIds)
-            });
+            })
+            .then(res => {
+                if (res.ok) {
+                    showToast('✅ Column order updated!', 'success');
+                } else {
+                    showToast('Failed to save column order', 'danger');
+                }
+            })
+            .catch(() => showToast('Failed to save column order', 'danger'));
         }
     });
 
@@ -1237,13 +1324,17 @@
             // Reload board to reflect assignment
             loadTeamBoard(currentTeamName);
         })
-        .catch(() => alert("Failed to assign task"));
+        .catch(() => showToast('Failed to assign task — please try again.', 'danger'));
     }
 
 
                 function enableTaskDragDrop() {
 
+        const role = (typeof currentUserRole !== 'undefined') ? currentUserRole : 'User';
+
         document.querySelectorAll('.kanban-tasks').forEach(container => {
+            // Skip History column task list (read-only)
+            if (container.id === 'historyTasksList') return;
 
             if (container._taskSortable) {
                 container._taskSortable.destroy();
@@ -1251,14 +1342,42 @@
 
             container._taskSortable = new Sortable(container, {
                 group: 'tasks',
-                animation: 150,
+                animation: 200,
                 draggable: '.task-card',
                 ghostClass: 'task-ghost',
                 chosenClass: 'task-chosen',
 
+                onMove: function (evt) {
+                    const targetColumn = evt.to?.closest('.kanban-column');
+                    if (!targetColumn) return true;
+
+                    const colName = targetColumn.dataset.columnName?.toLowerCase().trim();
+
+                    // Block: History column
+                    if (colName === 'history' || targetColumn.classList.contains('col-history')) {
+                        return false;
+                    }
+
+                    // Block: Non-admin to completed
+                    if (colName === 'completed' && role !== 'Admin') {
+                        return false;
+                    }
+
+                    return true;
+                },
+
                 onEnd: function (evt) {
                     const taskId = parseInt(evt.item.dataset.taskId);
                     const newColumnId = parseInt(evt.to.dataset.columnId);
+                    const targetColumn = evt.to?.closest('.kanban-column');
+                    const colName = targetColumn?.dataset.columnName?.toLowerCase().trim();
+
+                    // Revalidate restrictions
+                    if (colName === 'history' || (colName === 'completed' && role !== 'Admin')) {
+                        showToast(colName === 'history' ? '📋 History is read-only.' : '🔒 Only admins can move tasks to Completed.', 'warning');
+                        loadTeamBoard(currentTeamName);
+                        return;
+                    }
 
                     if (!taskId || !newColumnId) return;
 
@@ -1285,8 +1404,11 @@
         .then(res => {
             if (!res.ok) throw new Error('Failed to move task');
         })
+        .then(() => {
+            showToast('✅ Task moved successfully!', 'success');
+        })
         .catch(err => {
-            alert(err.message);
+            showToast(err.message || 'Failed to move task', 'danger');
             // reload board to recover UI
             loadTeamBoard(currentTeamName);
         });

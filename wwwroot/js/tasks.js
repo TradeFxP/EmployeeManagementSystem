@@ -64,13 +64,13 @@ $(document).on("input", "#taskDescription", function () {
 
 $(document).on("click", ".delete-task", function () {
 
-    if (!confirm("Delete this task?")) return;
+    if (!confirm("Are you sure you want to delete this task?")) return;
 
     const id = $(this).data("id");
 
     $.post("/Tasks/DeleteTask", { id: id })
         .done(() => location.reload())
-        .fail(() => alert("Delete failed"));
+        .fail(() => showToast('Failed to delete task. Please try again.', 'danger'));
 });
 
 
@@ -145,58 +145,98 @@ $(document).on("click", ".edit-task", function () {
 
 
 let draggedTaskId = null;
-let draggedFromStatus = null;
+let draggedFromColumnId = null;
 
 // ================= DRAG START =================
 $(document).on("dragstart", ".task-card", function (e) {
     draggedTaskId = $(this).data("task-id");
-    draggedFromStatus = $(this).data("current-status");
-
+    draggedFromColumnId = $(this).closest('.kanban-column').data('column-id');
     e.originalEvent.dataTransfer.effectAllowed = "move";
+    e.originalEvent.dataTransfer.setData('text/plain', draggedTaskId);
 });
 
-// ================= ALLOW DROP =================
+// ================= ALLOW DROP (with visual feedback) =================
 $(document).on("dragover", ".kanban-column", function (e) {
-    e.preventDefault(); // REQUIRED
+    e.preventDefault();
+    const colName = $(this).data('column-name')?.toString().toLowerCase().trim();
+    const role = (typeof currentUserRole !== 'undefined') ? currentUserRole : 'User';
+
+    // If non-admin drags to completed, show blocked cursor
+    if (colName === 'completed' && role !== 'Admin') {
+        e.originalEvent.dataTransfer.dropEffect = 'none';
+        $(this).addClass('drag-blocked').removeClass('drag-over');
+    } else if (colName === 'history') {
+        e.originalEvent.dataTransfer.dropEffect = 'none';
+        $(this).addClass('drag-blocked').removeClass('drag-over');
+    } else {
+        e.originalEvent.dataTransfer.dropEffect = 'move';
+        $(this).addClass('drag-over').removeClass('drag-blocked');
+    }
 });
 
 // ================= DROP =================
 $(document).on("drop", ".kanban-column", function (e) {
     e.preventDefault();
+    $(this).removeClass('drag-over drag-blocked');
 
-    // 🔥 IGNORE IF NOT DRAGGING A TASK (e.g. column drag)
     if (!draggedTaskId) return;
 
-    const targetStatus = $(this).data("status");
+    const targetColumnId = $(this).data("column-id");
+    const targetColumnName = $(this).data('column-name')?.toString().toLowerCase().trim();
+    const role = (typeof currentUserRole !== 'undefined') ? currentUserRole : 'User';
 
+    // BLOCK: History column (no drop allowed)
+    if (targetColumnName === 'history') {
+        showToast('📋 History is read-only. Tasks are moved here via archiving.', 'warning');
+        draggedTaskId = null;
+        return;
+    }
 
+    // BLOCK: Non-admin to completed
+    if (targetColumnName === 'completed' && role !== 'Admin') {
+        showToast('🔒 Only admins can move tasks to the Completed column.', 'warning');
+        draggedTaskId = null;
+        return;
+    }
 
-    // $.post("/Tasks/UpdateStatus", {
-    //     taskId: draggedTaskId,
-    //     newStatus: targetStatus
-    // })
-    //     .done(() => {
-    //         location.reload();
-    //     })
-    //     .fail(() => {
-    //         alert("Status update failed");
-    //     });
+    // Same column drop — ignore
+    if (targetColumnId === draggedFromColumnId) {
+        draggedTaskId = null;
+        return;
+    }
+
+    // EXECUTE MOVE
+    $.ajax({
+        url: '/Tasks/MoveTask',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            TaskId: draggedTaskId,
+            ColumnId: targetColumnId
+        }),
+        success: function (response) {
+            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
+                loadTeamBoard(currentTeamName);
+            } else {
+                location.reload();
+            }
+        },
+        error: function (xhr) {
+            const msg = xhr.responseText || 'Move failed';
+            showToast(msg, 'danger');
+        }
+    });
+
+    draggedTaskId = null;
+    draggedFromColumnId = null;
 });
-
-
-
-function isMoveAllowed(from, to) {
-    if (from === to) return false;
-    return true; // Allow all moves
-}
-
 
 $(document).on("dragenter", ".kanban-column", function () {
-    $(this).addClass("drag-over");
+    // handled in dragover
 });
 
-$(document).on("dragleave drop", ".kanban-column", function () {
-    $(this).removeClass("drag-over");
+$(document).on("dragleave", ".kanban-column", function () {
+    $(this).removeClass('drag-over drag-blocked');
 });
 
 // ========== NEW TASK CREATION WITH PRIORITY & CUSTOM FIELDS ==========
@@ -230,12 +270,12 @@ function submitCreateTask() {
     const priority = parseInt(document.getElementById("taskPriority").value);
 
     if (!title) {
-        alert("Please enter a task title");
+        showToast('Please enter a task title to continue.', 'warning');
         return;
     }
 
     if (!columnId) {
-        alert("Column ID is missing");
+        showToast('Column not found — please refresh.', 'danger');
         return;
     }
 
@@ -280,7 +320,7 @@ function submitCreateTask() {
         },
         error: function (xhr) {
             const text = xhr.responseText || 'An error occurred while creating the task.';
-            alert(text);
+            showToast(text, 'danger');
         }
     });
 }
@@ -320,26 +360,369 @@ function confirmAssignTask(taskId) {
     const userId = select.val();
 
     if (!userId) {
-        alert("Please select a user");
+        showToast('Please select a user to assign this task.', 'warning');
         return;
     }
 
     $.post("/Tasks/AssignTask", { taskId: taskId, userId: userId })
         .done(function (response) {
             if (response.success) {
-                // Determine if we need to reload the whole board or just update UI
-                // For simplicity, reload current board to reflect all changes (audit log, etc)
-                const activeTeam = $(".task-link.active").data("url"); // e.g., /Tasks/TeamBoard?team=...
+                const activeTeam = $(".task-link.active").data("url");
                 if (activeTeam) {
                     $("#taskBoardContainer").load(activeTeam);
                 } else {
                     location.reload();
                 }
             } else {
-                alert("Failed to assign task");
+                showToast('Failed to assign task. Please try again.', 'danger');
             }
         })
         .fail(function () {
-            alert("Error assigning task");
+            showToast('Error assigning task — please check your connection.', 'danger');
         });
 }
+
+// ═══════════════════════════════════════════════
+// REVIEW WORKFLOW FUNCTIONS
+// ═══════════════════════════════════════════════
+
+function openReviewModal(taskId, taskTitle) {
+    document.getElementById('reviewTaskId').value = taskId;
+    document.getElementById('reviewTaskTitle').textContent = taskTitle;
+    document.getElementById('reviewNote').value = '';
+    document.querySelector('#reviewPass').checked = true;
+
+    const modal = new bootstrap.Modal(document.getElementById('reviewTaskModal'));
+    modal.show();
+}
+
+function submitReview() {
+    const taskId = parseInt(document.getElementById('reviewTaskId').value);
+    const decision = document.querySelector('input[name="reviewDecision"]:checked').value;
+    const note = document.getElementById('reviewNote').value.trim();
+    const passed = decision === 'pass';
+
+    if (!passed && !note) {
+        showToast('Please provide a review note explaining why this task failed.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('submitReviewBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
+
+    $.ajax({
+        url: '/Tasks/ReviewTask',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            TaskId: taskId,
+            Passed: passed,
+            ReviewNote: note
+        }),
+        success: function (response) {
+            bootstrap.Modal.getInstance(document.getElementById('reviewTaskModal'))?.hide();
+
+            if (response.passed) {
+                showToast('✅ Review Passed! Task ready for completed.', 'success');
+            } else {
+                showToast('❌ Review Failed. Task returned to previous column.', 'warning');
+            }
+
+            // Reload board
+            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
+                loadTeamBoard(currentTeamName);
+            } else {
+                location.reload();
+            }
+        },
+        error: function (xhr) {
+            showToast(xhr.responseText || 'Review failed', 'danger');
+        },
+        complete: function () {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send me-1"></i> Submit Review';
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════
+// ARCHIVE FUNCTIONS
+// ═══════════════════════════════════════════════
+
+function archiveCompletedTasks(teamName) {
+    if (!confirm('Archive all completed & passed tasks to the history column?')) return;
+
+    $.ajax({
+        url: '/Tasks/ArchiveCompletedTasks',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ TeamName: teamName }),
+        success: function (response) {
+            showToast(`Archived ${response.archivedCount} task(s) to history`, 'success');
+            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
+                loadTeamBoard(currentTeamName);
+            } else {
+                location.reload();
+            }
+        },
+        error: function (xhr) {
+            showToast(xhr.responseText || 'Archive failed', 'danger');
+        }
+    });
+}
+
+function archiveSingleTask(taskId) {
+    if (!confirm('Archive this task to the history column?')) return;
+
+    $.ajax({
+        url: '/Tasks/ArchiveSingleTask',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(taskId),
+        success: function () {
+            showToast('Task archived to history', 'success');
+            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
+                loadTeamBoard(currentTeamName);
+            } else {
+                location.reload();
+            }
+        },
+        error: function (xhr) {
+            showToast(xhr.responseText || 'Archive failed', 'danger');
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════
+// HISTORY FUNCTIONS
+// ═══════════════════════════════════════════════
+
+function loadArchivedTasks(teamName) {
+    const container = document.getElementById('historyTasksList');
+    container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div></div>';
+
+    $.ajax({
+        url: '/Tasks/GetArchivedTasks',
+        method: 'GET',
+        data: { team: teamName },
+        success: function (tasks) {
+            if (!tasks || tasks.length === 0) {
+                container.innerHTML = '<div class="text-muted text-center small p-3"><i class="bi bi-inbox"></i><br/>No archived tasks</div>';
+                return;
+            }
+
+            let html = '';
+            tasks.forEach(function (t) {
+                const completedDate = t.completedAt ? new Date(t.completedAt).toLocaleDateString('en-GB', {
+                    day: '2-digit', month: 'short', year: 'numeric'
+                }) : '';
+                html += `
+                    <div class="history-task-card" onclick="openArchivedTaskDetail(${t.id})">
+                        <div class="history-task-title">${escapeHtml(t.title)}</div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="history-completed-badge">
+                                <i class="bi bi-check-circle-fill"></i>
+                                ${escapeHtml(t.completedBy)}
+                            </span>
+                            <span class="history-task-meta">${completedDate}</span>
+                        </div>
+                    </div>`;
+            });
+            container.innerHTML = html;
+        },
+        error: function () {
+            container.innerHTML = '<div class="text-danger text-center small p-3">Failed to load history</div>';
+        }
+    });
+}
+
+function openArchivedTaskDetail(taskId) {
+    const body = document.getElementById('archivedTaskBody');
+    body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+
+    const modal = new bootstrap.Modal(document.getElementById('archivedTaskModal'));
+    modal.show();
+
+    $.ajax({
+        url: '/Tasks/GetArchivedTaskDetail',
+        method: 'GET',
+        data: { id: taskId },
+        success: function (t) {
+            body.innerHTML = `
+                <div class="mb-4">
+                    <h4 class="mb-1">${escapeHtml(t.title)}</h4>
+                    <div class="d-flex gap-2 mt-2">
+                        <span class="badge bg-success"><i class="bi bi-check-circle"></i> ${t.reviewStatus}</span>
+                        <span class="badge bg-secondary">${t.priority}</span>
+                    </div>
+                </div>
+
+                ${t.description ? `<div class="mb-3"><h6 class="text-muted">Description</h6><p>${escapeHtml(t.description)}</p></div>` : ''}
+
+                ${t.reviewNote ? `<div class="mb-3"><h6 class="text-muted">Review Note</h6><div class="alert alert-info py-2">${escapeHtml(t.reviewNote)}</div></div>` : ''}
+
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Created By</small>
+                            <strong>${escapeHtml(t.createdBy || 'N/A')}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Assigned To</small>
+                            <strong>${escapeHtml(t.assignedTo || 'N/A')}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Reviewed By</small>
+                            <strong>${escapeHtml(t.reviewedBy || 'N/A')}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2">
+                            <small class="text-muted d-block">Completed By</small>
+                            <strong>${escapeHtml(t.completedBy || 'N/A')}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-top pt-3">
+                    <h6 class="text-muted mb-2">Timeline</h6>
+                    <div class="small">
+                        ${t.createdAt ? `<div class="mb-1"><i class="bi bi-plus-circle text-primary me-2"></i>Created: ${formatDate(t.createdAt)}</div>` : ''}
+                        ${t.assignedAt ? `<div class="mb-1"><i class="bi bi-person text-info me-2"></i>Assigned: ${formatDate(t.assignedAt)}</div>` : ''}
+                        ${t.reviewedAt ? `<div class="mb-1"><i class="bi bi-clipboard-check text-warning me-2"></i>Reviewed: ${formatDate(t.reviewedAt)}</div>` : ''}
+                        ${t.completedAt ? `<div class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Completed: ${formatDate(t.completedAt)}</div>` : ''}
+                        ${t.archivedAt ? `<div class="mb-1"><i class="bi bi-archive text-secondary me-2"></i>Archived: ${formatDate(t.archivedAt)}</div>` : ''}
+                    </div>
+                </div>
+
+                ${t.customFields && t.customFields.length > 0 ? `
+                    <div class="border-top pt-3 mt-3">
+                        <h6 class="text-muted mb-2">Custom Fields</h6>
+                        ${t.customFields.map(f => `<div class="small mb-1"><strong>${escapeHtml(f.fieldName || '')}:</strong> ${escapeHtml(f.value || '')}</div>`).join('')}
+                    </div>
+                ` : ''}
+            `;
+        },
+        error: function () {
+            body.innerHTML = '<div class="text-danger text-center">Failed to load task details</div>';
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        return new Date(dateStr).toLocaleDateString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+    } catch {
+        return dateStr;
+    }
+}
+
+function showToast(message, type) {
+    type = type || 'info';
+    // Remove existing toasts
+    document.querySelectorAll('.premium-toast').forEach(t => t.remove());
+
+    const icons = {
+        success: 'bi-check-circle-fill',
+        danger: 'bi-exclamation-triangle-fill',
+        warning: 'bi-exclamation-circle-fill',
+        info: 'bi-info-circle-fill'
+    };
+    const bgColors = {
+        success: 'linear-gradient(135deg, #00C851, #007E33)',
+        danger: 'linear-gradient(135deg, #ff4444, #CC0000)',
+        warning: 'linear-gradient(135deg, #ffbb33, #FF8800)',
+        info: 'linear-gradient(135deg, #33b5e5, #0099CC)'
+    };
+
+    const toast = document.createElement('div');
+    toast.className = 'premium-toast';
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        padding: 14px 20px;
+        border-radius: 12px;
+        color: #fff;
+        font-weight: 600;
+        font-size: 14px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        animation: toastSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 420px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        backdrop-filter: blur(10px);
+        background: ${bgColors[type] || bgColors.info};
+    `;
+
+    const icon = document.createElement('i');
+    icon.className = `bi ${icons[type] || icons.info}`;
+    icon.style.fontSize = '18px';
+
+    const text = document.createElement('span');
+    text.style.flex = '1';
+    text.textContent = message;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.style.cssText = 'background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 0 0 8px;opacity:0.8;';
+    closeBtn.onclick = () => {
+        toast.style.animation = 'toastSlideOut 0.3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    };
+
+    // Progress bar
+    const progress = document.createElement('div');
+    progress.style.cssText = 'position:absolute;bottom:0;left:0;height:3px;background:rgba(255,255,255,0.4);border-radius:0 0 12px 12px;animation:toastProgress 5s linear forwards;';
+
+    toast.appendChild(icon);
+    toast.appendChild(text);
+    toast.appendChild(closeBtn);
+    toast.appendChild(progress);
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'toastSlideOut 0.3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+// Add toast animations
+const toastStyle = document.createElement('style');
+toastStyle.textContent = `
+    @keyframes toastSlideIn {
+        from { transform: translateX(100%) scale(0.95); opacity: 0; }
+        to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    @keyframes toastSlideOut {
+        from { transform: translateX(0) scale(1); opacity: 1; }
+        to { transform: translateX(100%) scale(0.95); opacity: 0; }
+    }
+    @keyframes toastProgress {
+        from { width: 100%; }
+        to { width: 0%; }
+    }
+`;
+document.head.appendChild(toastStyle);

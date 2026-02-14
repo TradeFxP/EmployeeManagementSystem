@@ -26,8 +26,8 @@ namespace UserRoles.Models
         public int? TimeSpentInSeconds { get; set; }
         
         // Audit fields
-        public string ChangedByUserId { get; set; }
-        public Users ChangedByUser { get; set; }
+        public string? ChangedByUserId { get; set; }
+        public Users? ChangedByUser { get; set; }
         public DateTime ChangedAt { get; set; }
         
         // Additional context (JSON for flexibility)

@@ -9,6 +9,10 @@ namespace UserRoles.Models.Enums
         ColumnMoved = 4,
         FieldValueChanged = 5,
         PriorityChanged = 6,
-        Deleted = 7
+        Deleted = 7,
+        ReviewSubmitted = 8,
+        ReviewPassed = 9,
+        ReviewFailed = 10,
+        ArchivedToHistory = 11
     }
 }

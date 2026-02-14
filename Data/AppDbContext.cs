@@ -88,6 +88,29 @@ namespace UserRoles.Data
 
             builder.Entity<EmailLog>()
                 .HasIndex(e => new { e.ToEmail, e.SentAt });
+
+            // Review workflow FK configs
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.ReviewedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.CompletedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.PreviousColumn)
+                .WithMany()
+                .HasForeignKey(t => t.PreviousColumnId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Index for archived tasks lookup
+            builder.Entity<TaskItem>()
+                .HasIndex(t => new { t.TeamName, t.IsArchived });
         }
     }
 }
