@@ -141,6 +141,58 @@ namespace UserRoles.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task LogReviewSubmitted(int taskId, string userId)
+        {
+            _context.TaskHistories.Add(new TaskHistory
+            {
+                TaskId = taskId,
+                ChangeType = TaskHistoryChangeType.ReviewSubmitted,
+                ChangedByUserId = userId,
+                ChangedAt = DateTime.UtcNow,
+                Details = "Task submitted for review"
+            });
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task LogReviewPassed(int taskId, string userId, string? reviewNote)
+        {
+            _context.TaskHistories.Add(new TaskHistory
+            {
+                TaskId = taskId,
+                ChangeType = TaskHistoryChangeType.ReviewPassed,
+                ChangedByUserId = userId,
+                ChangedAt = DateTime.UtcNow,
+                Details = string.IsNullOrWhiteSpace(reviewNote) ? "Review passed" : $"Review passed: {reviewNote}"
+            });
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task LogReviewFailed(int taskId, string userId, string? reviewNote)
+        {
+            _context.TaskHistories.Add(new TaskHistory
+            {
+                TaskId = taskId,
+                ChangeType = TaskHistoryChangeType.ReviewFailed,
+                ChangedByUserId = userId,
+                ChangedAt = DateTime.UtcNow,
+                Details = string.IsNullOrWhiteSpace(reviewNote) ? "Review failed" : $"Review failed: {reviewNote}"
+            });
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task LogArchivedToHistory(int taskId, string userId)
+        {
+            _context.TaskHistories.Add(new TaskHistory
+            {
+                TaskId = taskId,
+                ChangeType = TaskHistoryChangeType.ArchivedToHistory,
+                ChangedByUserId = userId,
+                ChangedAt = DateTime.UtcNow,
+                Details = "Task archived to history"
+            });
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<List<TaskHistoryDto>> GetTaskHistory(int taskId)
         {
             var history = await _context.TaskHistories
