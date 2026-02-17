@@ -76,7 +76,7 @@
 
                                 <div class="small text-muted mb-2">
                                     <strong>Created By:</strong>
-                                    @(task.CreatedByUser?.Name ?? "Unknown")
+                                    @(task.CreatedByUser?.FirstName ?? "Unknown")
                                 </div>
 
                                 @* CUSTOM FIELDS DISPLAY *@
@@ -118,7 +118,7 @@
                                                 {
                                                     <option value="@u.Id"
                                                             selected="@(u.Id == task.AssignedToUserId)">
-                                                        @u.Name
+                                                        @u.FirstName
                                                     </option>
                                                 }
                                             </select>

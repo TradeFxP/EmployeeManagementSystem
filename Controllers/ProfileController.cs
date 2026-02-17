@@ -34,9 +34,9 @@ namespace UserRoles.Controllers
 
             var model = new ProfileViewModel
             {
-                FirstName = user.Name,
+                FirstName = user.FirstName,
 
-                Address = user.Address,
+                
                 Email = user.Email,
                 MobileNumber = user.MobileNumber,
                 AlternateMobileNumber = user.AlternateMobileNumber,
@@ -64,7 +64,7 @@ namespace UserRoles.Controllers
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 Email = user.Email,
-                Address = user.Address,
+              
                 MobileNumber = user.MobileNumber,
                 IsEditMode = true,               // 🔑 THIS ENABLES EDIT
                 CanEditEmail = User.IsInRole("Admin")
@@ -91,7 +91,7 @@ namespace UserRoles.Controllers
                 return RedirectToAction("Login", "Account");
 
             // ✅ Update common fields
-            user.Name = model.FirstName.Trim();
+            user.FirstName = model.FirstName.Trim();
             user.MobileNumber = model.MobileNumber.Trim();
 
             // ================= ADMIN EMAIL CHANGE =================

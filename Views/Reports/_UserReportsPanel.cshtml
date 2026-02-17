@@ -17,7 +17,7 @@
     string addDate = ViewBag.AddDate as string;
 
     bool showAddReportForOthers =
-        (isManager || isAdmin) && targetUserId != currentUserId;
+        isManager && targetUserId != currentUserId;
 
     bool isViewingOthers = targetUserId != currentUserId;
     bool showReviewerColumn = true;
