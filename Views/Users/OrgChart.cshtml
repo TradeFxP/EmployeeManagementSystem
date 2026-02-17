@@ -111,7 +111,7 @@
                         <span class="tree-toggle-icon">▶</span>
                         <div class="node-info">
                             <span class="node-name">@manager.Name</span>
-                            <span class="node-role">Manager</span>
+                            <span class="node-role">@(string.IsNullOrEmpty(manager.ParentUserId) ? "Manager" : "Sub-Manager")</span>
 
                         </div>
 

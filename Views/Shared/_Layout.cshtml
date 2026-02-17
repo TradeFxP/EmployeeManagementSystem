@@ -113,7 +113,7 @@
 
                             string role =
                             User.IsInRole("Admin") ? "Admin" :
-                            User.IsInRole("Manager") ? "Manager" :
+                            User.IsInRole("Manager") ? (!string.IsNullOrEmpty(currentUser?.ParentUserId) ? "Sub-Manager" : "Manager") :
                             User.IsInRole("User") ? "User" :
                             "";
 
