@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260212062550_FixPendingChanges")]
+    partial class FixPendingChanges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -234,63 +237,12 @@ namespace UserRoles.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationUserId", "Date")
                         .IsUnique();
 
                     b.ToTable("DailyReports");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.EmailLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("EmailType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("SentAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("SentByUserId")
-                        .HasMaxLength(450)
-                        .HasColumnType("character varying(450)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<string>("Subject")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("ToEmail")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SentByUserId");
-
-                    b.HasIndex("ToEmail", "SentAt");
-
-                    b.ToTable("EmailLogs");
                 });
 
             modelBuilder.Entity("UserRoles.Models.Epic", b =>
@@ -539,6 +491,7 @@ namespace UserRoles.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ChangedByUserId")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Details")
@@ -586,9 +539,6 @@ namespace UserRoles.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime?>("ArchivedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime?>("AssignedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -601,12 +551,6 @@ namespace UserRoles.Migrations
 
                     b.Property<int>("ColumnId")
                         .HasColumnType("integer");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CompletedByUserId")
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -622,29 +566,11 @@ namespace UserRoles.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("PreviousColumnId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("Priority")
                         .HasColumnType("integer");
 
                     b.Property<int?>("ProjectId")
                         .HasColumnType("integer");
-
-                    b.Property<string>("ReviewNote")
-                        .HasColumnType("text");
-
-                    b.Property<int>("ReviewStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ReviewedByUserId")
-                        .HasColumnType("text");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -674,19 +600,11 @@ namespace UserRoles.Migrations
 
                     b.HasIndex("ColumnId");
 
-                    b.HasIndex("CompletedByUserId");
-
                     b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("PreviousColumnId");
 
                     b.HasIndex("ProjectId");
 
-                    b.HasIndex("ReviewedByUserId");
-
                     b.HasIndex("StoryId");
-
-                    b.HasIndex("TeamName", "IsArchived");
 
                     b.ToTable("TaskItems");
                 });
@@ -766,22 +684,12 @@ namespace UserRoles.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
-                    b.Property<string>("AlternateMobileNumber")
-                        .HasColumnType("text");
-
-
-                    b.Property<string>("BloodGroup")
+                    b.Property<string>("Address")
                         .HasColumnType("text");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
-
-                    b.Property<DateTime?>("DateOfBirth")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime?>("DateOfJoining")
-                        .HasColumnType("date");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -796,15 +704,6 @@ namespace UserRoles.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("FirstName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Gender")
-                        .HasColumnType("text");
-
-                    b.Property<string>("LastName")
-                        .HasColumnType("text");
-
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 
@@ -815,6 +714,9 @@ namespace UserRoles.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("MobileNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
                         .HasColumnType("text");
 
                     b.Property<string>("NormalizedEmail")
@@ -940,16 +842,6 @@ namespace UserRoles.Migrations
                     b.Navigation("AssignedTo");
                 });
 
-            modelBuilder.Entity("UserRoles.Models.EmailLog", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "SentByUser")
-                        .WithMany()
-                        .HasForeignKey("SentByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("SentByUser");
-                });
-
             modelBuilder.Entity("UserRoles.Models.Epic", b =>
                 {
                     b.HasOne("UserRoles.Models.Users", "CreatedByUser")
@@ -1045,7 +937,8 @@ namespace UserRoles.Migrations
                     b.HasOne("UserRoles.Models.Users", "ChangedByUser")
                         .WithMany()
                         .HasForeignKey("ChangedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("UserRoles.Models.TeamColumn", "FromColumn")
                         .WithMany()
@@ -1088,30 +981,15 @@ namespace UserRoles.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("UserRoles.Models.Users", "CompletedByUser")
-                        .WithMany()
-                        .HasForeignKey("CompletedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("UserRoles.Models.Users", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("UserRoles.Models.TeamColumn", "PreviousColumn")
-                        .WithMany()
-                        .HasForeignKey("PreviousColumnId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("UserRoles.Models.Project", "Project")
                         .WithMany("Tasks")
                         .HasForeignKey("ProjectId");
-
-                    b.HasOne("UserRoles.Models.Users", "ReviewedByUser")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("UserRoles.Models.Story", "Story")
                         .WithMany("Tasks")
@@ -1123,15 +1001,9 @@ namespace UserRoles.Migrations
 
                     b.Navigation("Column");
 
-                    b.Navigation("CompletedByUser");
-
                     b.Navigation("CreatedByUser");
 
-                    b.Navigation("PreviousColumn");
-
                     b.Navigation("Project");
-
-                    b.Navigation("ReviewedByUser");
 
                     b.Navigation("Story");
                 });

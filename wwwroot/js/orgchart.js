@@ -12,14 +12,14 @@ function getCsrfToken() {
 window.drag = function (ev) {
     if (!window.__isAdmin) return;
 
-    const node = ev.target.closest(".org-node");
+    // Find the closest .tree-content element (the row being dragged)
+    const node = ev.target.closest(".tree-content");
     if (!node) return;
 
     const draggedNode = {
         id: node.dataset.id,
         role: node.dataset.role,
-        fromParent: node.dataset.parentId || "ADMIN",
-        name: node.querySelector(".node-title")?.innerText?.trim()
+        name: node.querySelector(".node-name")?.innerText?.trim() || "Unknown"
     };
 
     console.log("✅ DRAG STARTED:", draggedNode);
@@ -29,16 +29,54 @@ window.drag = function (ev) {
         "application/json",
         JSON.stringify(draggedNode)
     );
+
+    // Visual feedback: add dragging class
+    node.classList.add("dragging");
+    setTimeout(function () { node.classList.add("dragging-active"); }, 0);
 };
 
 window.allowDrop = function (ev) {
     if (!window.__isAdmin) return;
-    ev.preventDefault(); // REQUIRED
+    ev.preventDefault();
+
+    // Highlight the drop target
+    const target = ev.target.closest(".tree-content");
+    if (target && !target.classList.contains("drag-over")) {
+        // Remove previous highlights
+        document.querySelectorAll(".tree-content.drag-over").forEach(function (el) {
+            el.classList.remove("drag-over");
+        });
+        target.classList.add("drag-over");
+    }
 };
+
+// Remove drag-over highlight when leaving
+document.addEventListener("dragleave", function (ev) {
+    const target = ev.target.closest(".tree-content");
+    if (target) target.classList.remove("drag-over");
+});
+
+// Clean up when drag ends (drop or cancel)
+document.addEventListener("dragend", function (ev) {
+    document.querySelectorAll(".tree-content.dragging, .tree-content.dragging-active").forEach(function (el) {
+        el.classList.remove("dragging", "dragging-active");
+    });
+    document.querySelectorAll(".tree-content.drag-over").forEach(function (el) {
+        el.classList.remove("drag-over");
+    });
+});
 
 window.drop = function (event, newParentId) {
     event.preventDefault();
     if (!window.__isAdmin) return;
+
+    // Clear all drag visual states
+    document.querySelectorAll(".tree-content.drag-over").forEach(function (el) {
+        el.classList.remove("drag-over");
+    });
+    document.querySelectorAll(".tree-content.dragging, .tree-content.dragging-active").forEach(function (el) {
+        el.classList.remove("dragging", "dragging-active");
+    });
 
     const data = event.dataTransfer.getData("application/json");
     if (!data) return;
@@ -46,8 +84,15 @@ window.drop = function (event, newParentId) {
     const dragged = JSON.parse(data);
     console.log("⬇️ DROP:", dragged, "→", newParentId);
 
-    // ❌ prevent self-drop
+    // Prevent self-drop
     if (dragged.id === newParentId) return;
+
+    // Get target name from the drop zone element
+    const dropTarget = event.target.closest(".tree-content");
+    let targetName = "Admin";
+    if (newParentId !== "ADMIN" && dropTarget) {
+        targetName = dropTarget.querySelector(".node-name")?.innerText?.trim() || "Unknown";
+    }
 
     fetch('/Users/MoveOrgNode', {
         method: 'POST',
@@ -60,12 +105,73 @@ window.drop = function (event, newParentId) {
             newParentId: newParentId
         })
     })
-        .then(r => r.json())
-        .then(res => {
-            if (res.success) location.reload();
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (res.success) {
+                // Show industry-standard toast notification (5 seconds)
+                showOrgToast(
+                    'Moved "' + dragged.name + '" (' + (dragged.role || 'User') + ') → ' + targetName,
+                    'success',
+                    5000
+                );
+                // Delay reload slightly so user sees the toast
+                setTimeout(function () { location.reload(); }, 800);
+            } else {
+                showOrgToast("Failed to move " + dragged.name, "error", 5000);
+            }
         })
-        .catch(err => console.error(err));
+        .catch(function (err) {
+            console.error("Drop error:", err);
+            showOrgToast("Error: Could not move " + dragged.name + ". Please try again.", "error", 5000);
+        });
 };
+
+// ===============================
+// TOAST NOTIFICATION SYSTEM
+// ===============================
+function showOrgToast(message, type, duration) {
+    type = type || "success";
+    duration = duration || 5000;
+
+    // Create toast container if not present
+    var container = document.getElementById("orgToastContainer");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "orgToastContainer";
+        container.className = "org-toast-container";
+        document.body.appendChild(container);
+    }
+
+    // Create individual toast
+    var toast = document.createElement("div");
+    toast.className = "org-toast org-toast-" + type;
+
+    // Icon based on type
+    var icon = type === "success" ? "✓" : type === "error" ? "✕" : "ℹ";
+
+    toast.innerHTML =
+        '<div class="org-toast-icon">' + icon + '</div>' +
+        '<div class="org-toast-message">' + message + '</div>' +
+        '<button class="org-toast-close" onclick="this.parentElement.remove()">×</button>' +
+        '<div class="org-toast-progress"><div class="org-toast-progress-bar" style="animation-duration: ' + duration + 'ms"></div></div>';
+
+    container.appendChild(toast);
+
+    // Trigger animation
+    requestAnimationFrame(function () {
+        toast.classList.add("org-toast-show");
+    });
+
+    // Auto-remove after duration
+    setTimeout(function () {
+        toast.classList.remove("org-toast-show");
+        toast.classList.add("org-toast-hide");
+        setTimeout(function () { toast.remove(); }, 400);
+    }, duration);
+}
+
+// Expose globally so the IIFE module can also use it
+window.showOrgToast = showOrgToast;
 
 (function () {
 

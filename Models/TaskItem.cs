@@ -50,6 +50,27 @@
         // Column tracking
         public DateTime CurrentColumnEntryAt { get; set; } // When task entered current column
         
+        // Previous column (for returning failed review tasks)
+        public int? PreviousColumnId { get; set; }
+        public TeamColumn? PreviousColumn { get; set; }
+        
+        // ================= REVIEW WORKFLOW =================
+        public UserRoles.Models.Enums.ReviewStatus ReviewStatus { get; set; } = UserRoles.Models.Enums.ReviewStatus.None;
+        public string? ReviewNote { get; set; }
+        
+        public string? ReviewedByUserId { get; set; }
+        public Users? ReviewedByUser { get; set; }
+        public DateTime? ReviewedAt { get; set; }
+        
+        // Completed by tracking
+        public string? CompletedByUserId { get; set; }
+        public Users? CompletedByUser { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        
+        // ================= HISTORY ARCHIVAL =================
+        public bool IsArchived { get; set; } = false;
+        public DateTime? ArchivedAt { get; set; }
+        
         // History tracking
         public ICollection<TaskHistory> History { get; set; } = new List<TaskHistory>();
     }

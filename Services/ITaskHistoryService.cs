@@ -12,6 +12,10 @@ namespace UserRoles.Services
         Task LogPriorityChange(int taskId, TaskPriority oldPriority, TaskPriority newPriority, string userId);
         Task LogCustomFieldChange(int taskId, string fieldName, string oldValue, string newValue, string userId);
         Task LogTaskDeleted(int taskId, string userId);
+        Task LogReviewSubmitted(int taskId, string userId);
+        Task LogReviewPassed(int taskId, string userId, string? reviewNote);
+        Task LogReviewFailed(int taskId, string userId, string? reviewNote);
+        Task LogArchivedToHistory(int taskId, string userId);
         Task<List<TaskHistoryDto>> GetTaskHistory(int taskId);
     }
 }

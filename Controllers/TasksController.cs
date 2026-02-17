@@ -431,20 +431,33 @@ public class TasksController : Controller
                 return Forbid();
         }
 
-        // Load columns
-        var columns = await _context.TeamColumns
+        // Load columns — enforce order: normal columns → Review → Completed
+        var columnsRaw = await _context.TeamColumns
             .Where(c => c.TeamName == team)
             .OrderBy(c => c.Order)
             .ToListAsync();
 
-        // Load all tasks for team (with users and custom field values)
+        // Sort: normal columns first, then Review, then Completed
+        var columns = columnsRaw
+            .OrderBy(c =>
+            {
+                var name = c.ColumnName?.Trim().ToLower();
+                if (name == "review") return 1000;
+                if (name == "completed") return 1001;
+                return c.Order;
+            })
+            .ToList();
+
+        // Load all tasks for team (with users and custom field values) — exclude archived
         var allTasks = await _context.TaskItems
-     .Where(t => t.TeamName == team)
+     .Where(t => t.TeamName == team && !t.IsArchived)
      .Include(t => t.CreatedByUser)
      .Include(t => t.AssignedToUser)
-     .Include(t => t.AssignedByUser)   // ✅ REQUIRED
-     .Include(t => t.CustomFieldValues)  // Load custom field values
-        .ThenInclude(v => v.Field)      // Load field definitions
+     .Include(t => t.AssignedByUser)
+     .Include(t => t.ReviewedByUser)
+     .Include(t => t.CompletedByUser)
+     .Include(t => t.CustomFieldValues)
+        .ThenInclude(v => v.Field)
      .ToListAsync();
 
 
@@ -634,14 +647,13 @@ public class TasksController : Controller
         if (model == null)
             return BadRequest("Invalid payload");
 
-        // 🔹 Get task
         var task = await _context.TaskItems
+            .Include(t => t.Column)
             .FirstOrDefaultAsync(t => t.Id == model.TaskId);
 
         if (task == null)
             return NotFound("Task not found");
 
-        // 🔹 Get target column
         var targetColumn = await _context.TeamColumns
             .FirstOrDefaultAsync(c => c.Id == model.ColumnId);
 
@@ -651,28 +663,304 @@ public class TasksController : Controller
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
 
-        // ✅ LOG HISTORY before move to capture time spent in previous column
+        var isAdmin = User.IsInRole("Admin");
+        var targetColName = targetColumn.ColumnName?.Trim().ToLower();
+        var sourceColName = task.Column?.ColumnName?.Trim().ToLower();
+
+        // ═══════ ROLE-BASED RESTRICTIONS ═══════
+        
+        // 1. COMPLETED column: ONLY Admin can move tasks here
+        if (targetColName == "completed")
+        {
+            if (!isAdmin)
+                return StatusCode(403, "Only Admin can move tasks to Completed.");
+
+            // Task must have passed review first
+            if (task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.Passed)
+                return BadRequest("Task must pass review before moving to Completed.");
+        }
+
+        // 2. REVIEW column: Check hierarchy - user can only move tasks they or subordinates own
+        if (targetColName == "review")
+        {
+            if (!await CanUserMoveTask(task, user))
+                return StatusCode(403, "You can only move tasks assigned to you or your subordinates to Review.");
+        }
+
+        // 3. Moving FROM review back (fail rework): allowed if task was failed
+        if (sourceColName == "review" && targetColName != "completed" && !isAdmin)
+        {
+            // Non-admin can only move back if review was failed
+            if (task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.Failed && 
+                task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.None)
+            {
+                if (!await CanUserMoveTask(task, user))
+                    return StatusCode(403, "You cannot move this task.");
+            }
+        }
+
+        // ═══════ LOG & MOVE ═══════
         await _historyService.LogColumnMove(task.Id, task.ColumnId, targetColumn.Id, user.Id);
 
-        // ✅ Move task to new column
+        // Save previous column for fail-return
+        task.PreviousColumnId = task.ColumnId;
         task.ColumnId = targetColumn.Id;
 
-        // ✅ Sync status with column name
+        // Sync status
         task.Status = targetColumn.ColumnName switch
         {
             "ToDo" => TaskStatusEnum.ToDo,
             "Doing" => TaskStatusEnum.Doing,
             "Review" => TaskStatusEnum.Review,
-            //"Done" => TaskStatusEnum.Done,
+            "completed" => TaskStatusEnum.Complete,
             _ => task.Status
         };
 
+        // If moving to review, set review status to pending
+        if (targetColName == "review")
+        {
+            task.ReviewStatus = UserRoles.Models.Enums.ReviewStatus.Pending;
+            task.ReviewNote = null; // Clear old notes
+            await _historyService.LogReviewSubmitted(task.Id, user.Id);
+        }
+
+        // If moving to completed (admin only), track completion
+        if (targetColName == "completed")
+        {
+            task.CompletedByUserId = task.AssignedToUserId;
+            task.CompletedAt = DateTime.UtcNow;
+        }
+
         task.UpdatedAt = DateTime.UtcNow;
-        task.CurrentColumnEntryAt = DateTime.UtcNow; // Reset timer for new column
-        
+        task.CurrentColumnEntryAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
 
-        return Ok();
+        return Ok(new { success = true, message = "Task moved successfully" });
+    }
+
+    // ═══════ HIERARCHY-BASED MOVE PERMISSION CHECK ═══════
+    private async Task<bool> CanUserMoveTask(TaskItem task, Users currentUser)
+    {
+        // Admin can do anything
+        if (await _userManager.IsInRoleAsync(currentUser, "Admin"))
+            return true;
+
+        // User can move their own assigned tasks
+        if (task.AssignedToUserId == currentUser.Id)
+            return true;
+
+        // User can move tasks they created
+        if (task.CreatedByUserId == currentUser.Id)
+            return true;
+
+        var userRoles = await _userManager.GetRolesAsync(currentUser);
+
+        // Manager: can move tasks of users under them
+        if (userRoles.Contains("Manager") || userRoles.Contains("Sub-Manager"))
+        {
+            // Check if the assigned user is a subordinate
+            var assignedUser = await _userManager.FindByIdAsync(task.AssignedToUserId);
+            if (assignedUser != null)
+            {
+                // Direct report check
+                if (assignedUser.ManagerId == currentUser.Id)
+                    return true;
+
+                // Indirect: sub-manager's reports
+                var subordinateIds = await _context.Users
+                    .Where(u => u.ManagerId == currentUser.Id)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                if (subordinateIds.Contains(task.AssignedToUserId))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ═══════ ADMIN REVIEW ENDPOINT ═══════
+    public class ReviewTaskRequest
+    {
+        public int TaskId { get; set; }
+        public bool Passed { get; set; }
+        public string? ReviewNote { get; set; }
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ReviewTask([FromBody] ReviewTaskRequest model)
+    {
+        if (model == null) return BadRequest();
+
+        var task = await _context.TaskItems
+            .Include(t => t.Column)
+            .Include(t => t.PreviousColumn)
+            .FirstOrDefaultAsync(t => t.Id == model.TaskId);
+
+        if (task == null) return NotFound("Task not found");
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        task.ReviewedByUserId = user.Id;
+        task.ReviewedAt = DateTime.UtcNow;
+        task.ReviewNote = model.ReviewNote;
+
+        if (model.Passed)
+        {
+            // ✅ PASSED
+            task.ReviewStatus = UserRoles.Models.Enums.ReviewStatus.Passed;
+            await _historyService.LogReviewPassed(task.Id, user.Id, model.ReviewNote);
+
+            return Ok(new { success = true, passed = true, message = "Review passed. Task can now be moved to Completed." });
+        }
+        else
+        {
+            // ❌ FAILED — move back to previous column
+            task.ReviewStatus = UserRoles.Models.Enums.ReviewStatus.Failed;
+            await _historyService.LogReviewFailed(task.Id, user.Id, model.ReviewNote);
+
+            // Move back to previous column
+            if (task.PreviousColumnId.HasValue)
+            {
+                var prevCol = task.PreviousColumn ?? await _context.TeamColumns.FindAsync(task.PreviousColumnId);
+                if (prevCol != null)
+                {
+                    await _historyService.LogColumnMove(task.Id, task.ColumnId, prevCol.Id, user.Id);
+                    task.ColumnId = prevCol.Id;
+                    task.CurrentColumnEntryAt = DateTime.UtcNow;
+                }
+            }
+
+            task.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, passed = false, message = "Review failed. Task returned to previous column." });
+        }
+    }
+
+    // ═══════ ARCHIVE TO HISTORY ═══════
+    public class ArchiveRequest
+    {
+        public string TeamName { get; set; } = string.Empty;
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ArchiveCompletedTasks([FromBody] ArchiveRequest model)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        var completedTasks = await _context.TaskItems
+            .Where(t => t.TeamName == model.TeamName
+                     && !t.IsArchived
+                     && t.ReviewStatus == UserRoles.Models.Enums.ReviewStatus.Passed
+                     && t.CompletedAt != null)
+            .ToListAsync();
+
+        foreach (var task in completedTasks)
+        {
+            task.IsArchived = true;
+            task.ArchivedAt = DateTime.UtcNow;
+            await _historyService.LogArchivedToHistory(task.Id, user.Id);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { success = true, archivedCount = completedTasks.Count });
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ArchiveSingleTask([FromBody] int taskId)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        var task = await _context.TaskItems.FindAsync(taskId);
+        if (task == null) return NotFound();
+
+        task.IsArchived = true;
+        task.ArchivedAt = DateTime.UtcNow;
+        await _historyService.LogArchivedToHistory(task.Id, user.Id);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { success = true });
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetArchivedTasks(string team)
+    {
+        if (string.IsNullOrWhiteSpace(team))
+            return BadRequest();
+
+        var archivedTasks = await _context.TaskItems
+            .Where(t => t.TeamName == team && t.IsArchived)
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.CompletedByUser)
+            .OrderByDescending(t => t.ArchivedAt)
+            .Select(t => new
+            {
+                t.Id,
+                t.Title,
+                t.Description,
+                CompletedBy = t.CompletedByUser != null ? t.CompletedByUser.UserName : (t.AssignedToUser != null ? t.AssignedToUser.UserName : "Unknown"),
+                CompletedAt = t.CompletedAt,
+                ArchivedAt = t.ArchivedAt,
+                Priority = (int)t.Priority,
+                ReviewStatus = t.ReviewStatus.ToString()
+            })
+            .ToListAsync();
+
+        return Ok(archivedTasks);
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetArchivedTaskDetail(int id)
+    {
+        var task = await _context.TaskItems
+            .Include(t => t.CreatedByUser)
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.AssignedByUser)
+            .Include(t => t.ReviewedByUser)
+            .Include(t => t.CompletedByUser)
+            .Include(t => t.CustomFieldValues)
+                .ThenInclude(v => v.Field)
+            .FirstOrDefaultAsync(t => t.Id == id && t.IsArchived);
+
+        if (task == null) return NotFound();
+
+        return Ok(new
+        {
+            task.Id,
+            task.Title,
+            task.Description,
+            Priority = task.Priority.ToString(),
+            Status = task.Status.ToString(),
+            ReviewStatus = task.ReviewStatus.ToString(),
+            task.ReviewNote,
+            CreatedBy = task.CreatedByUser?.UserName,
+            AssignedTo = task.AssignedToUser?.UserName,
+            AssignedBy = task.AssignedByUser?.UserName,
+            ReviewedBy = task.ReviewedByUser?.UserName,
+            CompletedBy = task.CompletedByUser?.UserName ?? task.AssignedToUser?.UserName,
+            task.CreatedAt,
+            task.AssignedAt,
+            task.ReviewedAt,
+            task.CompletedAt,
+            task.ArchivedAt,
+            CustomFields = task.CustomFieldValues?.Select(fv => new
+            {
+                FieldName = fv.Field?.FieldName,
+                fv.Value
+            }).ToList()
+        });
     }
 
     [HttpGet]

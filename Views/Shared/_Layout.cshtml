@@ -20,6 +20,7 @@
     <script src="~/js/orgchart.js" asp-append-version="true"></script>
     
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<<<<<<< HEAD
 
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -32,6 +33,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
 
+=======
+    <script src="~/js/reports-actions.js"></script>
+    <script src="~/js/tasks.js" asp-append-version="true"></script>
+>>>>>>> 2a194a583c145a9e67eac4fe67ecb3f203ba7bbc
 
     <style>
         .nav-username {
@@ -134,7 +139,7 @@
                                     @displayName
                                     @if (!string.IsNullOrEmpty(role))
                                     {
-                                        <span class="badge bg-light text-primary ms-1" style="font-size: 0.7rem;">@role</span>
+                                            <span class="badge bg-primary text-dark ms-1" style="font-size: 0.7rem;">@role</span>
                                     }
                                 </span>
                             </li>
