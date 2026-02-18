@@ -215,8 +215,8 @@ $(document).on("drop", ".kanban-column", function (e) {
             ColumnId: targetColumnId
         }),
         success: function (response) {
-            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
-                loadTeamBoard(currentTeamName);
+            if (window.currentTeamName && window.loadTeamBoard) {
+                window.loadTeamBoard(window.currentTeamName);
             } else {
                 location.reload();
             }
@@ -304,9 +304,9 @@ function submitCreateTask() {
             if (response && response.success) {
                 bootstrap.Modal.getInstance(document.getElementById("createTaskModal"))?.hide();
                 // reload board
-                if (typeof currentTeamName !== 'undefined') {
+                if (window.currentTeamName) {
                     // prefer partial reload
-                    if (window.loadTeamBoard) loadTeamBoard(currentTeamName);
+                    if (window.loadTeamBoard) window.loadTeamBoard(window.currentTeamName);
                     else location.reload();
                 } else {
                     location.reload();
@@ -430,8 +430,8 @@ function submitReview() {
             }
 
             // Reload board
-            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
-                loadTeamBoard(currentTeamName);
+            if (window.currentTeamName && window.loadTeamBoard) {
+                window.loadTeamBoard(window.currentTeamName);
             } else {
                 location.reload();
             }
@@ -460,8 +460,8 @@ function archiveCompletedTasks(teamName) {
         data: JSON.stringify({ TeamName: teamName }),
         success: function (response) {
             showToast(`Archived ${response.archivedCount} task(s) to history`, 'success');
-            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
-                loadTeamBoard(currentTeamName);
+            if (window.currentTeamName && window.loadTeamBoard) {
+                window.loadTeamBoard(window.currentTeamName);
             } else {
                 location.reload();
             }
@@ -482,8 +482,8 @@ function archiveSingleTask(taskId) {
         data: JSON.stringify(taskId),
         success: function () {
             showToast('Task archived to history', 'success');
-            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
-                loadTeamBoard(currentTeamName);
+            if (window.currentTeamName && window.loadTeamBoard) {
+                window.loadTeamBoard(window.currentTeamName);
             } else {
                 location.reload();
             }
@@ -500,7 +500,12 @@ function archiveSingleTask(taskId) {
 
 function loadArchivedTasks(teamName) {
     const container = document.getElementById('historyTasksList');
-    container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div></div>';
+    if (!container) return; // Guard against missing container
+
+    // Keep spinner if already there or set it
+    if (!container.querySelector('.spinner-border')) {
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-info"></div></div>';
+    }
 
     $.ajax({
         url: '/Tasks/GetArchivedTasks',
@@ -508,7 +513,7 @@ function loadArchivedTasks(teamName) {
         data: { team: teamName },
         success: function (tasks) {
             if (!tasks || tasks.length === 0) {
-                container.innerHTML = '<div class="text-muted text-center small p-3"><i class="bi bi-inbox"></i><br/>No archived tasks</div>';
+                container.innerHTML = '<div class="text-muted text-center small p-4"><i class="bi bi-inbox" style="font-size:24px;"></i><br/>No archived tasks</div>';
                 return;
             }
 
@@ -517,15 +522,45 @@ function loadArchivedTasks(teamName) {
                 const completedDate = t.completedAt ? new Date(t.completedAt).toLocaleDateString('en-GB', {
                     day: '2-digit', month: 'short', year: 'numeric'
                 }) : '';
+
+                // Unified Card Design (matches .task-card style but simplified for read-only)
                 html += `
-                    <div class="history-task-card" onclick="openArchivedTaskDetail(${t.id})">
-                        <div class="history-task-title">${escapeHtml(t.title)}</div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="history-completed-badge">
-                                <i class="bi bi-check-circle-fill"></i>
-                                ${escapeHtml(t.completedBy)}
+                    <div class="task-card history-card" 
+                         data-task-id="${t.id}"
+                         data-created-at="${t.archivedAt || t.completedAt || ''}"
+                         onclick="openArchivedTaskDetail(${t.id})">
+                        
+                        <div class="card-top-row mb-2">
+                            <span class="priority-pill priority-${(t.priority === 3 ? 'critical' : t.priority === 2 ? 'high' : t.priority === 1 ? 'medium' : 'low')}">
+                                ${(t.priority === 3 ? 'Critical' : t.priority === 2 ? 'High' : t.priority === 1 ? 'Medium' : 'Low')}
                             </span>
-                            <span class="history-task-meta">${completedDate}</span>
+                            <div class="d-flex flex-column align-items-end gap-1">
+                                <span class="review-badge review-badge-pass">
+                                    <i class="bi bi-check-circle-fill"></i> PASS
+                                </span>
+                                ${window.isAdmin ? `
+                                <button class="btn btn-xs btn-outline-danger border-0 p-0 px-1 d-flex align-items-center gap-1" 
+                                        onclick="deleteArchivedTask(event, ${t.id})" 
+                                        title="Delete Permanently">
+                                    <i class="bi bi-trash-fill" style="font-size: 10px;"></i> Delete
+                                </button>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="task-title-text mb-2">${escapeHtml(t.title)}</div>
+                        
+                        <!-- Hidden description for filtering -->
+                        <div class="task-desc-text d-none">${escapeHtml(t.description || '')}</div>
+                        
+                        <div class="task-meta mt-2">
+                             <div><i class="bi bi-person-check me-1"></i> ${escapeHtml(t.completedBy)}</div>
+                             <div><i class="bi bi-calendar-check me-1"></i> ${completedDate}</div>
+                        </div>
+
+                        <div class="task-actions mt-2">
+                             <button class="action-btn action-btn-info w-100 justify-content-center" title="View Details">
+                                <i class="bi bi-info-circle"></i> View Details
+                             </button>
                         </div>
                     </div>`;
             });
@@ -605,6 +640,14 @@ function openArchivedTaskDetail(taskId) {
                         <h6 class="text-muted mb-2">Custom Fields</h6>
                         ${t.customFields.map(f => `<div class="small mb-1"><strong>${escapeHtml(f.fieldName || '')}:</strong> ${escapeHtml(f.value || '')}</div>`).join('')}
                     </div>
+                ` : ''}
+
+                ${window.isAdmin ? `
+                <div class="mt-4 pt-3 border-top text-end">
+                    <button class="btn btn-danger" onclick="deleteArchivedTask(null, ${t.id})">
+                        <i class="bi bi-trash-fill me-1"></i> Delete Task Permanently
+                    </button>
+                </div>
                 ` : ''}
             `;
         },
@@ -726,3 +769,34 @@ toastStyle.textContent = `
     }
 `;
 document.head.appendChild(toastStyle);
+
+function deleteArchivedTask(event, taskId) {
+    if (event) event.stopPropagation();
+
+    if (!confirm("Are you sure you want to PERMANENTLY delete this archived task? This cannot be undone.")) return;
+
+    $.ajax({
+        url: '/Tasks/DeleteTask',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(taskId),
+        success: function () {
+            showToast('Task deleted permanently', 'success');
+
+            // Close modal if open
+            const modalEl = document.getElementById('archivedTaskModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+
+            // Refresh history
+            if (window.currentTeamName) {
+                loadArchivedTasks(window.currentTeamName);
+            }
+        },
+        error: function () {
+            showToast('Failed to delete task', 'danger');
+        }
+    });
+}

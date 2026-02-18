@@ -1,13 +1,13 @@
 // customFields.js - Custom field management for tasks
 
-let customFieldsCache = null;
+window.customFieldsCache = window.customFieldsCache || null;
 
 // Load custom fields from server
 async function loadCustomFields() {
     // Return cached if available
-    if (customFieldsCache !== null) {
-        console.log('Using cached custom fields:', customFieldsCache);
-        return customFieldsCache;
+    if (window.customFieldsCache !== null) {
+        console.log('Using cached custom fields:', window.customFieldsCache);
+        return window.customFieldsCache;
     }
 
     try {
@@ -15,9 +15,9 @@ async function loadCustomFields() {
         const response = await fetch(`/Tasks/GetCustomFields?t=${new Date().getTime()}`);
         if (!response.ok) throw new Error('Failed to load custom fields');
 
-        customFieldsCache = await response.json();
-        console.log('Loaded custom fields:', customFieldsCache);
-        return customFieldsCache;
+        window.customFieldsCache = await response.json();
+        console.log('Loaded custom fields:', window.customFieldsCache);
+        return window.customFieldsCache;
     } catch (error) {
         console.error('Error loading custom fields:', error);
         return [];
@@ -164,7 +164,7 @@ async function addNewCustomField() {
         if (!response.ok) throw new Error('Failed to create field');
 
         // Clear cache and reload
-        customFieldsCache = null;
+        window.customFieldsCache = null;
         await renderCustomFieldInputs('customFieldsContainer', collectCustomFieldValues()); // Preserve values
 
     } catch (error) {
@@ -189,7 +189,7 @@ async function renameCustomField(id, currentName) {
         if (!response.ok) throw new Error('Failed to rename field');
 
         // Clear cache and reload
-        customFieldsCache = null;
+        window.customFieldsCache = null;
         await renderCustomFieldInputs('customFieldsContainer', collectCustomFieldValues());
 
     } catch (error) {
@@ -210,7 +210,7 @@ async function deleteCustomFieldInline(id) {
         if (!response.ok) throw new Error('Failed to delete field');
 
         // Clear cache and reload
-        customFieldsCache = null;
+        window.customFieldsCache = null;
         await renderCustomFieldInputs('customFieldsContainer', collectCustomFieldValues());
 
     } catch (error) {
@@ -244,7 +244,7 @@ function collectCustomFieldValues(containerId = 'customFieldsContainer') {
 
 // Validate required custom fields
 function validateCustomFields(containerId = 'customFieldsContainer') {
-    if (!customFieldsCache) return true;
+    if (!window.customFieldsCache) return true;
 
     // We can't easily rely on just cache because we need to check if the field exists in the SPECIFIC container
     // But for now, let's just check the inputs inside the container
@@ -252,7 +252,7 @@ function validateCustomFields(containerId = 'customFieldsContainer') {
     const container = document.getElementById(containerId);
     if (!container) return true;
 
-    for (const field of customFieldsCache) {
+    for (const field of window.customFieldsCache) {
         if (field.isRequired) {
             // Find input within the container
             const input = container.querySelector(`[data-field-id="${field.id}"]`);
@@ -283,7 +283,7 @@ async function loadFieldsList() {
 
     try {
         // Force fresh load for manage fields modal
-        customFieldsCache = null;
+        window.customFieldsCache = null;
         const fields = await loadCustomFields();
 
         if (fields.length === 0) {
@@ -344,7 +344,7 @@ async function createNewField() {
         document.getElementById('newFieldRequired').checked = false;
 
         // IMPORTANT: Clear cache so new fields load
-        customFieldsCache = null;
+        window.customFieldsCache = null;
 
         // Reload list in modal
         await loadFieldsList();
@@ -372,7 +372,7 @@ async function deleteField(fieldId) {
         if (!response.ok) throw new Error('Failed to delete field');
 
         // Clear cache
-        customFieldsCache = null;
+        window.customFieldsCache = null;
 
         // Reload list
         await loadFieldsList();

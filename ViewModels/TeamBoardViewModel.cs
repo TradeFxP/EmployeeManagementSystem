@@ -22,5 +22,8 @@ namespace UserRoles.ViewModels
         
         // Custom field definitions
         public List<TaskCustomField> CustomFields { get; set; } = new();
+
+        // ✅ User's permissions for this board
+        public BoardPermission? UserPermissions { get; set; }
     }
 }

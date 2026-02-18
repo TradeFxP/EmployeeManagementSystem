@@ -737,7 +737,7 @@
 
     // open add column modal (admin only)
     function openAddColumnModal(teamName) {
-        if (!__isTasksAdmin) return;
+        if (!__isTasksAdmin && (!window.boardPermissions || !window.boardPermissions.canAddColumn)) return;
         document.getElementById("addColumnTeam").value = teamName;
         document.getElementById("newColumnName").value = "";
 
@@ -747,7 +747,7 @@
 
     // save new column (admin only)
     document.getElementById('addColumnSubmit')?.addEventListener('click', function () {
-        if (!__isTasksAdmin) return;
+        if (!__isTasksAdmin && (!window.boardPermissions || !window.boardPermissions.canAddColumn)) return;
         const team = document.getElementById('addColumnTeam').value;
         const columnName = document.getElementById('newColumnName').value.trim();
         if (!columnName) { alert('Column name is required'); return; }
@@ -782,10 +782,30 @@
 <script src="~/js/taskHistory.js"></script>
 <script src="~/js/column_filter.js"></script>
 <script src="~/js/index_ui.js"></script>
+<script src="~/js/board-permissions.js"></script>
 
     <script>
+        function syncBoardPermissions() {
+            const board = document.getElementById('kanbanBoard');
+            if (!board) {
+                console.warn("Kanban board not found for permission sync");
+                return;
+            }
+
+            window.boardPermissions = {
+                canAddColumn: board.dataset.permAddCol === 'true',
+                canRenameColumn: board.dataset.permRenameCol === 'true',
+                canReorderColumns: board.dataset.permReorderCols === 'true',
+                canDeleteColumn: board.dataset.permDeleteCol === 'true',
+                canEditAllFields: board.dataset.permEditTasks === 'true',
+                canDeleteTask: board.dataset.permDeleteTask === 'true',
+                canReviewTask: board.dataset.permReviewTask === 'true'
+            };
+            console.log("Board permissions synced from DOM:", window.boardPermissions);
+        }
+
            function enableColumnDrag() {
-        if (!__isTasksAdmin) return;
+        if (!__isTasksAdmin && (!window.boardPermissions || !window.boardPermissions.canReorderColumns)) return;
 
         const board = document.querySelector('#kanbanBoard');
         if (!board) {
@@ -836,7 +856,7 @@
 // Removed duplicate definitions to avoid function override/conflict
 
         function startRename(columnId) {
-            if (!__isTasksAdmin) return;
+            if (!__isTasksAdmin && (!window.boardPermissions || !window.boardPermissions.canRenameColumn)) return;
             document.getElementById(`column-title-${columnId}`).style.display = 'none';
             document.getElementById(`column-rename-${columnId}`).style.display = 'flex';
         }
@@ -847,7 +867,7 @@
         }
 
         function saveColumnName(columnId) {
-            if (!__isTasksAdmin) return;
+            if (!__isTasksAdmin && (!window.boardPermissions || !window.boardPermissions.canRenameColumn)) return;
             const input = document.getElementById(`column-input-${columnId}`);
             const newName = input?.value?.trim();
             if (!newName) { alert('Column name required'); return; }
@@ -864,7 +884,7 @@
         }
 
         function confirmDeleteColumn(columnId) {
-            if (!__isTasksAdmin) return;
+            if (!__isTasksAdmin && (!window.boardPermissions || !window.boardPermissions.canDeleteColumn)) return;
             if (!confirm('Delete this column?')) return;
             fetch('/Tasks/DeleteColumn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId }) })
                 .then(res => { if (!res.ok) return res.text().then(t => { throw new Error(t); }); return res.text(); })
@@ -873,41 +893,57 @@
         }
     </script>
 
-        <script>
-                  function loadTeamBoard(team) {
-        // ✅ SAVE CURRENT TEAM
-        currentTeamName = team;
+    <script>
+        // ✅ GLOBAL STATE FOR TASK BOARDS
+        window.currentTeamName = "";
 
-        const container = document.getElementById('taskBoardContainer');
-        container.innerHTML = "<div class='text-muted p-3'>Loading...</div>";
+        function loadTeamBoard(team) {
+            // ✅ SAVE CURRENT TEAM
+            window.currentTeamName = team;
 
-        fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
-            .then(res => {
-                if (!res.ok) throw new Error("Failed to load board");
-                return res.text();
-            })
-            .then(html => {
-                container.innerHTML = html;
+            const container = document.getElementById('taskBoardContainer');
+            container.innerHTML = "<div class='text-center py-5'><div class='spinner-border text-info mb-2'></div><br><span class='text-muted'>Loading board...</span></div>";
 
-                // highlight active team button
-                document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll(`.team-btn[data-team]`).forEach(b => {
-                    if (b.dataset.team === team) b.classList.add('active');
+            fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("Failed to load board");
+                    return res.text();
+                })
+                .then(html => {
+                    container.innerHTML = html;
+
+                    // highlight active team button
+                    document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll(`.team-btn[data-team]`).forEach(b => {
+                        if (b.dataset.team === team) b.classList.add('active');
+                    });
+
+                    // Execute scripts from the dynamically loaded content
+                    const scripts = container.querySelectorAll('script');
+                    scripts.forEach(script => {
+                        const newScript = document.createElement('script');
+                        if (script.src) {
+                            newScript.src = script.src;
+                        } else {
+                            newScript.textContent = script.textContent;
+                        }
+                        document.body.appendChild(newScript);
+                        // Remove after execution to avoid duplicates if re-rendered
+                        setTimeout(() => newScript.remove(), 100);
+                    });
+
+                    if (typeof enableColumnDrag === "function") {
+                        syncBoardPermissions();
+                        enableColumnDrag();
+                        enableTaskDragDrop();
+                    }
+                })
+                .catch(err => {
+                    container.innerHTML = "<div class='text-danger p-4'>Error loading board. Please try again.</div>";
+                    console.error(err);
                 });
-
-                if (typeof enableColumnDrag === "function") {
-                    enableColumnDrag();
-                    enableTaskDragDrop();
-                }
-            })
-            .catch(err => {
-                container.innerHTML = "<div class='text-danger'>Error loading board</div>";
-                console.error(err);
-            });
-    }
- 
-
-        </script>
+        }
+    </script>
 
 <script>
     function focusColumn(columnId) {
@@ -1419,9 +1455,11 @@
                         return false;
                     }
 
-                    // Block: Non-admin to completed
+                    // Block: Non-admin to completed (unless has review permission)
                     if (colName === 'completed' && role !== 'Admin') {
-                        return false;
+                        if (!window.boardPermissions || !window.boardPermissions.canReviewTask) {
+                            return false;
+                        }
                     }
 
                     return true;
@@ -1434,8 +1472,8 @@
                     const colName = targetColumn?.dataset.columnName?.toLowerCase().trim();
 
                     // Revalidate restrictions
-                    if (colName === 'history' || (colName === 'completed' && role !== 'Admin')) {
-                        showToast(colName === 'history' ? '📋 History is read-only.' : '🔒 Only admins can move tasks to Completed.', 'warning');
+                    if (colName === 'history' || (colName === 'completed' && role !== 'Admin' && (!window.boardPermissions || !window.boardPermissions.canReviewTask))) {
+                        showToast(colName === 'history' ? '📋 History is read-only.' : '🔒 Only authorized reviewers or admins can move tasks to Completed.', 'warning');
                         loadTeamBoard(currentTeamName);
                         return;
                     }
