@@ -87,6 +87,12 @@
                                                 onclick="loadReports('@user.Id'); event.stopPropagation();">
                                             📊
                                         </button>
+                                        @if (currentRole == "Admin")
+                                        {
+                                            <button class="action-btn role-change-btn"
+                                                    title="Change Role"
+                                                    onclick="openRoleModal('@user.Id','@user.Name','User'); event.stopPropagation();">🔄</button>
+                                        }
                                     </div>
                                 </div>
                             </div>
@@ -123,6 +129,9 @@
                                 @if (currentRole == "Admin")
                                 {
                                     <button class="action-btn" onclick="openDeleteModal('@manager.Id','@manager.Name','Manager'); event.stopPropagation();">🗑</button>
+                                    <button class="action-btn role-change-btn"
+                                            title="Change Role"
+                                            onclick="openRoleModal('@manager.Id','@manager.Name','Manager'); event.stopPropagation();">🔄</button>
                                 }
                                 <button class="action-btn" onclick="loadReports('@manager.Id'); event.stopPropagation();">📊</button>
                             </div>
@@ -218,6 +227,9 @@
                                                             onclick="openDeleteModal('@subMgr.Id','@subMgr.Name','SubManager'); event.stopPropagation();">
                                                         🗑
                                                     </button>
+                                                    <button class="action-btn role-change-btn"
+                                                            title="Change Role"
+                                                            onclick="openRoleModal('@subMgr.Id','@subMgr.Name','SubManager'); event.stopPropagation();">🔄</button>
                                                 }
 
                                                 <button class="action-btn"
@@ -260,6 +272,9 @@
                                                             @if (currentRole == "Admin")
                                                             {
                                                                 <button class="action-btn" onclick="openDeleteModal('@smUser.Id','@smUser.Name','User'); event.stopPropagation();">🗑</button>
+                                                                <button class="action-btn role-change-btn"
+                                                                        title="Change Role"
+                                                                        onclick="openRoleModal('@smUser.Id','@smUser.Name','User'); event.stopPropagation();">🔄</button>
                                                             }
                                                             <button class="action-btn" onclick="loadReports('@smUser.Id'); event.stopPropagation();">📊</button>
                                                         </div>
@@ -291,3 +306,55 @@
         </div>
     </div>
 </div>
+
+@if (currentRole == "Admin")
+{
+<!-- ================= ROLE CHANGE MODAL (OrgChart) ================= -->
+<div class="modal fade" id="roleChangeModal" tabindex="-1" aria-labelledby="roleChangeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:12px; overflow:hidden;">
+            <div class="modal-header" style="background: linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff;">
+                <h5 class="modal-title" id="roleChangeModalLabel">🔄 Change Role</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="rcUserId" />
+                <p class="mb-3">
+                    Changing role for: <strong id="rcUserName"></strong>
+                    <span class="badge ms-2" id="rcCurrentRoleBadge"></span>
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">New Role</label>
+                    <select id="rcNewRole" class="form-select" onchange="onRoleModalRoleChange()">
+                        <option value="">-- Select Role --</option>
+                        <option value="Manager">Manager (Top-level)</option>
+                        <option value="SubManager">Sub-Manager (under a Manager)</option>
+                        <option value="User">User</option>
+                    </select>
+                </div>
+
+                <div class="mb-3" id="rcParentBlock" style="display:none;">
+                    <label class="form-label fw-semibold">Parent Manager</label>
+                    <select id="rcParentId" class="form-select">
+                        <option value="">-- Select Manager --</option>
+                        @{
+                            var allMgrs = ViewBag.Managers as List<UserRoles.Models.Users> ?? new List<UserRoles.Models.Users>();
+                        }
+                        @foreach (var m in allMgrs)
+                        {
+                            <option value="@m.Id">@m.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div id="rcError" class="alert alert-danger d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="rcSaveBtn" onclick="submitRoleChange()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+}

@@ -1008,6 +1008,112 @@ namespace UserRoles.Controllers
             return Ok();            
         }
 
+        // ================= CHANGE ROLE (Admin Only) =================
+        /// <summary>
+        /// Allows Admin to change a user's role between User, Manager, and SubManager.
+        /// Updates both Identity roles and the ParentUserId/ManagerId hierarchy fields.
+        /// Returns JSON { success, message } for AJAX.
+        /// </summary>
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        [IgnoreAntiforgeryToken]
+        public async Task<IActionResult> ChangeRole(
+            [FromBody] ChangeRoleRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.UserId))
+                return BadRequest(new { success = false, message = "Invalid request." });
+
+            var user = await _userManager.FindByIdAsync(request.UserId);
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found." });
+
+            // Safety: never change Admin role
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            if (currentRoles.Contains("Admin"))
+                return BadRequest(new { success = false, message = "Cannot change the Admin role." });
+
+            string newRole = (request.NewRole ?? "").Trim();
+            if (newRole != "Manager" && newRole != "SubManager" && newRole != "User")
+                return BadRequest(new { success = false, message = "Invalid role specified." });
+
+            // ── 1. Remove all existing roles ──────────────────────────────
+            if (currentRoles.Any())
+                await _userManager.RemoveFromRolesAsync(user, currentRoles);
+
+            // ── 2. Assign new Identity role ───────────────────────────────
+            // SubManager uses Identity role "Manager" (same permissions level)
+            string identityRole = (newRole == "SubManager") ? "Manager" : newRole;
+
+            if (!await _roleManager.RoleExistsAsync(identityRole))
+                await _roleManager.CreateAsync(new IdentityRole(identityRole));
+
+            await _userManager.AddToRoleAsync(user, identityRole);
+
+            // ── 3. Update hierarchy fields ────────────────────────────────
+            if (newRole == "Manager")
+            {
+                // Promote to top-level Manager (directly under Admin)
+                user.ParentUserId = null;
+                user.ManagerId = null;
+            }
+            else if (newRole == "SubManager")
+            {
+                // Must have a parent manager
+                string? parentId = request.ParentId;
+
+                if (string.IsNullOrWhiteSpace(parentId))
+                {
+                    // Attempt to find a default manager
+                    var defaultManager = (await _userManager.GetUsersInRoleAsync("Manager"))
+                        .FirstOrDefault(m => m.Id != user.Id && string.IsNullOrEmpty(m.ParentUserId));
+
+                    if (defaultManager == null)
+                        return BadRequest(new { success = false, message = "No available top-level manager found to assign as parent." });
+
+                    parentId = defaultManager.Id;
+                }
+
+                var parent = await _userManager.FindByIdAsync(parentId);
+                if (parent == null)
+                    return BadRequest(new { success = false, message = "Parent manager not found." });
+
+                user.ParentUserId = parentId;
+                user.ManagerId = parentId;
+            }
+            else // User
+            {
+                // Keep existing parent if present; otherwise leave under Admin (null)
+                // (Admin can reassign via drag-drop or Assign To button)
+            }
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+                return BadRequest(new { success = false, message = errors });
+            }
+
+            // ── 4. Refresh security stamp so session tokens are invalidated ──
+            await _userManager.UpdateSecurityStampAsync(user);
+
+            string displayRole = newRole == "SubManager" ? "Sub-Manager" : newRole;
+            return Ok(new { success = true, message = $"Role changed to {displayRole} successfully." });
+        }
+
+        // DTO for ChangeRole body
+        public class ChangeRoleRequest
+        {
+            public string UserId { get; set; } = "";
+            public string NewRole { get; set; } = "";
+            public string? ParentId { get; set; }
+        }
+
+        public class MoveOrgNodeRequest
+        {
+            public string UserId { get; set; }
+            public string NewParentId { get; set; }
+        }
+
         //// ================= REASSIGN USER =================
         //[Authorize(Roles = "Admin")]
         //[HttpPost]
