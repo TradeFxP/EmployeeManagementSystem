@@ -688,6 +688,132 @@ window.showOrgToast = showOrgToast;
 
 })();
 
+// ===============================
+// ROLE CHANGE MODAL
+// ===============================
+
+/**
+ * Opens the role change modal for a given user.
+ * @param {string} userId
+ * @param {string} userName
+ * @param {string} currentRole  "User" | "Manager" | "SubManager"
+ */
+window.openRoleModal = function (userId, userName, currentRole) {
+    try {
+        const modalEl = document.getElementById('roleChangeModal');
+        if (!modalEl) {
+            console.warn('roleChangeModal not found');
+            return;
+        }
+
+        // Populate hidden fields
+        document.getElementById('rcUserId').value = userId;
+        document.getElementById('rcUserName').innerText = userName;
+
+        // Badge colour
+        const badge = document.getElementById('rcCurrentRoleBadge');
+        if (badge) {
+            const colours = { User: 'bg-info', Manager: 'bg-success', SubManager: 'bg-warning text-dark' };
+            badge.className = 'badge ms-2 ' + (colours[currentRole] || 'bg-secondary');
+            badge.innerText = currentRole === 'SubManager' ? 'Sub-Manager' : currentRole;
+        }
+
+        // Build role options excluding current role
+        const roleSelect = document.getElementById('rcNewRole');
+        if (roleSelect) {
+            roleSelect.innerHTML = '<option value="">-- Select New Role --</option>';
+            const allRoles = [
+                { value: 'Manager', label: 'Manager (Top-level)' },
+                { value: 'SubManager', label: 'Sub-Manager (under a Manager)' },
+                { value: 'User', label: 'User' }
+            ];
+            allRoles.forEach(r => {
+                if (r.value !== currentRole) {
+                    const opt = document.createElement('option');
+                    opt.value = r.value;
+                    opt.text = r.label;
+                    roleSelect.appendChild(opt);
+                }
+            });
+        }
+
+        // Hide parent block initially
+        const parentBlock = document.getElementById('rcParentBlock');
+        if (parentBlock) parentBlock.style.display = 'none';
+
+        // Clear error
+        const errEl = document.getElementById('rcError');
+        if (errEl) errEl.classList.add('d-none');
+
+        new bootstrap.Modal(modalEl).show();
+    } catch (ex) {
+        console.error('openRoleModal error', ex);
+    }
+};
+
+/** Show/hide parent manager selector based on selected new role */
+window.onRoleModalRoleChange = function () {
+    const newRole = document.getElementById('rcNewRole')?.value;
+    const parentBlock = document.getElementById('rcParentBlock');
+    if (parentBlock) {
+        parentBlock.style.display = (newRole === 'SubManager') ? 'block' : 'none';
+    }
+};
+
+/** Submit the role change via AJAX */
+window.submitRoleChange = async function () {
+    const userId = document.getElementById('rcUserId')?.value;
+    const newRole = document.getElementById('rcNewRole')?.value;
+    const parentId = document.getElementById('rcParentId')?.value || null;
+    const errEl = document.getElementById('rcError');
+    const saveBtn = document.getElementById('rcSaveBtn');
+
+    if (!userId || !newRole) {
+        if (errEl) { errEl.innerText = 'Please select a role.'; errEl.classList.remove('d-none'); }
+        return;
+    }
+
+    if (newRole === 'SubManager' && !parentId) {
+        if (errEl) { errEl.innerText = 'Please select a parent manager.'; errEl.classList.remove('d-none'); }
+        return;
+    }
+
+    if (errEl) errEl.classList.add('d-none');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = 'Saving...'; }
+
+    try {
+        const res = await fetch('/Users/ChangeRole', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, newRole, parentId })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            // Close modal
+            const modalEl = document.getElementById('roleChangeModal');
+            const bsModal = bootstrap.Modal.getInstance(modalEl);
+            if (bsModal) bsModal.hide();
+
+            // Toast + reload
+            showOrgToast(data.message || 'Role changed successfully.', 'success', 4000);
+            setTimeout(() => location.reload(), 800);
+        } else {
+            if (errEl) {
+                errEl.innerText = data.message || 'Failed to change role.';
+                errEl.classList.remove('d-none');
+            }
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = 'Save Changes'; }
+        }
+    } catch (ex) {
+        console.error('submitRoleChange error', ex);
+        if (errEl) { errEl.innerText = 'Unexpected error. Please try again.'; errEl.classList.remove('d-none'); }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = 'Save Changes'; }
+    }
+};
+
+
 
 
 // ===============================
