@@ -255,28 +255,48 @@
                 <div class="modal-body">
                     <input type="hidden" id="taskColumnId" />
 
-                    <div class="mb-3">
+                    <div class="mb-3" id="groupCreateTaskTitle">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0">Title</label>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Focus title" onclick="document.getElementById('taskTitle').focus();">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-link text-danger p-0" title="Clear title" onclick="document.getElementById('taskTitle').value='';">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
+                            <label class="form-label mb-0" id="labelCreateTaskTitle">Title</label>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Title" onclick="renameField('labelCreateTaskTitle')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Title" onclick="hideField('groupCreateTaskTitle')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
                         </div>
                         <input type="text" id="taskTitle" class="form-control" required />
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea id="taskDescription" class="form-control"></textarea>
+                    <div class="mb-3" id="groupCreateTaskDescription">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0" id="labelCreateTaskDescription">Description</label>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Description" onclick="renameField('labelCreateTaskDescription')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Description" onclick="hideField('groupCreateTaskDescription')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                        </div>
+                        <textarea id="taskDescription" class="form-control" rows="3"></textarea>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">Priority</label>
+                    <div class="mb-3" id="groupCreateTaskPriority">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0" id="labelCreateTaskPriority">Priority</label>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Priority" onclick="renameField('labelCreateTaskPriority')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Priority" onclick="hideField('groupCreateTaskPriority')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                        </div>
                         <select id="taskPriority" class="form-select">
                             <option value="0">Low</option>
                             <option value="1" selected>Medium</option>
@@ -299,7 +319,7 @@
                 </div>
 
                 <div class="modal-footer">
-                    @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager"))
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                     {
                         <button class="btn btn-sm btn-outline-secondary me-auto" onclick="openManageFieldsModal(); event.preventDefault();">
                             <i class="bi bi-gear"></i> Manage Fields
@@ -326,19 +346,49 @@
                 <div class="modal-body">
                     <input type="hidden" id="editTaskId" />
 
-                    <div class="mb-3">
-                        <label class="form-label">Title</label>
+                    <div class="mb-3" id="groupEditTaskTitle">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0" id="labelEditTaskTitle">Title</label>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Title" onclick="renameField('labelEditTaskTitle')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Title" onclick="hideField('groupEditTaskTitle')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                        </div>
                         <input type="text" id="editTaskTitle" class="form-control" required />
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
+                    <div class="mb-3" id="groupEditTaskDescription">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0" id="labelEditTaskDescription">Description</label>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Description" onclick="renameField('labelEditTaskDescription')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Description" onclick="hideField('groupEditTaskDescription')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                        </div>
                         <textarea id="editTaskDescription" class="form-control" rows="4"></textarea>
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Priority</label>
+                        <div class="col-md-6 mb-3" id="groupEditTaskPriority">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0" id="labelEditTaskPriority">Priority</label>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Priority" onclick="renameField('labelEditTaskPriority')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-link text-danger p-0" title="Delete Priority" onclick="hideField('groupEditTaskPriority')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                            </div>
                             <select id="editTaskPriority" class="form-select">
                                 <option value="0">Low</option>
                                 <option value="1">Medium</option>
@@ -346,8 +396,18 @@
                                 <option value="3">Critical</option>
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Assign To</label>
+                        <div class="col-md-6 mb-3" id="groupEditTaskAssignTo">
+                             <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0" id="labelEditTaskAssignTo">Assign To</label>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Assign To" onclick="renameField('labelEditTaskAssignTo')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-link text-danger p-0" title="Delete Assign To" onclick="hideField('groupEditTaskAssignTo')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                            </div>
                             <select id="editTaskAssignedTo" class="form-select">
                                 <option value="">-- Unassigned --</option>
                                 @if (Model != null && Model.AssignableUsers != null)
@@ -475,6 +535,7 @@
                                 <option value="Text">Text</option>
                                 <option value="Number">Number</option>
                                 <option value="Date">Date</option>
+                                <option value="DateTime">Date & Time</option>
                             </select>
                         </div>
                         <div class="col-md-3 d-flex align-items-end">
@@ -522,7 +583,7 @@
 <script>
     // Define admin status for JS
     const isAdmin = @(User.IsInRole("Admin") ? "true" : "false");
-    const isManager = @((User.IsInRole("Manager") || User.IsInRole("SubManager")) ? "true" : "false");
+    const isManager = @((User.IsInRole("Manager") || User.IsInRole("Sub-Manager")) ? "true" : "false");
     window.isAdmin = isAdmin;
     console.log("Admin status loaded:", window.isAdmin);
 </script>
@@ -1513,6 +1574,76 @@
             }
         });
     }
+
+    // ===== PERSISTENT FIELD SETTINGS (Title, Description, etc.) =====
+    const EMS_FIELD_SETTINGS = 'EMS_Field_Settings';
+
+    function getFieldSettings() {
+        const settings = localStorage.getItem(EMS_FIELD_SETTINGS);
+        return settings ? JSON.parse(settings) : { hidden: [], names: {} };
+    }
+
+    function saveFieldSettings(settings) {
+        localStorage.setItem(EMS_FIELD_SETTINGS, JSON.stringify(settings));
+    }
+
+    function applyFieldSettings() {
+        const settings = getFieldSettings();
+        console.log("Applying field settings:", settings);
+        
+        // Apply hidden states
+        (settings.hidden || []).forEach(groupId => {
+            const el = document.getElementById(groupId);
+            if (el) el.style.display = 'none';
+        });
+
+        // Apply custom names
+        for (const [labelId, name] of Object.entries(settings.names || {})) {
+            const el = document.getElementById(labelId);
+            if (el) {
+                const isRequired = el.textContent.includes('*');
+                el.textContent = name + (isRequired ? ' *' : '');
+            }
+        }
+    }
+
+    function renameField(labelId) {
+        const labelEl = document.getElementById(labelId);
+        if (!labelEl) return;
+        const currentName = labelEl.textContent.replace(' *', '').trim();
+        const newName = prompt("Rename field:", currentName);
+        
+        if (newName !== null && newName.trim() !== "" && newName !== currentName) {
+            const name = newName.trim();
+            const isRequired = labelEl.textContent.includes('*');
+            labelEl.textContent = name + (isRequired ? ' *' : '');
+
+            // Persist
+            const settings = getFieldSettings();
+            settings.names[labelId] = name;
+            saveFieldSettings(settings);
+        }
+    }
+
+    function hideField(groupId) {
+        if (!confirm("Are you sure you want to delete this field from view? This will be saved in your browser.")) return;
+        const groupEl = document.getElementById(groupId);
+        if (groupEl) {
+            groupEl.style.display = 'none';
+
+            // Persist
+            const settings = getFieldSettings();
+            if (!settings.hidden.includes(groupId)) {
+                settings.hidden.push(groupId);
+            }
+            saveFieldSettings(settings);
+        }
+    }
+
+    // Call on load
+    document.addEventListener('DOMContentLoaded', function() {
+        applyFieldSettings();
+    });
 
     function getCsrfToken() {
         const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');

@@ -604,28 +604,26 @@ public class TasksController : Controller
 
     public class DeleteColumnRequest
     {
-        public int ColumnId { get; set; }
+        public int columnId { get; set; } // Match JS casing precisely or use [JsonPropertyName]
     }
 
     [HttpPost]
     [Authorize]
     public async Task<IActionResult> DeleteColumn([FromBody] DeleteColumnRequest model)
     {
-        if (model == null || model.ColumnId <= 0)
+        if (model == null || model.columnId <= 0)
             return BadRequest("Invalid request");
 
-        var col = await _context.TeamColumns.FindAsync(model.ColumnId);
-        if (col == null) return NotFound();
+        var hasAnyTasks = await _context.TaskItems.AnyAsync(t => t.ColumnId == model.columnId);
+        if (hasAnyTasks)
+            return BadRequest("Move all tasks (including archived) before deleting column");
 
-        if (!await AuthorizeBoardAction(col.TeamName, "DeleteColumn"))
-            return Forbid();
-
-        var hasTasks = await _context.TaskItems.AnyAsync(t => t.ColumnId == model.ColumnId);
+        var col = await _context.TeamColumns.FindAsync(model.columnId);
         if (col == null)
             return NotFound();
 
         _context.TeamColumns.Remove(col);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return Ok();
     }
@@ -959,7 +957,7 @@ public class TasksController : Controller
             .Include(t => t.AssignedByUser)
             .Include(t => t.ReviewedByUser)
             .Include(t => t.CompletedByUser)
-            .Include(t => t.CustomFieldValues)
+            .Include(t => t.CustomFieldValues.Where(cv => cv.Field.IsActive))
                 .ThenInclude(v => v.Field)
             .FirstOrDefaultAsync(t => t.Id == id && t.IsArchived);
 
@@ -1083,6 +1081,7 @@ public class TasksController : Controller
     
     [HttpGet]
     [Authorize]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> GetCustomFields()
     {
         var fields = await _context.TaskCustomFields
@@ -1109,7 +1108,7 @@ public class TasksController : Controller
     }
     
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> CreateCustomField([FromBody] CreateFieldRequest model)
     {
         if (string.IsNullOrWhiteSpace(model.FieldName))
@@ -1149,7 +1148,7 @@ public class TasksController : Controller
     }
     
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> UpdateCustomField([FromBody] UpdateFieldRequest model)
     {
         var field = await _context.TaskCustomFields.FindAsync(model.FieldId);
@@ -1171,7 +1170,7 @@ public class TasksController : Controller
     }
     
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> DeleteCustomField([FromBody] int fieldId)
     {
         var field = await _context.TaskCustomFields.FindAsync(fieldId);
@@ -1190,7 +1189,7 @@ public class TasksController : Controller
     }
     
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> ReorderCustomFields([FromBody] List<int> fieldIds)
     {
         if (fieldIds == null || !fieldIds.Any())
@@ -1231,7 +1230,7 @@ public class TasksController : Controller
         if (taskId <= 0) return BadRequest("Invalid task id");
 
         var values = await _context.TaskFieldValues
-            .Where(v => v.TaskId == taskId)
+            .Where(v => v.TaskId == taskId && v.Field.IsActive)
             .Select(v => new { v.FieldId, v.Value })
             .ToListAsync();
 

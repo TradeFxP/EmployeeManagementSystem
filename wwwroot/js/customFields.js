@@ -12,7 +12,7 @@ async function loadCustomFields() {
 
     try {
         console.log('Fetching custom fields from server...');
-        const response = await fetch('/Tasks/GetCustomFields');
+        const response = await fetch(`/Tasks/GetCustomFields?t=${new Date().getTime()}`);
         if (!response.ok) throw new Error('Failed to load custom fields');
 
         window.customFieldsCache = await response.json();
@@ -58,29 +58,31 @@ async function renderCustomFieldInputs(containerId, existingValues = {}) {
         label.htmlFor = `field_${field.id}`;
         header.appendChild(label);
 
-        // Inline Actions
-        const actions = document.createElement('div');
-        actions.className = 'btn-group btn-group-sm';
+        // Inline Actions (All Roles for local customization/UI preference)
+        if (true) {
+            const actions = document.createElement('div');
+            actions.className = 'btn-group btn-group-sm';
 
-        // Rename Button
-        const renameBtn = document.createElement('button');
-        renameBtn.type = 'button';
-        renameBtn.className = 'btn btn-link text-secondary p-0 me-2';
-        renameBtn.innerHTML = '<i class="bi bi-pencil"></i>';
-        renameBtn.title = 'Rename Field';
-        renameBtn.onclick = (e) => { e.preventDefault(); renameCustomField(field.id, field.fieldName); };
-        actions.appendChild(renameBtn);
+            // Rename Button
+            const renameBtn = document.createElement('button');
+            renameBtn.type = 'button';
+            renameBtn.className = 'btn btn-link text-secondary p-0 me-2';
+            renameBtn.innerHTML = '<i class="bi bi-pencil"></i>';
+            renameBtn.title = 'Rename Field';
+            renameBtn.onclick = (e) => { e.preventDefault(); renameCustomField(field.id, field.fieldName); };
+            actions.appendChild(renameBtn);
 
-        // Delete Button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'btn btn-link text-danger p-0';
-        deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-        deleteBtn.title = 'Delete Field';
-        deleteBtn.onclick = (e) => { e.preventDefault(); deleteCustomFieldInline(field.id); }; // Changed function name to avoid conflict
-        actions.appendChild(deleteBtn);
+            // Delete Button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'btn btn-link text-danger p-0';
+            deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+            deleteBtn.title = 'Delete Field';
+            deleteBtn.onclick = (e) => { e.preventDefault(); deleteCustomFieldInline(field.id); };
+            actions.appendChild(deleteBtn);
 
-        header.appendChild(actions);
+            header.appendChild(actions);
+        }
         fieldGroup.appendChild(header);
 
         let input;
@@ -94,6 +96,11 @@ async function renderCustomFieldInputs(containerId, existingValues = {}) {
             case 'Date':
                 input = document.createElement('input');
                 input.type = 'date';
+                input.className = 'form-control';
+                break;
+            case 'DateTime':
+                input = document.createElement('input');
+                input.type = 'datetime-local';
                 input.className = 'form-control';
                 break;
             case 'Dropdown':
@@ -121,18 +128,20 @@ async function renderCustomFieldInputs(containerId, existingValues = {}) {
         container.appendChild(fieldGroup);
     });
 
-    // Add "Add Field" button at the bottom
-    const addBtnContainer = document.createElement('div');
-    addBtnContainer.className = 'mt-3 pt-2 border-top text-center';
+    // Add "Add Field" button at the bottom (All Roles)
+    {
+        const addBtnContainer = document.createElement('div');
+        addBtnContainer.className = 'mt-3 pt-2 border-top text-center';
 
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'btn btn-sm btn-outline-primary';
-    addBtn.innerHTML = '<i class="bi bi-plus-lg"></i> Add New Field';
-    addBtn.onclick = (e) => { e.preventDefault(); addNewCustomField(); };
-    addBtnContainer.appendChild(addBtn);
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'btn btn-sm btn-outline-primary';
+        addBtn.innerHTML = '<i class="bi bi-plus-lg"></i> Add New Field';
+        addBtn.onclick = (e) => { e.preventDefault(); addNewCustomField(); };
+        addBtnContainer.appendChild(addBtn);
 
-    container.appendChild(addBtnContainer);
+        container.appendChild(addBtnContainer);
+    }
 }
 
 // ================= INLINE CUSTOM FIELD ACTIONS =================
@@ -282,22 +291,21 @@ async function loadFieldsList() {
             return;
         }
 
-        // Check if user is admin
-        const isAdmin = typeof window.isAdmin !== 'undefined' ? window.isAdmin : false;
 
         container.innerHTML = fields.map(f => `
             <div class="field-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded" data-field-id="${f.id}">
                 <div class="flex-grow-1">
                     <strong>${f.fieldName}</strong>
-                    <span class="badge bg-secondary ms-2">${f.fieldType}</span>
+                    <span class="badge bg-secondary ms-2">${f.fieldType === 'DateTime' ? 'Date & Time' : f.fieldType}</span>
                     ${f.isRequired ? '<span class="badge bg-warning text-dark ms-1">Required</span>' : ''}
                 </div>
-                <div>
-                    ${isAdmin ? `
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteField(${f.id}); event.stopPropagation();">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    ` : ''}
+                <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-primary" onclick="changeFieldType(${f.id}, '${f.fieldType}'); event.stopPropagation();" title="Change Type">
+                        <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteField(${f.id}); event.stopPropagation();">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             </div>
         `).join('');
@@ -376,6 +384,48 @@ async function deleteField(fieldId) {
 
     } catch (error) {
         alert('Error deleting field: ' + error.message);
+    }
+}
+
+async function changeFieldType(fieldId, currentType) {
+    const types = ['Text', 'Number', 'Date', 'DateTime'];
+    const typeLabels = { 'Text': 'Text', 'Number': 'Number', 'Date': 'Date', 'DateTime': 'Date & Time' };
+
+    const options = types.map((t, i) => `${i + 1}. ${typeLabels[t]}${t === currentType ? ' (current)' : ''}`).join('\n');
+    const choice = prompt(`Select new field type:\n${options}\n\nEnter number (1-${types.length}):`);
+
+    if (!choice) return;
+
+    const index = parseInt(choice) - 1;
+    if (isNaN(index) || index < 0 || index >= types.length) {
+        alert('Invalid selection');
+        return;
+    }
+
+    const newType = types[index];
+    if (newType === currentType) return;
+
+    try {
+        const response = await fetch('/Tasks/UpdateCustomField', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fieldId: fieldId,
+                fieldType: newType
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to update field type');
+
+        // Clear cache and reload
+        customFieldsCache = null;
+        await loadFieldsList();
+        await renderCustomFieldInputs('customFieldsContainer');
+
+        console.log(`Field type changed to ${newType}`);
+
+    } catch (error) {
+        alert('Error changing field type: ' + error.message);
     }
 }
 
