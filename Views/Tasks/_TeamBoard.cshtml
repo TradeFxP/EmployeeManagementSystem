@@ -18,11 +18,20 @@
     <div class="d-flex gap-2">
         @if (User.IsInRole("Admin"))
         {
+            <button class="btn btn-sm btn-outline-info"
+                    onclick="openBoardPermissionModal('@Model.TeamName')"
+                    title="Manage Board Permissions">
+                <i class="bi bi-shield-lock me-1"></i> Permission
+            </button>
             <button class="btn btn-sm btn-archive-glow"
                     onclick="archiveCompletedTasks('@Model.TeamName')"
                     title="Archive all completed & passed tasks">
                 <i class="bi bi-archive me-1"></i> Archive Completed
             </button>
+        }
+        
+        @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanAddColumn == true))
+        {
             <button class="btn btn-sm btn-add-col"
                     onclick="openAddColumnModal('@Model.TeamName')">
                 <i class="bi bi-plus-lg me-1"></i> Add Column
@@ -73,7 +82,15 @@
 </div>
 
 <!-- KANBAN BOARD -->
-<div class="kanban-board" id="kanbanBoard">
+<div class="kanban-board" id="kanbanBoard"
+     data-team-name="@Model.TeamName"
+     data-perm-add-col="@((Model.UserPermissions?.CanAddColumn ?? false) ? "true" : "false")"
+     data-perm-rename-col="@((Model.UserPermissions?.CanRenameColumn ?? false) ? "true" : "false")"
+     data-perm-reorder-cols="@((Model.UserPermissions?.CanReorderColumns ?? false) ? "true" : "false")"
+     data-perm-delete-col="@((Model.UserPermissions?.CanDeleteColumn ?? false) ? "true" : "false")"
+     data-perm-edit-tasks="@((Model.UserPermissions?.CanEditAllFields ?? false) ? "true" : "false")"
+     data-perm-delete-task="@((Model.UserPermissions?.CanDeleteTask ?? false) ? "true" : "false")"
+     data-perm-review-task="@((Model.UserPermissions?.CanReviewTask ?? false) ? "true" : "false")">
 
     <!-- ================= FOCUSED TASK PANEL ================= -->
     <div id="focusedTaskPanel" class="focused-task-panel d-none">
@@ -161,12 +178,15 @@
                         <i class="bi bi-funnel"></i>
                     </button>
 
-                    <!-- ADMIN ACTIONS -->
-                    @if (User.IsInRole("Admin"))
+                    <!-- ADMIN / GRANTED ACTIONS -->
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanRenameColumn == true))
                     {
                         <button class="header-icon-btn" title="Edit" onclick="startRename(@column.Id); event.stopPropagation();">
                             <i class="bi bi-pencil"></i>
                         </button>
+                    }
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteColumn == true))
+                    {
                         <button class="header-icon-btn text-danger" title="Delete" onclick="confirmDeleteColumn(@column.Id); event.stopPropagation();">
                             <i class="bi bi-trash3"></i>
                         </button>
@@ -359,8 +379,8 @@
                                     <i class="bi bi-person-plus"></i> 
                                 </button>
 
-                                @* ADMIN: Review button in Review column *@
-                                @if (User.IsInRole("Admin") && isReviewCol && isPending)
+                                @* ADMIN / GRANTED: Review button in Review column *@
+                                @if ((User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true)) && isReviewCol && isPending)
                                 {
                                     <button class="action-btn action-btn-warning"
                                             onclick="openReviewModal(@task.Id, '@task.Title.Replace("'", "\\'")'); event.stopPropagation();">
@@ -368,8 +388,8 @@
                                     </button>
                                 }
 
-                                @* ADMIN: Archive button in Completed column *@
-                                @if (User.IsInRole("Admin") && isCompletedCol && isPassed)
+                                @* ADMIN / GRANTED: Archive button in Completed column *@
+                                @if ((User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true)) && isCompletedCol && isPassed)
                                 {
                                     <button class="action-btn action-btn-success"
                                             onclick="archiveSingleTask(@task.Id); event.stopPropagation();">
@@ -382,7 +402,7 @@
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
 
-                                @if (User.IsInRole("Admin"))
+                                @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteTask == true))
                                 {
                                     <button class="action-btn action-btn-danger"
                                             onclick="deleteTask(@task.Id); event.stopPropagation();">
@@ -404,17 +424,38 @@
                 <i class="bi bi-clock-history col-icon me-2"></i>
                 <span class="column-title">History</span>
             </div>
-            <button class="header-icon-btn text-info"
-                    onclick="loadArchivedTasks('@Model.TeamName'); event.stopPropagation();"
-                    title="Refresh history">
-                <i class="bi bi-arrow-clockwise"></i>
-            </button>
+            <div class="d-flex align-items-center gap-1">
+                <!-- FILTER -->
+                <button class="header-icon-btn" title="Filter / Sort"
+                        onclick="toggleColumnFilter('history'); event.stopPropagation();">
+                    <i class="bi bi-funnel"></i>
+                </button>
+            </div>
         </div>
+        <!-- 🔽 COLUMN TOOLBAR -->
+        <div id="column-toolbar-history" class="column-toolbar" style="display:none;">
+            <input type="text" id="search-input-history"
+                   class="form-control form-control-sm mb-2"
+                   placeholder="Search history..."
+                   oninput="applyColumnFilter('history')" />
+            <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-secondary flex-fill"
+                        onclick="setColumnSort('history', 'desc')" id="sort-desc-history" title="Newest First">
+                    <i class="bi bi-sort-down"></i> Newest
+                </button>
+                <button class="btn btn-sm btn-outline-secondary flex-fill"
+                        onclick="setColumnSort('history', 'asc')" id="sort-asc-history" title="Oldest First">
+                    <i class="bi bi-sort-up"></i> Oldest
+                </button>
+            </div>
+        </div>
+
         <div class="kanban-column-body">
-            <div class="kanban-tasks" id="historyTasksList">
+            <div class="kanban-tasks" id="historyTasksList" data-column-id="history">
                 <div class="empty-state">
-                    <i class="bi bi-archive" style="font-size:28px;"></i><br />
-                    <span>Click <i class="bi bi-arrow-clockwise"></i> to load history</span>
+                    <div class="spinner-border spinner-border-sm text-info mb-2"></div>
+                    <br />
+                    <span>Loading history...</span>
                 </div>
             </div>
         </div>
@@ -1053,5 +1094,90 @@
         .board-top-bar {
             flex-wrap: wrap;
         }
+
+        /* Permission Modal Styles */
+        #permissionTable .avatar-sm {
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .bg-soft-primary { background-color: rgba(13, 110, 253, 0.1); color: #0d6efd; }
+        .bg-soft-danger { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
+        .bg-soft-info { background-color: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
+        .bg-soft-success { background-color: rgba(25, 135, 84, 0.1); color: #198754; }
+        .bg-soft-warning { background-color: rgba(255, 193, 7, 0.1); color: #ffc107; }
+        .bg-soft-secondary { background-color: rgba(108, 117, 125, 0.1); color: #6c757d; }
+
+        #permissionTable thead th {
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            background: #f8f9fa;
+        }
+
+        .form-switch .form-check-input {
+            width: 2.5em;
+            height: 1.25em;
+            cursor: pointer;
+        }
+        .form-switch .form-check-input:checked {
+            background-color: #0dcaf0;
+            border-color: #0dcaf0;
+        }
     }
 </style>
+
+<!-- ================= BOARD PERMISSION MODAL ================= -->
+<div class="modal fade" id="boardPermissionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white border-bottom-0">
+                <h5 class="modal-title font-weight-bold"><i class="bi bi-shield-lock-fill me-2 text-info"></i> Board Access Control</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="bg-light p-3 border-bottom">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0 fw-bold text-dark">Team: <span class="text-info">@Model.TeamName</span></h6>
+                            <small class="text-muted">Manage granular board permissions for team members</small>
+                        </div>
+                        <div class="badge bg-soft-info text-info p-2 px-3 rounded-pill border border-info">
+                            <i class="bi bi-people me-1"></i> Permissions
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height: 500px;">
+                    <table class="table table-hover align-middle mb-0" id="permissionTable" style="min-width: 800px;">
+                        <thead class="bg-white sticky-top shadow-sm">
+                            <tr class="text-uppercase small fw-bold text-muted">
+                                <th class="ps-4 border-0 py-3" style="width: 250px;">Member</th>
+                                <th class="border-0 py-3 text-center" title="Add Column">Add Col</th>
+                                <th class="border-0 py-3 text-center" title="Rename Column">Ren Col</th>
+                                <th class="border-0 py-3 text-center" title="Reorder Columns">Reorder</th>
+                                <th class="border-0 py-3 text-center" title="Delete Column">Del Col</th>
+                                <th class="border-0 py-3 text-center" title="Edit All Task Fields">Edit Tasks</th>
+                                <th class="border-0 py-3 text-center" title="Delete Task">Del Task</th>
+                                <th class="border-0 py-3 text-center" title="Review Task">Review</th>
+                            </tr>
+                        </thead>
+                        <tbody id="permissionTableBody" class="border-top-0">
+                            @* Rows loaded via AJAX *@
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 bg-light">
+                <button type="button" class="btn btn-outline-secondary px-4 rounded-pill" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // 🚀 AUTO-LOAD HISTORY
+    (function() {
+        if (typeof loadArchivedTasks === 'function') {
+            loadArchivedTasks('@Model.TeamName');
+        }
+    })();
+</script>

@@ -34,6 +34,9 @@ namespace UserRoles.Data
         // Task History
         public DbSet<TaskHistory> TaskHistories { get; set; }
 
+        // Board Permissions
+        public DbSet<BoardPermission> BoardPermissions { get; set; }
+
         // Email Logs
         public DbSet<EmailLog> EmailLogs { get; set; }
 
@@ -111,6 +114,11 @@ namespace UserRoles.Data
             // Index for archived tasks lookup
             builder.Entity<TaskItem>()
                 .HasIndex(t => new { t.TeamName, t.IsArchived });
+
+            // BoardPermission configuration
+            builder.Entity<BoardPermission>()
+                .HasIndex(p => new { p.UserId, p.TeamName })
+                .IsUnique();
         }
     }
 }
