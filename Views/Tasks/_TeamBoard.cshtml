@@ -231,30 +231,21 @@
                              data-assigned-to-id="@(task.AssignedToUserId ?? "")"
                              data-assigned-by-admin="@(task.AssignedByUser != null && task.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                              data-review-status="@reviewStatusInt"
-                             onclick="focusTask(@task.Id)">
+                             onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@task.Id)">
 
                             <!-- TOP ROW: Priority (left) + Review Status (right) -->
                             <div class="card-top-row">
                                 <span class="priority-pill @priorityBorderClass">@priorityLabel</span>
 
-                                @if (isFailed)
-                                {
-                                    <span class="review-badge review-badge-fail">
-                                        <i class="bi bi-x-circle-fill"></i> FAIL
-                                    </span>
-                                }
-                                else if (isPassed)
-                                {
-                                    <span class="review-badge review-badge-pass">
-                                        <i class="bi bi-check-circle-fill"></i> PASS
-                                    </span>
-                                }
-                                else if (isPending && isReviewCol)
-                                {
-                                    <span class="review-badge review-badge-pending">
-                                        <i class="bi bi-hourglass-split"></i> PENDING
-                                    </span>
-                                }
+                                <span class="review-badge review-badge-fail" style="display: @(isFailed ? "inline-flex" : "none")">
+                                    <i class="bi bi-x-circle-fill"></i> FAIL
+                                </span>
+                                <span class="review-badge review-badge-pass" style="display: @(isPassed ? "inline-flex" : "none")">
+                                    <i class="bi bi-check-circle-fill"></i> PASS
+                                </span>
+                                <span class="review-badge review-badge-pending" style="display: @(isPending && isReviewCol ? "inline-flex" : "none")">
+                                    <i class="bi bi-hourglass-split"></i> PENDING
+                                </span>
                             </div>
 
                             <!-- TITLE -->
@@ -276,7 +267,7 @@
                             @if (task.CustomFieldValues != null && task.CustomFieldValues.Any())
                             {
                                 <div class="custom-fields-summary mt-2">
-                                    @foreach (var fv in task.CustomFieldValues)
+                                    @foreach (var fv in task.CustomFieldValues.Take(2))
                                     {
                                         if (fv.Field == null) continue;
                                         <div class="cf-row">
@@ -348,43 +339,48 @@
 
                             <!-- ⚙️ Actions -->
                             <div class="task-actions mt-2">
-                                <button class="action-btn action-btn-info"
+                                <button class="action-btn action-btn-info" title="View Task History"
                                         onclick="openTaskHistoryModal(@task.Id); event.stopPropagation();">
                                     <i class="bi bi-clock-history"></i>
+                                    
                                 </button>
 
-                                <button class="action-btn action-btn-secondary"
+                                <button class="action-btn action-btn-secondary action-btn-assign" title="Assign Task"
                                         data-task-id="@task.Id"
+                                        style="display: @(!isReviewCol && !isCompletedCol ? "inline-flex" : "none")"
                                         onclick="showAssignUI(@task.Id); event.stopPropagation();">
                                     <i class="bi bi-person-plus"></i> 
                                 </button>
 
-                                @* ADMIN: Review button in Review column *@
-                                @if (User.IsInRole("Admin") && isReviewCol && isPending)
+                                @* ADMIN: Review button - always render for pending tasks, hide if not in Review column *@
+                                @if (User.IsInRole("Admin") && isPending)
                                 {
-                                    <button class="action-btn action-btn-warning"
+                                    <button class="action-btn action-btn-warning action-btn-review" title="Review Task"
+                                            style="display: @(isReviewCol ? "inline-flex" : "none")"
                                             onclick="openReviewModal(@task.Id, '@task.Title.Replace("'", "\\'")'); event.stopPropagation();">
                                         <i class="bi bi-clipboard-check"></i> 
                                     </button>
                                 }
 
-                                @* ADMIN: Archive button in Completed column *@
-                                @if (User.IsInRole("Admin") && isCompletedCol && isPassed)
+                                @* ADMIN: Archive button - always render for passed tasks, hide if not in Completed column *@
+                                @if (User.IsInRole("Admin") && isPassed)
                                 {
-                                    <button class="action-btn action-btn-success"
+                                    <button class="action-btn action-btn-success action-btn-archive" title="Archive Task"
+                                            style="display: @(isCompletedCol ? "inline-flex" : "none")"
                                             onclick="archiveSingleTask(@task.Id); event.stopPropagation();">
                                         <i class="bi bi-archive"></i> 
                                     </button>
                                 }
 
-                                <button class="action-btn action-btn-edit"
+                                <button class="action-btn action-btn-edit" title="Edit Task"
+                                        style="display: @(!isReviewCol && !isCompletedCol ? "inline-flex" : "none")"
                                         onclick="openEditTaskModal(@task.Id); event.stopPropagation();">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
 
                                 @if (User.IsInRole("Admin"))
                                 {
-                                    <button class="action-btn action-btn-danger"
+                                    <button class="action-btn action-btn-danger"title="Delete"
                                             onclick="deleteTask(@task.Id); event.stopPropagation();">
                                         <i class="bi bi-trash3"></i>
                                     </button>
@@ -413,7 +409,7 @@
         <div class="kanban-column-body">
             <div class="kanban-tasks" id="historyTasksList">
                 <div class="empty-state">
-                    <i class="bi bi-archive" style="font-size:28px;"></i><br />
+                    <i class="bi bi-archive" style="font-size:28px;"></i><br/>
                     <span>Click <i class="bi bi-arrow-clockwise"></i> to load history</span>
                 </div>
             </div>

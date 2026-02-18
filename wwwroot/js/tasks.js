@@ -143,102 +143,6 @@ $(document).on("click", ".edit-task", function () {
 });
 
 
-
-let draggedTaskId = null;
-let draggedFromColumnId = null;
-
-// ================= DRAG START =================
-$(document).on("dragstart", ".task-card", function (e) {
-    draggedTaskId = $(this).data("task-id");
-    draggedFromColumnId = $(this).closest('.kanban-column').data('column-id');
-    e.originalEvent.dataTransfer.effectAllowed = "move";
-    e.originalEvent.dataTransfer.setData('text/plain', draggedTaskId);
-});
-
-// ================= ALLOW DROP (with visual feedback) =================
-$(document).on("dragover", ".kanban-column", function (e) {
-    e.preventDefault();
-    const colName = $(this).data('column-name')?.toString().toLowerCase().trim();
-    const role = (typeof currentUserRole !== 'undefined') ? currentUserRole : 'User';
-
-    // If non-admin drags to completed, show blocked cursor
-    if (colName === 'completed' && role !== 'Admin') {
-        e.originalEvent.dataTransfer.dropEffect = 'none';
-        $(this).addClass('drag-blocked').removeClass('drag-over');
-    } else if (colName === 'history') {
-        e.originalEvent.dataTransfer.dropEffect = 'none';
-        $(this).addClass('drag-blocked').removeClass('drag-over');
-    } else {
-        e.originalEvent.dataTransfer.dropEffect = 'move';
-        $(this).addClass('drag-over').removeClass('drag-blocked');
-    }
-});
-
-// ================= DROP =================
-$(document).on("drop", ".kanban-column", function (e) {
-    e.preventDefault();
-    $(this).removeClass('drag-over drag-blocked');
-
-    if (!draggedTaskId) return;
-
-    const targetColumnId = $(this).data("column-id");
-    const targetColumnName = $(this).data('column-name')?.toString().toLowerCase().trim();
-    const role = (typeof currentUserRole !== 'undefined') ? currentUserRole : 'User';
-
-    // BLOCK: History column (no drop allowed)
-    if (targetColumnName === 'history') {
-        showToast('📋 History is read-only. Tasks are moved here via archiving.', 'warning');
-        draggedTaskId = null;
-        return;
-    }
-
-    // BLOCK: Non-admin to completed
-    if (targetColumnName === 'completed' && role !== 'Admin') {
-        showToast('🔒 Only admins can move tasks to the Completed column.', 'warning');
-        draggedTaskId = null;
-        return;
-    }
-
-    // Same column drop — ignore
-    if (targetColumnId === draggedFromColumnId) {
-        draggedTaskId = null;
-        return;
-    }
-
-    // EXECUTE MOVE
-    $.ajax({
-        url: '/Tasks/MoveTask',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({
-            TaskId: draggedTaskId,
-            ColumnId: targetColumnId
-        }),
-        success: function (response) {
-            if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
-                loadTeamBoard(currentTeamName);
-            } else {
-                location.reload();
-            }
-        },
-        error: function (xhr) {
-            const msg = xhr.responseText || 'Move failed';
-            showToast(msg, 'danger');
-        }
-    });
-
-    draggedTaskId = null;
-    draggedFromColumnId = null;
-});
-
-$(document).on("dragenter", ".kanban-column", function () {
-    // handled in dragover
-});
-
-$(document).on("dragleave", ".kanban-column", function () {
-    $(this).removeClass('drag-over drag-blocked');
-});
-
 // ========== NEW TASK CREATION WITH PRIORITY & CUSTOM FIELDS ==========
 
 // Open create task modal
@@ -367,9 +271,10 @@ function confirmAssignTask(taskId) {
     $.post("/Tasks/AssignTask", { taskId: taskId, userId: userId })
         .done(function (response) {
             if (response.success) {
-                const activeTeam = $(".task-link.active").data("url");
-                if (activeTeam) {
-                    $("#taskBoardContainer").load(activeTeam);
+                showToast('✅ Task assigned!', 'success');
+                // Use loadTeamBoard if available, otherwise reload
+                if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
+                    loadTeamBoard(currentTeamName);
                 } else {
                     location.reload();
                 }
