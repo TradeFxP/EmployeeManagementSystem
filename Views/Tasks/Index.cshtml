@@ -937,67 +937,58 @@
 <script>
     function loadTeamBoard(team) {
         // ✅ SAVE CURRENT TEAM
-        currentTeamName = team;
+        window.currentTeamName = team;
 
-        function loadTeamBoard(team) {
-            // ✅ SAVE CURRENT TEAM
-            window.currentTeamName = team;
+        const container = document.getElementById('taskBoardContainer');
+        if (!container) return;
 
-            const container = document.getElementById('taskBoardContainer');
-            container.innerHTML = "<div class='text-center py-5'><div class='spinner-border text-info mb-2'></div><br><span class='text-muted'>Loading board...</span></div>";
+        container.innerHTML = "<div class='text-center py-5'><div class='spinner-border text-info mb-2'></div><br><span class='text-muted'>Loading board...</span></div>";
 
-            fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
-                .then(res => {
-                    if (!res.ok) throw new Error("Failed to load board");
-                    return res.text();
-                })
-                .then(html => {
-                    container.innerHTML = html;
+        fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load board");
+                return res.text();
+            })
+            .then(html => {
+                container.innerHTML = html;
 
-                    // highlight active team button
-                    document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll(`.team-btn[data-team]`).forEach(b => {
-                        if (b.dataset.team === team) b.classList.add('active');
-                    });
-
-                    // Execute scripts from the dynamically loaded content
-                    const scripts = container.querySelectorAll('script');
-                    scripts.forEach(script => {
-                        const newScript = document.createElement('script');
-                        if (script.src) {
-                            newScript.src = script.src;
-                        } else {
-                            newScript.textContent = script.textContent;
-                        }
-                        document.body.appendChild(newScript);
-                        // Remove after execution to avoid duplicates if re-rendered
-                        setTimeout(() => newScript.remove(), 100);
-                    });
-
-                    if (typeof enableColumnDrag === "function") {
-                        syncBoardPermissions();
-                        enableColumnDrag();
-                        enableTaskDragDrop();
-                    }
-                })
-                .catch(err => {
-                    container.innerHTML = "<div class='text-danger p-4'>Error loading board. Please try again.</div>";
-                    console.error(err);
+                // highlight active team button
+                document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll(`.team-btn[data-team]`).forEach(b => {
+                    if (b.dataset.team === team) b.classList.add('active');
                 });
 
+                // Execute scripts from the dynamically loaded content
+                const scripts = container.querySelectorAll('script');
+                scripts.forEach(script => {
+                    const newScript = document.createElement('script');
+                    if (script.src) {
+                        newScript.src = script.src;
+                    } else {
+                        newScript.textContent = script.textContent;
+                    }
+                    document.body.appendChild(newScript);
+                    // Remove after execution to avoid duplicates if re-rendered
+                    setTimeout(() => newScript.remove(), 100);
+                });
+
+                if (typeof syncBoardPermissions === "function") {
+                    syncBoardPermissions();
+                }
                 if (typeof enableColumnDrag === "function") {
                     enableColumnDrag();
+                }
+                if (typeof enableTaskDragDrop === "function") {
                     enableTaskDragDrop();
                 }
             })
             .catch(err => {
-                container.innerHTML = "<div class='text-danger'>Error loading board</div>";
+                container.innerHTML = "<div class='text-danger p-4'>Error loading board. Please try again.</div>";
                 console.error(err);
             });
     }
-
-
 </script>
+
 
 <script>
     function focusColumn(columnId) {
