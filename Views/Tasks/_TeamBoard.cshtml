@@ -103,7 +103,12 @@
             </div>
             <div class="mb-3">
                 <label class="form-label">Description</label>
-                <textarea id="focusedTaskDescription" class="form-control" rows="4"></textarea>
+                <div class="input-group">
+                    <textarea id="focusedTaskDescription" class="form-control" rows="4"></textarea>
+                    <button type="button" class="btn btn-outline-danger" onclick="clearFocusedDescription()">
+                        <id class="bi bi-trash"></id>
+                    </button>
+                </div>
             </div>
             <div class="mb-3">
                 <label class="form-label">Assign to</label>
@@ -251,30 +256,21 @@
                              data-assigned-to-id="@(task.AssignedToUserId ?? "")"
                              data-assigned-by-admin="@(task.AssignedByUser != null && task.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
                              data-review-status="@reviewStatusInt"
-                             onclick="focusTask(@task.Id)">
+                             onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@task.Id)">
 
                             <!-- TOP ROW: Priority (left) + Review Status (right) -->
                             <div class="card-top-row">
                                 <span class="priority-pill @priorityBorderClass">@priorityLabel</span>
 
-                                @if (isFailed)
-                                {
-                                    <span class="review-badge review-badge-fail">
-                                        <i class="bi bi-x-circle-fill"></i> FAIL
-                                    </span>
-                                }
-                                else if (isPassed)
-                                {
-                                    <span class="review-badge review-badge-pass">
-                                        <i class="bi bi-check-circle-fill"></i> PASS
-                                    </span>
-                                }
-                                else if (isPending && isReviewCol)
-                                {
-                                    <span class="review-badge review-badge-pending">
-                                        <i class="bi bi-hourglass-split"></i> PENDING
-                                    </span>
-                                }
+                                <span class="review-badge review-badge-fail" style="display: @(isFailed ? "inline-flex" : "none")">
+                                    <i class="bi bi-x-circle-fill"></i> FAIL
+                                </span>
+                                <span class="review-badge review-badge-pass" style="display: @(isPassed ? "inline-flex" : "none")">
+                                    <i class="bi bi-check-circle-fill"></i> PASS
+                                </span>
+                                <span class="review-badge review-badge-pending" style="display: @(isPending && isReviewCol ? "inline-flex" : "none")">
+                                    <i class="bi bi-hourglass-split"></i> PENDING
+                                </span>
                             </div>
 
                             <!-- TITLE -->
@@ -296,20 +292,26 @@
                             @if (task.CustomFieldValues != null && task.CustomFieldValues.Any())
                             {
                                 <div class="custom-fields-summary mt-2">
-                                    @foreach (var fv in task.CustomFieldValues)
+                                    @foreach (var fv in task.CustomFieldValues.Take(2))
                                     {
-                                        if (fv.Field == null) continue;
-                                        <div class="cf-row">
-                                            <span class="cf-label">@fv.Field.FieldName:</span>
-                                            @if (fv.Field.FieldType == "Date" && DateTime.TryParse(fv.Value, out var sd))
-                                            {
-                                                <span>@sd.ToString("dd MMM yyyy")</span>
-                                            }
-                                            else
-                                            {
-                                                <span>@fv.Value</span>
-                                            }
-                                        </div>
+                                        @if (fv.Field != null && fv.Field.IsActive)
+                                        {
+                                            <div class="cf-row">
+                                                <span class="cf-label">@fv.Field.FieldName:</span>
+                                                @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
+                                                {
+                                                    <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
+                                                }
+                                                else if (fv.Field.FieldType == "Date" && DateTime.TryParse(fv.Value, out var sd))
+                                                {
+                                                    <span>@sd.ToString("dd MMM yyyy")</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>@fv.Value</span>
+                                                }
+                                            </div>
+                                        }
                                     }
                                 </div>
                             }
@@ -368,13 +370,15 @@
 
                             <!-- ⚙️ Actions -->
                             <div class="task-actions mt-2">
-                                <button class="action-btn action-btn-info"
+                                <button class="action-btn action-btn-info" title="View Task History"
                                         onclick="openTaskHistoryModal(@task.Id); event.stopPropagation();">
                                     <i class="bi bi-clock-history"></i>
+                                    
                                 </button>
 
-                                <button class="action-btn action-btn-secondary"
+                                <button class="action-btn action-btn-secondary action-btn-assign" title="Assign Task"
                                         data-task-id="@task.Id"
+                                        style="display: @(!isReviewCol && !isCompletedCol ? "inline-flex" : "none")"
                                         onclick="showAssignUI(@task.Id); event.stopPropagation();">
                                     <i class="bi bi-person-plus"></i> 
                                 </button>
@@ -382,7 +386,8 @@
                                 @* ADMIN / GRANTED: Review button in Review column *@
                                 @if ((User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true)) && isReviewCol && isPending)
                                 {
-                                    <button class="action-btn action-btn-warning"
+                                    <button class="action-btn action-btn-warning action-btn-review" title="Review Task"
+                                            style="display: @(isReviewCol ? "inline-flex" : "none")"
                                             onclick="openReviewModal(@task.Id, '@task.Title.Replace("'", "\\'")'); event.stopPropagation();">
                                         <i class="bi bi-clipboard-check"></i> 
                                     </button>
@@ -391,20 +396,22 @@
                                 @* ADMIN / GRANTED: Archive button in Completed column *@
                                 @if ((User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true)) && isCompletedCol && isPassed)
                                 {
-                                    <button class="action-btn action-btn-success"
+                                    <button class="action-btn action-btn-success action-btn-archive" title="Archive Task"
+                                            style="display: @(isCompletedCol ? "inline-flex" : "none")"
                                             onclick="archiveSingleTask(@task.Id); event.stopPropagation();">
                                         <i class="bi bi-archive"></i> 
                                     </button>
                                 }
 
-                                <button class="action-btn action-btn-edit"
+                                <button class="action-btn action-btn-edit" title="Edit Task"
+                                        style="display: @(!isReviewCol && !isCompletedCol ? "inline-flex" : "none")"
                                         onclick="openEditTaskModal(@task.Id); event.stopPropagation();">
                                     <i class="bi bi-pencil-square"></i>
                                 </button>
 
                                 @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteTask == true))
                                 {
-                                    <button class="action-btn action-btn-danger"
+                                    <button class="action-btn action-btn-danger"title="Delete"
                                             onclick="deleteTask(@task.Id); event.stopPropagation();">
                                         <i class="bi bi-trash3"></i>
                                     </button>
@@ -464,6 +471,19 @@
 
 
 <style>
+
+    <script >
+    function clearFocusedDescription() {
+        const desc = document.getElementById("focusedTaskDescription");
+
+        if (desc) {
+            desc .value = "";
+            // clears the textarea
+        }
+    }
+
+    </script >
+
     /* ═══════════════════════════════════════════════════════
        PREMIUM KANBAN BOARD — INDUSTRY STANDARD UI
        ═══════════════════════════════════════════════════════ */
@@ -1123,61 +1143,4 @@
             border-color: #0dcaf0;
         }
     }
-</style>
 
-<!-- ================= BOARD PERMISSION MODAL ================= -->
-<div class="modal fade" id="boardPermissionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white border-bottom-0">
-                <h5 class="modal-title font-weight-bold"><i class="bi bi-shield-lock-fill me-2 text-info"></i> Board Access Control</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div class="bg-light p-3 border-bottom">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-0 fw-bold text-dark">Team: <span class="text-info">@Model.TeamName</span></h6>
-                            <small class="text-muted">Manage granular board permissions for team members</small>
-                        </div>
-                        <div class="badge bg-soft-info text-info p-2 px-3 rounded-pill border border-info">
-                            <i class="bi bi-people me-1"></i> Permissions
-                        </div>
-                    </div>
-                </div>
-                <div class="table-responsive" style="max-height: 500px;">
-                    <table class="table table-hover align-middle mb-0" id="permissionTable" style="min-width: 800px;">
-                        <thead class="bg-white sticky-top shadow-sm">
-                            <tr class="text-uppercase small fw-bold text-muted">
-                                <th class="ps-4 border-0 py-3" style="width: 250px;">Member</th>
-                                <th class="border-0 py-3 text-center" title="Add Column">Add Col</th>
-                                <th class="border-0 py-3 text-center" title="Rename Column">Ren Col</th>
-                                <th class="border-0 py-3 text-center" title="Reorder Columns">Reorder</th>
-                                <th class="border-0 py-3 text-center" title="Delete Column">Del Col</th>
-                                <th class="border-0 py-3 text-center" title="Edit All Task Fields">Edit Tasks</th>
-                                <th class="border-0 py-3 text-center" title="Delete Task">Del Task</th>
-                                <th class="border-0 py-3 text-center" title="Review Task">Review</th>
-                            </tr>
-                        </thead>
-                        <tbody id="permissionTableBody" class="border-top-0">
-                            @* Rows loaded via AJAX *@
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer border-top-0 bg-light">
-                <button type="button" class="btn btn-outline-secondary px-4 rounded-pill" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<script>
-    // 🚀 AUTO-LOAD HISTORY
-    (function() {
-        if (typeof loadArchivedTasks === 'function') {
-            loadArchivedTasks('@Model.TeamName');
-        }
-    })();
-</script>
