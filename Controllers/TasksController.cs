@@ -239,6 +239,13 @@ public class TasksController : Controller
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
 
+        // Check permission if not Admin
+        if (!User.IsInRole("Admin") && task.AssignedToUserId != user.Id)
+        {
+            if (!await AuthorizeBoardAction(task.TeamName, "EditAllFields"))
+                return Forbid();
+        }
+
         // 1. Title
         if (task.Title != model.Title?.Trim())
         {
@@ -440,13 +447,15 @@ public class TasksController : Controller
 
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> DeleteTask([FromBody] int taskId)
-
     {
         var task = await _context.TaskItems.FindAsync(taskId);
         if (task == null)
             return NotFound();
+
+        if (!await AuthorizeBoardAction(task.TeamName, "DeleteTask"))
+            return Forbid();
 
         _context.TaskItems.Remove(task);
         await _context.SaveChangesAsync();
@@ -535,12 +544,16 @@ public class TasksController : Controller
             .ToListAsync();
 
         // ✅ 2. Build ViewModel AFTER data exists
+        var userPerms = await _context.BoardPermissions
+            .FirstOrDefaultAsync(p => p.UserId == user.Id && p.TeamName == team);
+
         var vm = new TeamBoardViewModel
         {
             TeamName = team,
             Columns = columns,
             AssignableUsers = assignableUsers,
-            CustomFields = customFields
+            CustomFields = customFields,
+            UserPermissions = userPerms
         };
 
         // ✅ 3. Return partial view
@@ -552,9 +565,12 @@ public class TasksController : Controller
 
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public IActionResult AddColumn([FromBody] AddColumnRequest model)
+    [Authorize]
+    public async Task<IActionResult> AddColumn([FromBody] AddColumnRequest model)
     {
+        if (!await AuthorizeBoardAction(model.Team, "AddColumn"))
+            return Forbid();
+
         // Validate input
         if (string.IsNullOrWhiteSpace(model.ColumnName))
             return BadRequest("Column name is required");
@@ -578,12 +594,16 @@ public class TasksController : Controller
         return Ok();
     }
     [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public IActionResult ReorderColumns([FromBody] List<int> columnIds)
+    [Authorize]
+    public async Task<IActionResult> ReorderColumns([FromBody] List<int> columnIds)
     {
         // 🔒 Safety check
         if (columnIds == null || columnIds.Count == 0)
             return BadRequest("No columns received");
+
+        var firstCol = await _context.TeamColumns.FindAsync(columnIds[0]);
+        if (firstCol == null || !await AuthorizeBoardAction(firstCol.TeamName, "ReorderColumns"))
+            return Forbid();
 
         // Load only affected columns
         var columns = _context.TeamColumns
@@ -606,13 +626,17 @@ public class TasksController : Controller
 
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public IActionResult RenameColumn([FromBody] RenameColumnRequest model)
+    [Authorize]
+    public async Task<IActionResult> RenameColumn([FromBody] RenameColumnRequest model)
     {
         if (model == null || model.ColumnId <= 0 || string.IsNullOrWhiteSpace(model.Name))
             return BadRequest("Invalid request");
 
-        var col = _context.TeamColumns.Find(model.ColumnId);
+        var col = await _context.TeamColumns.FindAsync(model.ColumnId);
+        if (col == null) return NotFound("Column not found");
+
+        if (!await AuthorizeBoardAction(col.TeamName, "RenameColumn"))
+            return Forbid();
 
         if (col == null)
             return NotFound("Column not found");
@@ -625,26 +649,26 @@ public class TasksController : Controller
 
     public class DeleteColumnRequest
     {
-        public int ColumnId { get; set; }
+        public int columnId { get; set; } // Match JS casing precisely or use [JsonPropertyName]
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public IActionResult DeleteColumn([FromBody] DeleteColumnRequest model)
+    [Authorize]
+    public async Task<IActionResult> DeleteColumn([FromBody] DeleteColumnRequest model)
     {
-        if (model == null || model.ColumnId <= 0)
+        if (model == null || model.columnId <= 0)
             return BadRequest("Invalid request");
 
-        var hasTasks = _context.TaskItems.Any(t => t.ColumnId == model.ColumnId);
-        if (hasTasks)
-            return BadRequest("Move tasks before deleting column");
+        var hasAnyTasks = await _context.TaskItems.AnyAsync(t => t.ColumnId == model.columnId);
+        if (hasAnyTasks)
+            return BadRequest("Move all tasks (including archived) before deleting column");
 
-        var col = _context.TeamColumns.Find(model.ColumnId);
+        var col = await _context.TeamColumns.FindAsync(model.columnId);
         if (col == null)
             return NotFound();
 
         _context.TeamColumns.Remove(col);
-        _context.SaveChanges();
+        await _context.SaveChangesAsync();
 
         return Ok();
     }
@@ -713,12 +737,12 @@ public class TasksController : Controller
         var sourceColName = task.Column?.ColumnName?.Trim().ToLower();
 
         // ═══════ ROLE-BASED RESTRICTIONS ═══════
-
-        // 1. COMPLETED column: ONLY Admin can move tasks here
+        
+        // 1. COMPLETED column: ONLY Admin OR users with ReviewTask permission can move tasks here
         if (targetColName == "completed")
         {
-            if (!isAdmin)
-                return StatusCode(403, "Only Admin can move tasks to Completed.");
+            if (!isAdmin && !await AuthorizeBoardAction(task.TeamName, "ReviewTask"))
+                return StatusCode(403, "Only Admin or authorized reviewers can move tasks to Completed.");
 
             // Task must have passed review first
             if (task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.Passed)
@@ -835,7 +859,7 @@ public class TasksController : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> ReviewTask([FromBody] ReviewTaskRequest model)
     {
         if (model == null) return BadRequest();
@@ -849,6 +873,9 @@ public class TasksController : Controller
 
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
+
+        if (!await AuthorizeBoardAction(task.TeamName, "ReviewTask"))
+            return Forbid();
 
         task.ReviewedByUserId = user.Id;
         task.ReviewedAt = DateTime.UtcNow;
@@ -975,7 +1002,7 @@ public class TasksController : Controller
             .Include(t => t.AssignedByUser)
             .Include(t => t.ReviewedByUser)
             .Include(t => t.CompletedByUser)
-            .Include(t => t.CustomFieldValues)
+            .Include(t => t.CustomFieldValues.Where(cv => cv.Field.IsActive))
                 .ThenInclude(v => v.Field)
             .FirstOrDefaultAsync(t => t.Id == id && t.IsArchived);
 
@@ -1099,6 +1126,7 @@ public class TasksController : Controller
 
     [HttpGet]
     [Authorize]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> GetCustomFields()
     {
         var fields = await _context.TaskCustomFields
@@ -1125,7 +1153,7 @@ public class TasksController : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> CreateCustomField([FromBody] CreateFieldRequest model)
     {
         if (string.IsNullOrWhiteSpace(model.FieldName))
@@ -1165,7 +1193,7 @@ public class TasksController : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> UpdateCustomField([FromBody] UpdateFieldRequest model)
     {
         var field = await _context.TaskCustomFields.FindAsync(model.FieldId);
@@ -1187,7 +1215,7 @@ public class TasksController : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> DeleteCustomField([FromBody] int fieldId)
     {
         var field = await _context.TaskCustomFields.FindAsync(fieldId);
@@ -1206,7 +1234,7 @@ public class TasksController : Controller
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> ReorderCustomFields([FromBody] List<int> fieldIds)
     {
         if (fieldIds == null || !fieldIds.Any())
@@ -1247,13 +1275,107 @@ public class TasksController : Controller
         if (taskId <= 0) return BadRequest("Invalid task id");
 
         var values = await _context.TaskFieldValues
-            .Where(v => v.TaskId == taskId)
+            .Where(v => v.TaskId == taskId && v.Field.IsActive)
             .Select(v => new { v.FieldId, v.Value })
             .ToListAsync();
 
         var dict = values.ToDictionary(v => v.FieldId, v => v.Value ?? string.Empty);
 
         return Ok(dict);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet]
+    public async Task<IActionResult> GetBoardPermissions(string team)
+    {
+        if (string.IsNullOrWhiteSpace(team)) return BadRequest();
+
+        var users = await _userManager.Users.OrderBy(u => u.UserName).ToListAsync();
+        var perms = await _context.BoardPermissions
+            .Where(p => p.TeamName == team)
+            .ToListAsync();
+
+        var result = new List<BoardPermissionDto>();
+
+        foreach (var u in users)
+        {
+            var p = perms.FirstOrDefault(x => x.UserId == u.Id);
+            var roles = await _userManager.GetRolesAsync(u);
+            
+            result.Add(new BoardPermissionDto
+            {
+                UserId = u.Id,
+                UserName = u.UserName ?? "Unknown",
+                Role = roles.FirstOrDefault() ?? "No Role",
+                TeamName = team,
+                CanAddColumn = p?.CanAddColumn ?? false,
+                CanRenameColumn = p?.CanRenameColumn ?? false,
+                CanReorderColumns = p?.CanReorderColumns ?? false,
+                CanDeleteColumn = p?.CanDeleteColumn ?? false,
+                CanEditAllFields = p?.CanEditAllFields ?? false,
+                CanDeleteTask = p?.CanDeleteTask ?? false,
+                CanReviewTask = p?.CanReviewTask ?? false
+            });
+        }
+
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    public async Task<IActionResult> UpdateBoardPermission([FromBody] BoardPermissionDto dto)
+    {
+        if (dto == null || string.IsNullOrWhiteSpace(dto.UserId) || string.IsNullOrWhiteSpace(dto.TeamName))
+            return BadRequest();
+
+        var existing = await _context.BoardPermissions
+            .FirstOrDefaultAsync(p => p.UserId == dto.UserId && p.TeamName == dto.TeamName);
+
+        if (existing == null)
+        {
+            existing = new BoardPermission
+            {
+                UserId = dto.UserId,
+                TeamName = dto.TeamName
+            };
+            _context.BoardPermissions.Add(existing);
+        }
+
+        existing.CanAddColumn = dto.CanAddColumn;
+        existing.CanRenameColumn = dto.CanRenameColumn;
+        existing.CanReorderColumns = dto.CanReorderColumns;
+        existing.CanDeleteColumn = dto.CanDeleteColumn;
+        existing.CanEditAllFields = dto.CanEditAllFields;
+        existing.CanDeleteTask = dto.CanDeleteTask;
+        existing.CanReviewTask = dto.CanReviewTask;
+
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true });
+    }
+
+    private async Task<bool> AuthorizeBoardAction(string teamName, string action)
+    {
+        if (User.IsInRole("Admin")) return true;
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return false;
+
+        var perms = await _context.BoardPermissions
+            .FirstOrDefaultAsync(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == teamName.ToLower().Trim());
+
+        if (perms == null) return false;
+
+        return action switch
+        {
+            "AddColumn" => perms.CanAddColumn,
+            "RenameColumn" => perms.CanRenameColumn,
+            "ReorderColumns" => perms.CanReorderColumns,
+            "DeleteColumn" => perms.CanDeleteColumn,
+            "EditAllFields" => perms.CanEditAllFields,
+            "DeleteTask" => perms.CanDeleteTask,
+            "ReviewTask" => perms.CanReviewTask,
+            _ => false
+        };
     }
 }
 
