@@ -322,14 +322,12 @@
 
                     <div class="mb-3" id="groupCreateTaskTitle">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0">Title</label>
+                            <label class="form-label mb-0" id="labelCreateTaskTitle">Title</label>
                             <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Focus title"
-                                    onclick="document.getElementById('taskTitle').focus();">
+                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Title" onclick="renameField('labelCreateTaskTitle')">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button type="button" class="btn btn-link text-danger p-0" title="Clear title"
-                                    onclick="document.getElementById('taskTitle').value='';">
+                                <button type="button" class="btn btn-link text-danger p-0" title="Delete Title" onclick="hideField('groupCreateTaskTitle')">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -352,8 +350,18 @@
                         <textarea id="taskDescription" class="form-control" rows="3"></textarea>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Priority</label>
+                    <div class="mb-3" id="groupCreateTaskPriority">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0" id="labelCreateTaskPriority">Priority</label>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Priority" onclick="renameField('labelCreateTaskPriority')">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-link text-danger p-0" title="Delete Priority" onclick="hideField('groupCreateTaskPriority')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
                         <select id="taskPriority" class="form-select">
                             <option value="0">Low</option>
                             <option value="1" selected>Medium</option>
@@ -484,6 +492,13 @@
                 </div>
 
                 <div class="modal-footer">
+                    @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
+                    {
+                        <button class="btn btn-sm btn-outline-secondary me-auto"
+                            onclick="openManageFieldsModal(); event.preventDefault();">
+                            <i class="bi bi-gear"></i> Manage Fields
+                        </button>
+                    }
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button class="btn btn-primary" onclick="submitEditTask()">Save Changes</button>
                 </div>
@@ -596,10 +611,11 @@
                                 <option value="Number">Number</option>
                                 <option value="Date">Date</option>
                                 <option value="DateTime">Date & Time</option>
+                                <option value="Dropdown">Dropdown</option>
                             </select>
                         </div>
                         <div class="col-md-3 d-flex align-items-end">
-                            <div class="form-check">
+                            <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="newFieldRequired" />
                                 <label class="form-check-label" for="newFieldRequired">
                                     Required
@@ -607,7 +623,22 @@
                             </div>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-success mt-2" onclick="createNewField()">
+
+                    <!-- Dropdown Options Section (Hidden by default) -->
+                    <div id="newFieldOptionsSection" class="mt-3 p-3 bg-light border rounded d-none">
+                        <label class="form-label d-flex justify-content-between align-items-center">
+                            Dropdown Options
+                            <button type="button" class="btn btn-sm btn-link p-0" onclick="addDropdownOptionRow()">
+                                <i class="bi bi-plus-circle me-1"></i>Add Option
+                            </button>
+                        </label>
+                        <div id="newFieldOptionsList">
+                            <!-- Option rows will be added here -->
+                        </div>
+                        <small class="text-muted">Users will pick one of these from a list.</small>
+                    </div>
+
+                    <button class="btn btn-sm btn-success mt-3" onclick="createNewField()">
                         <i class="bi bi-plus-lg"></i> Add Field
                     </button>
                 </div>
@@ -638,6 +669,46 @@
         </div>
     </div>
 </div>
+
+
+    <!-- ═══════ BOARD PERMISSION MODAL (Admin Only) ═══════ -->
+    <div class="modal fade" id="boardPermissionModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header bg-dark text-white" style="border-radius: 16px 16px 0 0;">
+                    <h5 class="modal-title">
+                        <i class="bi bi-shield-lock me-2 text-info"></i>Board Permissions
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light text-muted small text-uppercase fw-bold">
+                                <tr>
+                                    <th class="ps-4 py-3">Member</th>
+                                    <th class="text-center">Add Col</th>
+                                    <th class="text-center">Rename</th>
+                                    <th class="text-center">Reorder</th>
+                                    <th class="text-center">Del Col</th>
+                                    <th class="text-center">Full Edit</th>
+                                    <th class="text-center">Delete Task</th>
+                                    <th class="text-center">Review</th>
+                                    <th class="text-center text-info">All</th>
+                                </tr>
+                            </thead>
+                            <tbody id="permissionTableBody">
+                                <!-- Loaded via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button class="btn btn-secondary px-4" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 
 <script>
@@ -1257,7 +1328,10 @@
         const priority = parseInt(document.getElementById('editTaskPriority').value);
         const assignedToUserId = document.getElementById('editTaskAssignedTo').value;
 
-        if (!title) {
+        const titleEl = document.getElementById('editTaskTitle');
+        const titleVisible = titleEl && titleEl.closest('.mb-3').style.display !== 'none';
+
+        if (titleVisible && !title) {
             alert("Title is required");
             return;
         }
@@ -1328,13 +1402,22 @@
         const priorityEl = document.getElementById('taskPriority');
         const priority = priorityEl ? parseInt(priorityEl.value) : 1;
 
+        const titleEl = document.getElementById('taskTitle');
+        const title = titleEl ? titleEl.value.trim() : "";
+        const titleVisible = titleEl && titleEl.closest('.mb-3').style.display !== 'none';
+
+        if (titleVisible && !title) {
+            alert("Title is required");
+            return;
+        }
+
         const data = {
             columnId: parseInt(document.getElementById('taskColumnId').value),
-            title: document.getElementById('taskTitle').value.trim(),
+            title: title,
             description: document.getElementById('taskDescription').value.trim(),
             projectId: projectId,
             priority: priority,
-            customFieldValues: (typeof collectCustomFieldValues === 'function') ? collectCustomFieldValues() : {}
+            customFieldValues: (typeof collectCustomFieldValues === 'function') ? collectCustomFieldValues('customFieldsContainer') : {}
         };
 
         fetch('/Tasks/CreateTask', {
@@ -1414,27 +1497,88 @@
 
 
 <script>
-    function assignTask(taskId, userId) {
-        if (!userId) return;
+    // --- Dropdown Options Management ---
+    function addDropdownOptionRow(value = "") {
+        const list = document.getElementById('newFieldOptionsList');
+        if (!list) return;
 
-        fetch('/Tasks/AssignTask', {
+        const row = document.createElement('div');
+        row.className = 'input-group input-group-sm mb-2 dropdown-option-row';
+        row.innerHTML = `
+            <input type="text" class="form-control dropdown-option-input" value="${value}" placeholder="Option name" />
+            <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
+        list.appendChild(row);
+    }
+
+    // Toggle options section based on field type
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'newFieldType') {
+            const section = document.getElementById('newFieldOptionsSection');
+            if (section) {
+                if (e.target.value === 'Dropdown') {
+                    section.classList.remove('d-none');
+                    const list = document.getElementById('newFieldOptionsList');
+                    if (list && list.children.length === 0) {
+                        addDropdownOptionRow();
+                    }
+                } else {
+                    section.classList.add('d-none');
+                }
+            }
+        }
+    });
+
+    function createNewField() {
+        const fieldName = document.getElementById('newFieldName').value.trim();
+        const fieldType = document.getElementById('newFieldType').value;
+        const isRequired = document.getElementById('newFieldRequired').checked;
+
+        if (!fieldName) {
+            alert("Please enter a field name");
+            return;
+        }
+
+        // Collect dropdown options
+        let dropdownOptions = null;
+        if (fieldType === 'Dropdown') {
+            const optionInputs = document.querySelectorAll('#newFieldOptionsList .dropdown-option-input');
+            const options = Array.from(optionInputs).map(i => i.value.trim()).filter(v => v !== "");
+            if (options.length === 0) {
+                alert("Please add at least one option for the dropdown.");
+                return;
+            }
+            dropdownOptions = options.join(',');
+        }
+
+        const data = {
+            fieldName: fieldName,
+            fieldType: fieldType,
+            isRequired: isRequired,
+            dropdownOptions: dropdownOptions
+        };
+
+        fetch('/Tasks/CreateCustomField', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: `taskId=${taskId}&userId=${userId}`
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         })
-            .then(res => res.json())
-            .then(result => {
-                showAssignToast(
-                    userId,
-                    result.assignedBy,
-                    result.assignedAt
-                );
-
-                loadTeamBoard(currentTeamName);
-            })
-            .catch(() => alert('Failed to assign task'));
+        .then(res => res.json())
+        .then(res => {
+            if (res.success) {
+                document.getElementById('newFieldName').value = '';
+                document.getElementById('newFieldType').value = 'Text';
+                document.getElementById('newFieldRequired').checked = false;
+                document.getElementById('newFieldOptionsList').innerHTML = '';
+                document.getElementById('newFieldOptionsSection').classList.add('d-none');
+                
+                if (typeof loadCustomFieldsList === 'function') loadCustomFieldsList();
+                showToast('Field created successfully', 'success');
+            }
+        })
+        .catch(() => alert("Failed to create field"));
     }
 </script>
 

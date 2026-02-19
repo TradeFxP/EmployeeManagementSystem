@@ -1143,4 +1143,17 @@
             border-color: #0dcaf0;
         }
     }
+</style>
+
+<script>
+    (function() {
+        // Load history tasks
+        if (typeof loadArchivedTasks === 'function') {
+            loadArchivedTasks('@Model.TeamName');
+        }
+        
+        // Sync current team name
+        window.currentTeamName = '@Model.TeamName';
+    })();
+</script>
 

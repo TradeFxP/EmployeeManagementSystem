@@ -106,7 +106,26 @@ async function renderCustomFieldInputs(containerId, existingValues = {}) {
             case 'Dropdown':
                 input = document.createElement('select');
                 input.className = 'form-select';
-                // TODO: Add dropdown options from field configuration
+
+                // Use specified options or default if empty
+                const optionsStr = field.dropdownOptions || "";
+                const optionsArray = optionsStr ? optionsStr.split(',') : [];
+
+                if (optionsArray.length > 0) {
+                    input.innerHTML = optionsArray.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                } else {
+                    // Fallback for older fields
+                    if (field.fieldName.toLowerCase().includes('priority')) {
+                        input.innerHTML = `
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                        `;
+                    } else {
+                        input.innerHTML = `<option value="">-- No Options --</option>`;
+                    }
+                }
                 break;
             default: // Text
                 input = document.createElement('input');
@@ -165,7 +184,9 @@ async function addNewCustomField() {
 
         // Clear cache and reload
         window.customFieldsCache = null;
-        await renderCustomFieldInputs('customFieldsContainer', collectCustomFieldValues()); // Preserve values
+        const currentValues = collectCustomFieldValues('customFieldsContainer');
+        if (document.getElementById('customFieldsContainer')) await renderCustomFieldInputs('customFieldsContainer', currentValues);
+        if (document.getElementById('editCustomFieldsContainer')) await renderCustomFieldInputs('editCustomFieldsContainer', collectCustomFieldValues('editCustomFieldsContainer'));
 
     } catch (error) {
         alert("Error adding field: " + error.message);
@@ -293,20 +314,33 @@ async function loadFieldsList() {
 
 
         container.innerHTML = fields.map(f => `
-            <div class="field-item d-flex justify-content-between align-items-center p-2 mb-2 border rounded" data-field-id="${f.id}">
-                <div class="flex-grow-1">
-                    <strong>${f.fieldName}</strong>
-                    <span class="badge bg-secondary ms-2">${f.fieldType === 'DateTime' ? 'Date & Time' : f.fieldType}</span>
-                    ${f.isRequired ? '<span class="badge bg-warning text-dark ms-1">Required</span>' : ''}
+            <div class="field-item mb-3 border rounded shadow-sm overflow-hidden" data-field-id="${f.id}">
+                <div class="bg-light p-2 border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong class="text-primary">${f.fieldName}</strong>
+                        <span class="badge bg-secondary ms-2">${f.fieldType === 'DateTime' ? 'Date & Time' : f.fieldType}</span>
+                        ${f.isRequired ? '<span class="badge bg-warning text-dark ms-1">Required</span>' : ''}
+                    </div>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-xs btn-outline-primary" onclick="changeFieldType(${f.id}, '${f.fieldType}'); event.stopPropagation();" title="Change Type">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                        <button class="btn btn-xs btn-outline-danger" onclick="deleteField(${f.id}); event.stopPropagation();">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-outline-primary" onclick="changeFieldType(${f.id}, '${f.fieldType}'); event.stopPropagation();" title="Change Type">
-                        <i class="bi bi-arrow-repeat"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteField(${f.id}); event.stopPropagation();">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
+                ${f.fieldType === 'Dropdown' ? `
+                    <div class="p-2 small bg-white">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted"><i class="bi bi-list-check me-1"></i>Options:</span>
+                            <button class="btn btn-xs btn-link p-0" onclick="editDropdownOptions(${f.id}, '${f.dropdownOptions || ''}')">Edit Options</button>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1">
+                            ${(f.dropdownOptions || "").split(',').filter(o => o).map(o => `<span class="badge bg-light text-dark border">${o}</span>`).join('') || '<span class="text-danger italic">No options defined</span>'}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `).join('');
 
@@ -326,6 +360,18 @@ async function createNewField() {
         return;
     }
 
+    // Collect dropdown options from modal if type is Dropdown
+    let dropdownOptions = null;
+    if (fieldType === 'Dropdown') {
+        const optionInputs = document.querySelectorAll('#newFieldOptionsList .dropdown-option-input');
+        const options = Array.from(optionInputs).map(i => i.value.trim()).filter(v => v !== "");
+        if (options.length === 0) {
+            alert("Please add at least one option for the dropdown.");
+            return;
+        }
+        dropdownOptions = options.join(',');
+    }
+
     try {
         const response = await fetch('/Tasks/CreateCustomField', {
             method: 'POST',
@@ -333,15 +379,16 @@ async function createNewField() {
             body: JSON.stringify({
                 fieldName: fieldName,
                 fieldType: fieldType,
-                isRequired: isRequired
+                isRequired: isRequired,
+                dropdownOptions: dropdownOptions
             })
         });
 
         if (!response.ok) throw new Error('Failed to create field');
 
-        // Clear form
-        document.getElementById('newFieldName').value = '';
-        document.getElementById('newFieldRequired').checked = false;
+        // Clear UI in modal
+        document.getElementById('newFieldOptionsList').innerHTML = '';
+        document.getElementById('newFieldOptionsSection').classList.add('d-none');
 
         // IMPORTANT: Clear cache so new fields load
         window.customFieldsCache = null;
@@ -349,8 +396,9 @@ async function createNewField() {
         // Reload list in modal
         await loadFieldsList();
 
-        // Re-render fields in create task modal if it's open
-        await renderCustomFieldInputs('customFieldsContainer');
+        // Re-render fields in task modals
+        if (document.getElementById('customFieldsContainer')) await renderCustomFieldInputs('customFieldsContainer');
+        if (document.getElementById('editCustomFieldsContainer')) await renderCustomFieldInputs('editCustomFieldsContainer');
 
         console.log('Field created successfully and forms updated');
 
@@ -434,3 +482,29 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('DOMContentLoaded - loading custom fields...');
     loadCustomFields();
 });
+
+async function editDropdownOptions(fieldId, currentOptions) {
+    const newOptions = prompt("Edit choices (comma-separated):", currentOptions);
+    if (newOptions === null || newOptions === currentOptions) return;
+
+    try {
+        const response = await fetch('/Tasks/UpdateCustomField', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fieldId: fieldId,
+                dropdownOptions: newOptions
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to update options');
+
+        window.customFieldsCache = null;
+        await loadFieldsList();
+        if (document.getElementById('customFieldsContainer')) await renderCustomFieldInputs('customFieldsContainer');
+        if (document.getElementById('editCustomFieldsContainer')) await renderCustomFieldInputs('editCustomFieldsContainer');
+
+    } catch (error) {
+        alert('Error updating options: ' + error.message);
+    }
+}
