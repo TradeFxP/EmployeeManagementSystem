@@ -905,6 +905,7 @@
 
 <link rel="stylesheet" href="~/css/taskHistory.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <script src="~/js/customFields.js"></script>
@@ -1006,7 +1007,118 @@
 </script>
 
 <script>
+    // ════════ SignalR Real-Time Logic ════════
+    var taskHubConnection = new signalR.HubConnectionBuilder()
+        .withUrl("/taskHub")
+        .withAutomaticReconnect()
+        .build();
+
+    taskHubConnection.on("TaskMoved", function (data) {
+        console.log("Task moved received:", data);
+        handleTaskMovedUpdate(data);
+    });
+
+    taskHubConnection.on("TaskReviewed", function (data) {
+        console.log("Task reviewed received:", data);
+        handleTaskReviewedUpdate(data);
+    });
+
+    taskHubConnection.start()
+        .then(() => {
+            console.log("SignalR Connected");
+            if (window.currentTeamName) {
+                taskHubConnection.invoke("JoinTeamGroup", window.currentTeamName);
+            }
+        })
+        .catch(err => console.error("SignalR Connection Error: ", err));
+
+    function handleTaskMovedUpdate(data) {
+        const card = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+        if (!card) return;
+
+        const targetColumn = document.querySelector(`.kanban-column[data-column-id="${data.newColumnId}"]`);
+        if (!targetColumn) return;
+
+        const taskList = targetColumn.querySelector('.kanban-tasks');
+        if (!taskList) return;
+
+        // Move the element
+        taskList.appendChild(card);
+        
+        // Update attributes
+        card.dataset.columnId = data.newColumnId;
+
+        // UI Adjustments (Buttons / Badges)
+        const colName = data.columnName.toLowerCase().trim();
+        const isReview = colName === 'review';
+        const isCompleted = colName === 'completed';
+        const isRestricted = isReview || isCompleted;
+
+        const assignBtn = card.querySelector('.action-btn-assign');
+        const editBtn = card.querySelector('.action-btn-edit');
+        const reviewBtn = card.querySelector('.action-btn-review');
+        const archiveBtn = card.querySelector('.action-btn-archive');
+
+        if (assignBtn) assignBtn.style.display = isRestricted ? 'none' : 'inline-flex';
+        if (editBtn) editBtn.style.display = isRestricted ? 'none' : 'inline-flex';
+        if (reviewBtn) reviewBtn.style.display = isReview ? 'inline-flex' : 'none';
+        if (archiveBtn) archiveBtn.style.display = isCompleted ? 'inline-flex' : 'none';
+
+        const pendingBadge = card.querySelector('.review-badge-pending');
+        const failBadge = card.querySelector('.review-badge-fail');
+        const passBadge = card.querySelector('.review-badge-pass');
+
+        if (isReview) {
+            if (pendingBadge) pendingBadge.style.display = 'inline-flex';
+            if (failBadge) failBadge.style.display = 'none';
+            if (passBadge) passBadge.style.display = 'none';
+        } else {
+            if (pendingBadge) pendingBadge.style.display = 'none';
+        }
+
+        updateColumnCounts();
+        showToast(`Task #${data.taskId} moved to ${data.columnName}`, 'info');
+    }
+
+    function handleTaskReviewedUpdate(data) {
+        const card = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+        if (!card) return;
+
+        const passBadge = card.querySelector('.review-badge-pass');
+        const failBadge = card.querySelector('.review-badge-fail');
+        const pendingBadge = card.querySelector('.review-badge-pending');
+
+        if (data.passed) {
+            if (passBadge) passBadge.style.display = 'inline-flex';
+            if (failBadge) failBadge.style.display = 'none';
+        } else {
+            if (failBadge) failBadge.style.display = 'inline-flex';
+            if (passBadge) passBadge.style.display = 'none';
+        }
+        if (pendingBadge) pendingBadge.style.display = 'none';
+
+        // If moved columns due to review
+        if (data.newColumnId) {
+            const currentColumnId = parseInt(card.dataset.columnId);
+            if (currentColumnId !== data.newColumnId) {
+                handleTaskMovedUpdate({
+                    taskId: data.taskId,
+                    newColumnId: data.newColumnId,
+                    columnName: data.columnName
+                });
+            }
+        }
+    }
+
     function loadTeamBoard(team) {
+        // ✅ JOIN GROUP
+        if (taskHubConnection.state === signalR.HubConnectionState.Connected) {
+            if (window.currentTeamName) {
+                taskHubConnection.invoke("LeaveTeamGroup", window.currentTeamName);
+            }
+            taskHubConnection.invoke("JoinTeamGroup", team);
+        }
+
         // ✅ SAVE CURRENT TEAM
         window.currentTeamName = team;
 
@@ -1533,13 +1645,13 @@
         }
     });
 
-    function createNewField() {
+    async function createNewField() {
         const fieldName = document.getElementById('newFieldName').value.trim();
         const fieldType = document.getElementById('newFieldType').value;
         const isRequired = document.getElementById('newFieldRequired').checked;
 
         if (!fieldName) {
-            alert("Please enter a field name");
+            alert('Please enter a field name');
             return;
         }
 
@@ -1547,40 +1659,42 @@
         let dropdownOptions = null;
         if (fieldType === 'Dropdown') {
             const optionInputs = document.querySelectorAll('#newFieldOptionsList .dropdown-option-input');
-            const options = Array.from(optionInputs).map(i => i.value.trim()).filter(v => v !== "");
+            const options = Array.from(optionInputs).map(i => i.value.trim()).filter(v => v !== '');
             if (options.length === 0) {
-                alert("Please add at least one option for the dropdown.");
+                alert('Please add at least one option for the dropdown.');
                 return;
             }
             dropdownOptions = options.join(',');
         }
 
-        const data = {
-            fieldName: fieldName,
-            fieldType: fieldType,
-            isRequired: isRequired,
-            dropdownOptions: dropdownOptions
-        };
+        try {
+            const res = await fetch('/Tasks/CreateCustomField', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fieldName, fieldType, isRequired, dropdownOptions })
+            });
 
-        fetch('/Tasks/CreateCustomField', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        })
-        .then(res => res.json())
-        .then(res => {
-            if (res.success) {
-                document.getElementById('newFieldName').value = '';
-                document.getElementById('newFieldType').value = 'Text';
-                document.getElementById('newFieldRequired').checked = false;
-                document.getElementById('newFieldOptionsList').innerHTML = '';
-                document.getElementById('newFieldOptionsSection').classList.add('d-none');
-                
-                if (typeof loadCustomFieldsList === 'function') loadCustomFieldsList();
-                showToast('Field created successfully', 'success');
-            }
-        })
-        .catch(() => alert("Failed to create field"));
+            if (!res.ok) throw new Error('Server error');
+
+            // Clear form
+            document.getElementById('newFieldName').value = '';
+            document.getElementById('newFieldType').value = 'Text';
+            document.getElementById('newFieldRequired').checked = false;
+            document.getElementById('newFieldOptionsList').innerHTML = '';
+            document.getElementById('newFieldOptionsSection').classList.add('d-none');
+
+            // ✅ Reload Manage Fields list
+            window.customFieldsCache = null;
+            if (typeof loadFieldsList === 'function') await loadFieldsList();
+
+            // ✅ Refresh Create / Edit modals immediately — no page refresh needed
+            if (typeof refreshOpenModals === 'function') await refreshOpenModals();
+
+            showToast(`✅ Field "${fieldName}" added!`, 'success');
+
+        } catch (err) {
+            alert('Failed to create field: ' + err.message);
+        }
     }
 </script>
 

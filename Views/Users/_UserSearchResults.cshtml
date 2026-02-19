@@ -3,7 +3,7 @@
 @if (!Model.Any())
 {
     <tr>
-        <td colspan="4" class="text-center text-muted">
+        <td colspan="5" class="text-center text-muted">
             No results found
         </td>
     </tr>
@@ -13,6 +13,12 @@ else
     foreach (var item in Model)
     {
         <tr>
+            <td>
+                <span class="badge text-bg-secondary fw-semibold" 
+                      style="font-family: 'Courier New', monospace; font-size:.8rem; letter-spacing:1px;">
+                    #@item.User.Id
+                </span>
+            </td>
             <td class="highlight">@item.User.Name</td>
             <td class="highlight">@item.User.Email</td>
             <td class="highlight">@item.Role</td>

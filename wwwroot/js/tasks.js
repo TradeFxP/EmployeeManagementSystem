@@ -352,11 +352,19 @@ function submitReview() {
                 showToast('❌ Review Failed. Task returned to previous column.', 'warning');
             }
 
-            // Reload board
-            if (window.currentTeamName && window.loadTeamBoard) {
-                window.loadTeamBoard(window.currentTeamName);
+            // Reload board (If SignalR is not active or connection not established)
+            // Note: SignalR handleTaskReviewedUpdate will handle the update for everyone.
+            // But we reload for the reviewer anyway to ensure full sync, or we can skip it.
+            // For now, let's keep it to be safe, but SignalR will also trigger.
+            // Actually, let's skip it IF taskHubConnection exists and is connected.
+            if (typeof taskHubConnection !== 'undefined' && taskHubConnection.state === 'Connected') {
+                console.log("SignalR will handle the UI update.");
             } else {
-                location.reload();
+                if (window.currentTeamName && window.loadTeamBoard) {
+                    window.loadTeamBoard(window.currentTeamName);
+                } else {
+                    location.reload();
+                }
             }
         },
         error: function (xhr) {

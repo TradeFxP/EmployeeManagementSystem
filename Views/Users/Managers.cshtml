@@ -10,6 +10,7 @@
 <table class="table table-bordered table-hover align-middle">
     <thead class="table-light">
         <tr>
+            <th style="width:100px;">ID</th>
             <th>Name</th>
             <th>Email</th>
             <th style="width:420px;" class="text-center">Actions</th>
@@ -29,6 +30,12 @@
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@manager.Id" />
 
+                    <td>
+                        <span class="badge text-bg-secondary fw-semibold" 
+                              style="font-family: 'Courier New', monospace; font-size:.8rem; letter-spacing:1px;">
+                            #@manager.Id
+                        </span>
+                    </td>
                     <td>
                         <input name="name"
                                value="@manager.Name"
@@ -54,6 +61,12 @@
                 else
                 {
                     <!-- READ MODE -->
+                    <td>
+                        <span class="badge text-bg-secondary fw-semibold" 
+                              style="font-family: 'Courier New', monospace; font-size:.8rem; letter-spacing:1px;">
+                            #@manager.Id
+                        </span>
+                    </td>
                     <td>@manager.Name</td>
                     <td>@manager.Email</td>
 

@@ -9,6 +9,8 @@ using UserRoles.ViewModels;
 using UserRoles.Models.Enums;
 using UserRoles.DTOs;
 using UserRoles.Services; // Added for ITaskHistoryService
+using Microsoft.AspNetCore.SignalR;
+using UserRoles.Hubs;
 
 using TaskStatusEnum = UserRoles.Models.Enums.TaskStatus;
 
@@ -19,12 +21,14 @@ public class TasksController : Controller
     private readonly AppDbContext _context;
     private readonly UserManager<Users> _userManager;
     private readonly ITaskHistoryService _historyService;
+    private readonly IHubContext<TaskHub> _hubContext;
 
-    public TasksController(AppDbContext context, UserManager<Users> userManager, ITaskHistoryService historyService)
+    public TasksController(AppDbContext context, UserManager<Users> userManager, ITaskHistoryService historyService, IHubContext<TaskHub> hubContext)
     {
         _context = context;
         _userManager = userManager;
         _historyService = historyService;
+        _hubContext = hubContext;
     }
 
     // Loads page
@@ -797,6 +801,15 @@ public class TasksController : Controller
 
         await _context.SaveChangesAsync();
 
+        // 🚀 BROADCAST UPDATE
+        await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskMoved", new
+        {
+            taskId = task.Id,
+            oldColumnId = model.ColumnId, // this was the source in MoveTaskDto
+            newColumnId = task.ColumnId,
+            columnName = targetColumn.ColumnName
+        });
+
         return Ok(new { success = true, message = "Task moved successfully" });
     }
 
@@ -893,8 +906,32 @@ public class TasksController : Controller
                 task.CurrentColumnEntryAt = DateTime.UtcNow;
                 
                 await _context.SaveChangesAsync();
+
+                // 🚀 BROADCAST UPDATE (Review Result)
+                await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskReviewed", new
+                {
+                    taskId = task.Id,
+                    passed = true,
+                    newColumnId = task.ColumnId,
+                    columnName = "Completed",
+                    reviewNote = task.ReviewNote,
+                    reviewedBy = user.UserName
+                });
+
                 return Ok(new { success = true, passed = true, message = "Review passed! Task automatically moved to Completed." });
             }
+
+            // Normal pass without auto-move (edge case)
+            await _context.SaveChangesAsync();
+            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskReviewed", new
+            {
+                taskId = task.Id,
+                passed = true,
+                newColumnId = task.ColumnId,
+                columnName = task.Column?.ColumnName,
+                reviewNote = task.ReviewNote,
+                reviewedBy = user.UserName
+            });
 
             return Ok(new { success = true, passed = true, message = "Review passed. Task can now be moved to Completed." });
         }
@@ -918,6 +955,17 @@ public class TasksController : Controller
 
             task.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            // 🚀 BROADCAST UPDATE (Review Result)
+            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskReviewed", new
+            {
+                taskId = task.Id,
+                passed = model.Passed,
+                newColumnId = task.ColumnId,
+                columnName = task.Column?.ColumnName ?? "Completed",
+                reviewNote = task.ReviewNote,
+                reviewedBy = user.UserName
+            });
 
             return Ok(new { success = true, passed = false, message = "Review failed. Task returned to previous column." });
         }

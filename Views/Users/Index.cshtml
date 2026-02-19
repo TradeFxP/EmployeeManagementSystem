@@ -152,7 +152,8 @@
         <table class="table table-bordered table-hover align-middle fixed-table" id="usersTable">
             <thead class="table-light">
                 <tr>
-                    <th style="width:220px;">Name</th>
+                    <th style="width:80px;">ID</th>
+                    <th style="width:200px;">Name</th>
                     <th>Email</th>
                     <th style="width:140px;">Role</th>
                     <th style="width:360px;" class="text-center">Actions</th>
@@ -185,6 +186,14 @@
                                     <input type="hidden" name="id" value="@user.Id" />
                                     <input type="hidden" name="page" value="@Model.Page" />
                                     <input type="hidden" name="pageSize" value="@Model.PageSize" />
+
+                                <td>
+                                    <span class="badge text-bg-secondary fw-semibold"
+                                          style="font-family: 'Courier New', monospace; font-size:.8rem; letter-spacing:1px;"
+                                          title="User ID">
+                                        #@user.Id
+                                    </span>
+                                </td>
 
                                 <td>
                                     <input name="Name"
@@ -224,6 +233,12 @@
                             else
                             {
                                 <!-- ===== READ MODE ===== -->
+                                <td>
+                                    <span class="badge text-bg-secondary fw-semibold"
+                                          style="font-family: 'Courier New', monospace; font-size:.8rem; letter-spacing:1px;">
+                                        #@user.Id
+                                    </span>
+                                </td>
                                 <td class="user-name">@user.Name</td>
                                 <td>@user.Email</td>
                                 <td>

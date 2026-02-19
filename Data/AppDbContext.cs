@@ -108,6 +108,36 @@ namespace UserRoles.Data
                 .HasForeignKey(t => t.CompletedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.Entity<AssignedTask>()
+                .HasOne(t => t.AssignedBy)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<AssignedTask>()
+                .HasOne(t => t.AssignedTo)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedToId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.AssignedToUser)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedToUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.AssignedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.Entity<TaskItem>()
                 .HasOne(t => t.PreviousColumn)
                 .WithMany()
