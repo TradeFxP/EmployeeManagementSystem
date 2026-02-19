@@ -47,6 +47,5 @@ namespace UserRoles.Models
         /// </summary>
         public DateTime? EmailChangeCodeExpiry { get; set; }
 
-        public bool IsDeleted { get; set; } = false;
     }
 }
