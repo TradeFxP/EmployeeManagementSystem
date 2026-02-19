@@ -243,47 +243,65 @@ function getPriorityBadge(priority) {
 // ================= ASSIGN TASK UI HELPERS =================
 
 function showAssignUI(taskId) {
-    // Hide actions toolbar
-    $(`.task-card[data-task-id="${taskId}"] .task-actions`).addClass('d-none');
+    // Hide actions toolbar with a slight fade
+    const card = $(`.task-card[data-task-id="${taskId}"]`);
+    card.find('.task-actions').addClass('d-none');
 
-    // Show assign container
-    $(`.task-assign-container[data-task-id="${taskId}"]`).removeClass('d-none');
+    // Show assign panel
+    const panel = card.find('.task-assign-panel');
+    panel.removeClass('d-none');
+
+    // Focus the select for better UX
+    panel.find('.task-assign-select').focus();
 }
 
 function cancelAssignTask(taskId) {
-    // Hide assign container
-    $(`.task-assign-container[data-task-id="${taskId}"]`).addClass('d-none');
+    const card = $(`.task-card[data-task-id="${taskId}"]`);
 
-    // Show actions toolbar
-    $(`.task-card[data-task-id="${taskId}"] .task-actions`).removeClass('d-none');
+    // Hide assign panel
+    card.find('.task-assign-panel').addClass('d-none');
+
+    // Restore actions toolbar
+    card.find('.task-actions').removeClass('d-none');
 }
 
 function confirmAssignTask(taskId) {
-    const container = $(`.task-assign-container[data-task-id="${taskId}"]`);
-    const select = container.find('.task-assign-select');
+    const card = $(`.task-card[data-task-id="${taskId}"]`);
+    const select = card.find('.task-assign-select');
     const userId = select.val();
 
     if (!userId) {
-        showToast('Please select a user to assign this task.', 'warning');
+        showToast('Please select a team member to assign this task.', 'warning');
         return;
     }
+
+    // Show loading state on button
+    const saveBtn = card.find('.task-assign-panel button.btn-primary');
+    const originalHtml = saveBtn.html();
+    saveBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
     $.post("/Tasks/AssignTask", { taskId: taskId, userId: userId })
         .done(function (response) {
             if (response.success) {
-                showToast('✅ Task assigned!', 'success');
-                // Use loadTeamBoard if available, otherwise reload
+                showToast('✅ Task successfully assigned!', 'success');
+
+                // Hide panel and restore buttons immediately for responsiveness
+                cancelAssignTask(taskId);
+
+                // Refresh board data
                 if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
                     loadTeamBoard(currentTeamName);
                 } else {
                     location.reload();
                 }
             } else {
-                showToast('Failed to assign task. Please try again.', 'danger');
+                showToast(response.message || 'Failed to assign task.', 'danger');
+                saveBtn.prop('disabled', false).html(originalHtml);
             }
         })
         .fail(function () {
-            showToast('Error assigning task — please check your connection.', 'danger');
+            showToast('Error: Could not reach the server.', 'danger');
+            saveBtn.prop('disabled', false).html(originalHtml);
         });
 }
 

@@ -289,81 +289,62 @@ public class TasksController : Controller
         }
 
         // 4. Update custom field values
-        if (model.CustomFieldValues != null && model.CustomFieldValues.Any())
+        if (model.CustomFieldValues != null)
         {
-            // Remove existing field values for this task
-            var existingValues = await _context.TaskFieldValues
-                .Include(v => v.Field)
+            // Get existing values for this task
+            var existingFieldValues = await _context.TaskFieldValues
                 .Where(v => v.TaskId == task.Id)
                 .ToListAsync();
 
-            var existingDict = existingValues.ToDictionary(v => v.FieldId, v => v);
+            var providedFieldIds = model.CustomFieldValues.Keys.ToList();
 
-            foreach (var fieldValue in model.CustomFieldValues)
+            // 1. Update or Insert
+            foreach (var kvp in model.CustomFieldValues)
             {
-                int fieldId = fieldValue.Key;
-                string newValue = fieldValue.Value;
+                int fieldId = kvp.Key;
+                string newValue = kvp.Value ?? "";
 
-                if (existingDict.TryGetValue(fieldId, out var existingVal))
+                // Check if field exists
+                var fieldDef = await _context.TaskCustomFields.FindAsync(fieldId);
+                if (fieldDef == null) continue;
+
+                var existing = existingFieldValues.FirstOrDefault(v => v.FieldId == fieldId);
+
+                if (existing != null)
                 {
-                    if (existingVal.Value != newValue)
+                    // Update if changed
+                    if (existing.Value != newValue)
                     {
-                        await _historyService.LogCustomFieldChange(task.Id, existingVal.Field?.FieldName ?? $"Field #{fieldId}", existingVal.Value, newValue, user.Id);
-                        existingVal.Value = newValue;
+                        await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, existing.Value ?? "(empty)", newValue, user.Id);
+                        existing.Value = newValue;
+                        existing.UpdatedAt = DateTime.UtcNow;
                     }
                 }
                 else
                 {
-                    // New value
-                    var fieldDef = await _context.TaskCustomFields.FindAsync(fieldId);
-                    if (fieldDef != null)
+                    // Insert
+                    await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(empty)", newValue, user.Id);
+                    var newVal = new TaskFieldValue
                     {
-                        await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(empty)", newValue, user.Id);
-                        var customFieldValue = new TaskFieldValue
-                        {
-                            TaskId = task.Id,
-                            FieldId = fieldValue.Key,
-                            Value = fieldValue.Value,
-                            CreatedAt = DateTime.UtcNow
-                        };
-                        _context.TaskFieldValues.Add(customFieldValue);
-                    }
+                        TaskId = task.Id,
+                        FieldId = fieldId,
+                        Value = newValue,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.TaskFieldValues.Add(newVal);
                 }
             }
 
-            // Clean up old method: We used to remove all and re-add. Now we update in place? 
-            // The Original code did: _context.TaskFieldValues.RemoveRange(existingValues);
-            // If I change to update-in-place, I must ensure I don't break anything.
-            // AND I need to handle fields that are NOT in the payload (if any).
-            // Typically UpdateTask payload sends ALL fields.
-            // But to be safe and match original "replace all" behavior while logging diffs:
-
-            // Re-fetch or stick to Original Logic but with logging?
-            // Original logic:
-            // RemoveRange(existingValues) -> Add(newValues).
-            // This is easier but we lose "OldValue" reference if we delete first.
-            // So:
-            // 1. Log diffs (done above)
-            // 2. Remove all existing (except maybe ones we just updated? effectively same result)
-            // 3. Add all new.
-
-            // Let's stick to "Log then Replace" pattern to minimize side effects, 
-            // BUT we must be careful not to hold onto entities we are about to delete?
-            // Actually, if I logged changes, I don't need the entities anymore.
-
-            _context.TaskFieldValues.RemoveRange(existingValues);
-
-            foreach (var fieldValue in model.CustomFieldValues)
+            // 2. Remove fields that were NOT provided in the payload (optional, usually payload is complete)
+            // If you want to keep data even if not in payload, skip this. 
+            // Most kanban apps send the full state. 
+            /*
+            var toDelete = existingFieldValues.Where(v => !providedFieldIds.Contains(v.FieldId)).ToList();
+            if (toDelete.Any())
             {
-                var customFieldValue = new TaskFieldValue
-                {
-                    TaskId = task.Id,
-                    FieldId = fieldValue.Key,
-                    Value = fieldValue.Value,
-                    CreatedAt = DateTime.UtcNow
-                };
-                _context.TaskFieldValues.Add(customFieldValue);
+                _context.TaskFieldValues.RemoveRange(toDelete);
             }
+            */
         }
 
         await _context.SaveChangesAsync();
@@ -382,6 +363,14 @@ public class TasksController : Controller
 
         if (task == null) return NotFound();
 
+        // Safety: Group by FieldId and take the latest to avoid "duplicate key" 500 error in ToDictionary
+        var latestFieldValues = task.CustomFieldValues
+            .GroupBy(v => v.FieldId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(v => v.CreatedAt).ThenByDescending(v => v.Id).First().Value ?? ""
+            );
+
         // 1. Get basic info
         var result = new
         {
@@ -391,7 +380,7 @@ public class TasksController : Controller
             priority = (int)task.Priority,
             assignedToUserId = task.AssignedToUserId,
             // 2. Convert custom fields to dictionary for easy JS consumption
-            customFieldValues = task.CustomFieldValues.ToDictionary(k => k.FieldId, v => v.Value)
+            customFieldValues = latestFieldValues
         };
 
         return Ok(result);

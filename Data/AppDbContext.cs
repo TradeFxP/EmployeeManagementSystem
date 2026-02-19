@@ -48,6 +48,9 @@ namespace UserRoles.Data
                 .HasIndex(r => new { r.ApplicationUserId, r.Date })
                 .IsUnique();
 
+            builder.Entity<Users>()
+                .HasQueryFilter(u => !u.IsDeleted);
+
             builder.Entity<DailyReport>()
                 .Property(r => r.Date)
                 .HasColumnType("date");

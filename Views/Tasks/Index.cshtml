@@ -1332,7 +1332,7 @@
         const titleVisible = titleEl && titleEl.closest('.mb-3').style.display !== 'none';
 
         if (titleVisible && !title) {
-            alert("Title is required");
+            showToast("Title is required", "warning");
             return;
         }
 
@@ -1364,6 +1364,7 @@
                 return res.json();
             })
             .then(() => {
+                showToast("✅ Task updated successfully!", "success");
                 // Close modal
                 const modalEl = document.getElementById('editTaskModal');
                 const modal = bootstrap.Modal.getInstance(modalEl);
@@ -1374,7 +1375,7 @@
             })
             .catch(err => {
                 console.error(err);
-                alert("Failed to update task");
+                showToast("Failed to update task", "danger");
             });
     }
 
@@ -1407,7 +1408,7 @@
         const titleVisible = titleEl && titleEl.closest('.mb-3').style.display !== 'none';
 
         if (titleVisible && !title) {
-            alert("Title is required");
+            showToast("Title is required", "warning");
             return;
         }
 
@@ -1441,9 +1442,10 @@
 
                 // reload board
                 loadTeamBoard(currentTeamName);
+                showToast("✅ Task created successfully!", "success");
             })
             .catch(err => {
-                alert(err.message || 'Failed to create task');
+                showToast(err.message || 'Failed to create task', "danger");
             });
     }
 </script>
