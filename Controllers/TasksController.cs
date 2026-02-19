@@ -485,6 +485,9 @@ public class TasksController : Controller
                 return Forbid();
         }
 
+        // ✅ AUTO-ARCHIVE logic: Move tasks from "Completed" to "History" if they were finished before today
+        await AutoArchiveOldTasks(team);
+
         // Load columns — enforce order: normal columns → Review → Completed
         var columnsRaw = await _context.TeamColumns
             .Where(c => c.TeamName == team)
@@ -887,6 +890,23 @@ public class TasksController : Controller
             task.ReviewStatus = UserRoles.Models.Enums.ReviewStatus.Passed;
             await _historyService.LogReviewPassed(task.Id, user.Id, model.ReviewNote);
 
+            // ✅ AUTO-MOVE TO COMPLETED: Find the designated "Completed" column for this team
+            var completedCol = await _context.TeamColumns
+                .FirstOrDefaultAsync(c => c.TeamName == task.TeamName && c.ColumnName.ToLower().Trim() == "completed");
+
+            if (completedCol != null)
+            {
+                await _historyService.LogColumnMove(task.Id, task.ColumnId, completedCol.Id, user.Id);
+                task.ColumnId = completedCol.Id;
+                task.Status = TaskStatusEnum.Complete;
+                task.CompletedByUserId = task.AssignedToUserId;
+                task.CompletedAt = DateTime.UtcNow;
+                task.CurrentColumnEntryAt = DateTime.UtcNow;
+                
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, passed = true, message = "Review passed! Task automatically moved to Completed." });
+            }
+
             return Ok(new { success = true, passed = true, message = "Review passed. Task can now be moved to Completed." });
         }
         else
@@ -1138,6 +1158,7 @@ public class TasksController : Controller
                 f.FieldName,
                 f.FieldType,
                 f.IsRequired,
+                f.DropdownOptions,
                 f.Order
             })
             .ToListAsync();
@@ -1150,6 +1171,7 @@ public class TasksController : Controller
         public string FieldName { get; set; } = string.Empty;
         public string FieldType { get; set; } = "Text";
         public bool IsRequired { get; set; } = false;
+        public string? DropdownOptions { get; set; }
     }
 
     [HttpPost]
@@ -1172,6 +1194,7 @@ public class TasksController : Controller
             FieldName = model.FieldName.Trim(),
             FieldType = model.FieldType,
             IsRequired = model.IsRequired,
+            DropdownOptions = model.DropdownOptions,
             IsActive = true,
             Order = maxOrder + 1,
             CreatedByUserId = user.Id,
@@ -1190,6 +1213,7 @@ public class TasksController : Controller
         public string? FieldName { get; set; }
         public string? FieldType { get; set; }
         public bool? IsRequired { get; set; }
+        public string? DropdownOptions { get; set; }
     }
 
     [HttpPost]
@@ -1208,6 +1232,9 @@ public class TasksController : Controller
 
         if (model.IsRequired.HasValue)
             field.IsRequired = model.IsRequired.Value;
+
+        if (model.DropdownOptions != null)
+            field.DropdownOptions = model.DropdownOptions;
 
         await _context.SaveChangesAsync();
 
@@ -1376,6 +1403,33 @@ public class TasksController : Controller
             "ReviewTask" => perms.CanReviewTask,
             _ => false
         };
+    }
+
+    private async Task AutoArchiveOldTasks(string teamName)
+    {
+        // Find tasks in "Completed" column that were completed before today (UTC)
+        var today = DateTime.UtcNow.Date;
+
+        var oldTasks = await _context.TaskItems
+            .Include(t => t.Column)
+            .Where(t => t.TeamName == teamName 
+                     && !t.IsArchived 
+                     && t.Column.ColumnName.ToLower().Trim() == "completed" 
+                     && t.CompletedAt.HasValue 
+                     && t.CompletedAt.Value < today)
+            .ToListAsync();
+
+        if (oldTasks.Any())
+        {
+            foreach (var task in oldTasks)
+            {
+                task.IsArchived = true;
+                task.ArchivedAt = DateTime.UtcNow;
+                // Log archival (system user or null if we don't have a specific trigger user context here)
+                await _historyService.LogArchivedToHistory(task.Id, "System");
+            }
+            await _context.SaveChangesAsync();
+        }
     }
 }
 

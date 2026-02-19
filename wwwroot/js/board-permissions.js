@@ -52,6 +52,11 @@ async function loadBoardPermissions(teamName) {
                 <td class="text-center">${renderSwitch(p.userId, 'canEditAllFields', p.canEditAllFields)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canDeleteTask', p.canDeleteTask)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canReviewTask', p.canReviewTask)}</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-link text-info p-0" onclick="grantAllBoardPermissions(this, '${p.userId}', '${teamName}')" title="Grant All Permissions">
+                        <i class="bi bi-check-all fs-4"></i>
+                    </button>
+                </td>
             `;
             tbody.appendChild(tr);
         });
@@ -129,5 +134,48 @@ async function updatePermission(checkbox, teamName) {
         checkbox.checked = !val; // revert
     } finally {
         checkbox.disabled = false;
+    }
+}
+
+async function grantAllBoardPermissions(btn, userId, teamName) {
+    if (!confirm('Grant all permissions to this user for this board?')) return;
+
+    const row = btn.closest('tr');
+    const switches = row.querySelectorAll('.perm-switch');
+
+    const dto = {
+        userId: userId,
+        teamName: teamName,
+        canAddColumn: true,
+        canRenameColumn: true,
+        canReorderColumns: true,
+        canDeleteColumn: true,
+        canEditAllFields: true,
+        canDeleteTask: true,
+        canReviewTask: true
+    };
+
+    btn.disabled = true;
+    try {
+        const resp = await fetch('/Tasks/UpdateBoardPermission', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!resp.ok) throw new Error('Update failed');
+
+        switches.forEach(s => s.checked = true);
+
+        if (typeof showToast === 'function') {
+            showToast('✅ Full board access granted', 'success');
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') {
+            showToast(err.message, 'danger');
+        } else {
+            alert(err.message);
+        }
+    } finally {
+        btn.disabled = false;
     }
 }

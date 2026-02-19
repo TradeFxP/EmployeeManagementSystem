@@ -329,7 +329,7 @@ function submitReview() {
             bootstrap.Modal.getInstance(document.getElementById('reviewTaskModal'))?.hide();
 
             if (response.passed) {
-                showToast('✅ Review Passed! Task ready for completed.', 'success');
+                showToast('✅ Review Passed! Task automatically moved to Completed.', 'success');
             } else {
                 showToast('❌ Review Failed. Task returned to previous column.', 'warning');
             }

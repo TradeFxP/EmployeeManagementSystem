@@ -10,6 +10,9 @@ namespace UserRoles.Models
         public string FieldType { get; set; } = "Text";
         
         public bool IsRequired { get; set; } = false;
+
+        // Comma-separated or JSON list of options for Dropdown type
+        public string? DropdownOptions { get; set; }
         
         // Soft delete support
         public bool IsActive { get; set; } = true;
