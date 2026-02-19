@@ -258,19 +258,24 @@
                              data-review-status="@reviewStatusInt"
                              onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@task.Id)">
 
-                            <!-- TOP ROW: Priority (left) + Review Status (right) -->
+                            <!-- TOP ROW: Priority (left) + Task ID + Review Status (right) -->
                             <div class="card-top-row">
                                 <span class="priority-pill @priorityBorderClass">@priorityLabel</span>
 
-                                <span class="review-badge review-badge-fail" style="display: @(isFailed ? "inline-flex" : "none")">
-                                    <i class="bi bi-x-circle-fill"></i> FAIL
-                                </span>
-                                <span class="review-badge review-badge-pass" style="display: @(isPassed ? "inline-flex" : "none")">
-                                    <i class="bi bi-check-circle-fill"></i> PASS
-                                </span>
-                                <span class="review-badge review-badge-pending" style="display: @(isPending && isReviewCol ? "inline-flex" : "none")">
-                                    <i class="bi bi-hourglass-split"></i> PENDING
-                                </span>
+                                <div class="d-flex align-items-center gap-1 ms-auto">
+                                    <!-- TASK ID CHIP -->
+                                    <span class="task-id-chip" title="Task ID">#@task.Id</span>
+
+                                    <span class="review-badge review-badge-fail" style="display: @(isFailed ? "inline-flex" : "none")">
+                                        <i class="bi bi-x-circle-fill"></i> FAIL
+                                    </span>
+                                    <span class="review-badge review-badge-pass" style="display: @(isPassed ? "inline-flex" : "none")">
+                                        <i class="bi bi-check-circle-fill"></i> PASS
+                                    </span>
+                                    <span class="review-badge review-badge-pending" style="display: @(isPending && isReviewCol ? "inline-flex" : "none")">
+                                        <i class="bi bi-hourglass-split"></i> PENDING
+                                    </span>
+                                </div>
                             </div>
 
                             <!-- TITLE -->
@@ -388,21 +393,21 @@
                                     <i class="bi bi-person-plus"></i> 
                                 </button>
 
-                                @* ADMIN / GRANTED: Review button in Review column *@
-                                @if ((User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true)) && isReviewCol && isPending)
+                                @* ADMIN / GRANTED: Review button rendered if user has perms, display toggled by column *@
+                                @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true))
                                 {
                                     <button class="action-btn action-btn-warning action-btn-review" title="Review Task"
-                                            style="display: @(isReviewCol ? "inline-flex" : "none")"
+                                            style="display: @(isReviewCol && isPending ? "inline-flex" : "none")"
                                             onclick="openReviewModal(@task.Id, '@task.Title.Replace("'", "\\'")'); event.stopPropagation();">
                                         <i class="bi bi-clipboard-check"></i> 
                                     </button>
                                 }
 
-                                @* ADMIN / GRANTED: Archive button in Completed column *@
-                                @if ((User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true)) && isCompletedCol && isPassed)
+                                @* ADMIN / GRANTED: Archive button rendered if user has perms, display toggled by column *@
+                                @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true))
                                 {
                                     <button class="action-btn action-btn-success action-btn-archive" title="Archive Task"
-                                            style="display: @(isCompletedCol ? "inline-flex" : "none")"
+                                            style="display: @(isCompletedCol && isPassed ? "inline-flex" : "none")"
                                             onclick="archiveSingleTask(@task.Id); event.stopPropagation();">
                                         <i class="bi bi-archive"></i> 
                                     </button>
@@ -851,6 +856,28 @@
     @@keyframes pendingPulse {
         0%, 100% { box-shadow: 0 2px 8px rgba(255, 187, 51, 0.3); }
         50% { box-shadow: 0 2px 16px rgba(255, 187, 51, 0.6); }
+    }
+
+    /* ===== TASK ID CHIP ===== */
+    .task-id-chip {
+        display: inline-flex;
+        align-items: center;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        font-family: 'Courier New', monospace;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: rgba(102, 126, 234, 0.08);
+        color: #667eea;
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        cursor: default;
+        user-select: all;
+        transition: background 0.2s;
+    }
+    .task-id-chip:hover {
+        background: rgba(102, 126, 234, 0.15);
+        border-color: rgba(102, 126, 234, 0.4);
     }
 
     /* ===== TASK TITLE ===== */

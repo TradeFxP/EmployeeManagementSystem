@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260219111020_AddNumericUserId")]
+    partial class AddNumericUserId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -857,6 +860,9 @@ namespace UserRoles.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<int>("NumericId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ParentUserId")
                         .HasColumnType("text");
 
@@ -898,6 +904,9 @@ namespace UserRoles.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("NumericId")
+                        .IsUnique();
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -958,7 +967,7 @@ namespace UserRoles.Migrations
                     b.HasOne("UserRoles.Models.Users", "AssignedBy")
                         .WithMany()
                         .HasForeignKey("AssignedById")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("UserRoles.Models.Users", "AssignedTo")
@@ -1117,8 +1126,7 @@ namespace UserRoles.Migrations
                 {
                     b.HasOne("UserRoles.Models.Users", "AssignedByUser")
                         .WithMany()
-                        .HasForeignKey("AssignedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("AssignedByUserId");
 
                     b.HasOne("UserRoles.Models.Users", "AssignedToUser")
                         .WithMany()
@@ -1140,7 +1148,7 @@ namespace UserRoles.Migrations
                     b.HasOne("UserRoles.Models.Users", "CreatedByUser")
                         .WithMany()
                         .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("UserRoles.Models.TeamColumn", "PreviousColumn")

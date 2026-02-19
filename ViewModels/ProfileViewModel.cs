@@ -28,5 +28,7 @@ namespace UserRoles.ViewModels
 
         // 🔑 Role-based permission
         public bool CanEditEmail { get; set; }
+
+        public string UserId { get; set; }
     }
 }

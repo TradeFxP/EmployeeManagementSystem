@@ -1,5 +1,5 @@
 ﻿@model (UserRoles.Models.Users User, string Role)
 
-<h4>@Model.User.Name</h4>
+<h4>@Model.User.Name <span class="badge bg-secondary fs-6" style="font-family: monospace;">#@Model.User.Id</span></h4>
 <p>Email: @Model.User.Email</p>
 <p>Role: @Model.Role</p>

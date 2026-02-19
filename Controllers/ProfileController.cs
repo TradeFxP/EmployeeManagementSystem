@@ -35,10 +35,10 @@ namespace UserRoles.Controllers
             var model = new ProfileViewModel
             {
                 FirstName = user.Name,
-
                 Address = user.Address,
                 Email = user.Email,
                 MobileNumber = user.MobileNumber,
+                UserId = user.Id,
                 IsEditMode = false,
                 CanEditEmail = User.IsInRole("Admin")
             };
@@ -60,6 +60,7 @@ namespace UserRoles.Controllers
                 Email = user.Email,
                 Address = user.Address,
                 MobileNumber = user.MobileNumber,
+                UserId = user.Id,
                 IsEditMode = true,               // 🔑 THIS ENABLES EDIT
                 CanEditEmail = User.IsInRole("Admin")
             };

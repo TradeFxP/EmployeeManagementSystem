@@ -840,6 +840,22 @@ namespace UserRoles.Controllers
                 }
             }
 
+            // ✅ Assign next sequential numeric ID as the primary ID (Admin=100, others start at 101+)
+            var allIds = await _context.Users
+                .IgnoreQueryFilters()
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            int maxId = 100;
+            foreach (var idStr in allIds)
+            {
+                if (int.TryParse(idStr, out int val) && val > maxId)
+                {
+                    maxId = val;
+                }
+            }
+            user.Id = (maxId + 1).ToString();
+
             var result = await _userManager.CreateAsync(user, password);
             if (!result.Succeeded)
                 return BadRequest(string.Join(", ", result.Errors.Select(e => e.Description)));

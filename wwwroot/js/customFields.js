@@ -2,6 +2,23 @@
 
 window.customFieldsCache = window.customFieldsCache || null;
 
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+/** Bust the cache and re-render fields in whichever modals are currently open. */
+async function refreshOpenModals() {
+    window.customFieldsCache = null;
+    const createEl = document.getElementById('customFieldsContainer');
+    const editEl = document.getElementById('editCustomFieldsContainer');
+    if (createEl) {
+        const savedCreate = collectCustomFieldValues('customFieldsContainer');
+        await renderCustomFieldInputs('customFieldsContainer', savedCreate);
+    }
+    if (editEl) {
+        const savedEdit = collectCustomFieldValues('editCustomFieldsContainer');
+        await renderCustomFieldInputs('editCustomFieldsContainer', savedEdit);
+    }
+}
+
 // Load custom fields from server
 async function loadCustomFields() {
     // Return cached if available
@@ -182,11 +199,7 @@ async function addNewCustomField() {
 
         if (!response.ok) throw new Error('Failed to create field');
 
-        // Clear cache and reload
-        window.customFieldsCache = null;
-        const currentValues = collectCustomFieldValues('customFieldsContainer');
-        if (document.getElementById('customFieldsContainer')) await renderCustomFieldInputs('customFieldsContainer', currentValues);
-        if (document.getElementById('editCustomFieldsContainer')) await renderCustomFieldInputs('editCustomFieldsContainer', collectCustomFieldValues('editCustomFieldsContainer'));
+        await refreshOpenModals();
 
     } catch (error) {
         alert("Error adding field: " + error.message);
@@ -209,9 +222,7 @@ async function renameCustomField(id, currentName) {
 
         if (!response.ok) throw new Error('Failed to rename field');
 
-        // Clear cache and reload
-        window.customFieldsCache = null;
-        await renderCustomFieldInputs('customFieldsContainer', collectCustomFieldValues());
+        await refreshOpenModals();
 
     } catch (error) {
         alert("Error renaming field: " + error.message);
@@ -230,9 +241,7 @@ async function deleteCustomFieldInline(id) {
 
         if (!response.ok) throw new Error('Failed to delete field');
 
-        // Clear cache and reload
-        window.customFieldsCache = null;
-        await renderCustomFieldInputs('customFieldsContainer', collectCustomFieldValues());
+        await refreshOpenModals();
 
     } catch (error) {
         alert("Error deleting field: " + error.message);
@@ -387,8 +396,11 @@ async function createNewField() {
         if (!response.ok) throw new Error('Failed to create field');
 
         // Clear UI in modal
+        document.getElementById('newFieldName').value = '';
         document.getElementById('newFieldOptionsList').innerHTML = '';
         document.getElementById('newFieldOptionsSection').classList.add('d-none');
+        document.getElementById('newFieldType').value = 'Text';
+        document.getElementById('newFieldRequired').checked = false;
 
         // IMPORTANT: Clear cache so new fields load
         window.customFieldsCache = null;
@@ -396,11 +408,10 @@ async function createNewField() {
         // Reload list in modal
         await loadFieldsList();
 
-        // Re-render fields in task modals
-        if (document.getElementById('customFieldsContainer')) await renderCustomFieldInputs('customFieldsContainer');
-        if (document.getElementById('editCustomFieldsContainer')) await renderCustomFieldInputs('editCustomFieldsContainer');
+        // ✅ Re-render fields in task modals IMMEDIATELY (no page refresh needed)
+        await refreshOpenModals();
 
-        console.log('Field created successfully and forms updated');
+        if (typeof showToast === 'function') showToast(`✅ Field "${fieldName}" added!`, 'success');
 
     } catch (error) {
         alert('Error creating field: ' + error.message);
@@ -425,10 +436,10 @@ async function deleteField(fieldId) {
         // Reload list
         await loadFieldsList();
 
-        // Re-render fields in create task modal if it's open
-        await renderCustomFieldInputs('customFieldsContainer');
+        // ✅ Re-render fields in task modals IMMEDIATELY
+        await refreshOpenModals();
 
-        console.log('Field deleted successfully');
+        if (typeof showToast === 'function') showToast('🗑️ Field deleted', 'info');
 
     } catch (error) {
         alert('Error deleting field: ' + error.message);
@@ -468,9 +479,9 @@ async function changeFieldType(fieldId, currentType) {
         // Clear cache and reload
         customFieldsCache = null;
         await loadFieldsList();
-        await renderCustomFieldInputs('customFieldsContainer');
+        await refreshOpenModals();
 
-        console.log(`Field type changed to ${newType}`);
+        if (typeof showToast === 'function') showToast(`✅ Field type changed to ${newType}`, 'success');
 
     } catch (error) {
         alert('Error changing field type: ' + error.message);
@@ -501,8 +512,7 @@ async function editDropdownOptions(fieldId, currentOptions) {
 
         window.customFieldsCache = null;
         await loadFieldsList();
-        if (document.getElementById('customFieldsContainer')) await renderCustomFieldInputs('customFieldsContainer');
-        if (document.getElementById('editCustomFieldsContainer')) await renderCustomFieldInputs('editCustomFieldsContainer');
+        await refreshOpenModals();
 
     } catch (error) {
         alert('Error updating options: ' + error.message);

@@ -19,6 +19,7 @@ System.Net.ServicePointManager.SecurityProtocol =
 
 // ================= MVC =================
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR();
 
 // ================= DATABASE =================
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -83,6 +84,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // ================= ROUTING =================
+app.MapHub<UserRoles.Hubs.TaskHub>("/taskHub");
+
 // 🔴 IMPORTANT: DEFAULT ROUTE → RedirectByRole so authenticated Admin/Manager go to OrgChart
 app.MapControllerRoute(
     name: "default",
