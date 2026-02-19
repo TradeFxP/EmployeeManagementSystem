@@ -337,10 +337,14 @@ namespace UserRoles.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // ✅ NOW SAFE TO SOFT DELETE
-            manager.IsDeleted = true;
-            await _userManager.UpdateSecurityStampAsync(manager);
-            await _userManager.UpdateAsync(manager);
+            // ✅ NOW SAFE TO HARD DELETE
+            await PurgeUserReferences(manager.Id);
+            var result = await _userManager.DeleteAsync(manager);
+            if (!result.Succeeded)
+            {
+                TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));
+                return RedirectToAction(nameof(Managers));
+            }
 
             TempData["Success"] = "Manager deactivated and users reassigned successfully.";
             return RedirectToAction(nameof(Managers));
@@ -1022,9 +1026,11 @@ namespace UserRoles.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            user.IsDeleted = true;
-            await _userManager.UpdateSecurityStampAsync(user);
-            await _userManager.UpdateAsync(user);
+            await PurgeUserReferences(user.Id);
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+                return BadRequest(string.Join(", ", result.Errors.Select(e => e.Description)));
+
             return Ok();            
         }
 
@@ -1256,10 +1262,18 @@ namespace UserRoles.Controllers
                 return RedirectToAction(nameof(Managers));
             }
 
-            // ✅ SAFE SOFT DELETE FOR NORMAL USERS
-            user.IsDeleted = true;
-            await _userManager.UpdateSecurityStampAsync(user);
-            await _userManager.UpdateAsync(user);
+            // ✅ SAFE HARD DELETE FOR NORMAL USERS
+            await PurgeUserReferences(user.Id);
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                TempData["Error"] = string.Join(", ", result.Errors.Select(e => e.Description));
+            }
+            else
+            {
+                TempData["Success"] = "User deleted successfully.";
+            }
+
             return RedirectToAction(nameof(Index), new
             {
                 page,
@@ -1267,6 +1281,62 @@ namespace UserRoles.Controllers
                 search,
                 managerId = Request.Query["managerId"].ToString()
             });
+        }
+
+        // ================= PURGE USER REFERENCES (HARD DELETE PREP) =================
+        private async Task PurgeUserReferences(string userId)
+        {
+            // 1. Delete records that are purely user-dependent
+            var reports = await _context.DailyReports.Where(r => r.ApplicationUserId == userId).ToListAsync();
+            _context.DailyReports.RemoveRange(reports);
+
+            var teams = await _context.UserTeams.Where(t => t.UserId == userId).ToListAsync();
+            _context.UserTeams.RemoveRange(teams);
+
+            var perms = await _context.BoardPermissions.Where(p => p.UserId == userId).ToListAsync();
+            _context.BoardPermissions.RemoveRange(perms);
+
+            // 2. Set NULL for auditing/historical records
+            var emailLogs = await _context.EmailLogs.Where(l => l.SentByUserId == userId).ToListAsync();
+            foreach (var log in emailLogs) log.SentByUserId = null;
+
+            var histories = await _context.TaskHistories.Where(h => h.ChangedByUserId == userId).ToListAsync();
+            foreach (var history in histories) history.ChangedByUserId = null;
+
+            // 3. Application Entities (Projects, Epics, etc.)
+            var epics = await _context.Epics.Where(e => e.CreatedByUserId == userId).ToListAsync();
+            foreach (var e in epics) e.CreatedByUserId = null;
+
+            var features = await _context.Features.Where(f => f.CreatedByUserId == userId).ToListAsync();
+            foreach (var f in features) f.CreatedByUserId = null;
+
+            var projects = await _context.Projects.Where(p => p.CreatedByUserId == userId).ToListAsync();
+            foreach (var p in projects) p.CreatedByUserId = null;
+
+            var stories = await _context.Stories.Where(s => s.CreatedByUserId == userId).ToListAsync();
+            foreach (var s in stories) s.CreatedByUserId = null;
+
+            var customFields = await _context.TaskCustomFields.Where(cf => cf.CreatedByUserId == userId).ToListAsync();
+            foreach (var cf in customFields) cf.CreatedByUserId = null;
+
+            // 4. Task Items (Nullify or Hand over)
+            var tasksAssignedBy = await _context.TaskItems.Where(t => t.AssignedByUserId == userId).ToListAsync();
+            foreach (var t in tasksAssignedBy) t.AssignedByUserId = null;
+
+            var tasksReviewedBy = await _context.TaskItems.Where(t => t.ReviewedByUserId == userId).ToListAsync();
+            foreach (var t in tasksReviewedBy) t.ReviewedByUserId = null;
+
+            var tasksCompletedBy = await _context.TaskItems.Where(t => t.CompletedByUserId == userId).ToListAsync();
+            foreach (var t in tasksCompletedBy) t.CompletedByUserId = null;
+
+            var tasksCreatedBy = await _context.TaskItems.Where(t => t.CreatedByUserId == userId).ToListAsync();
+            foreach (var t in tasksCreatedBy) t.CreatedByUserId = null;
+
+            // 5. AssignedTasks Join Table (Deleted users can't have assignments)
+            var assignedTasks = await _context.AssignedTasks.Where(at => at.AssignedToId == userId || at.AssignedById == userId).ToListAsync();
+            _context.AssignedTasks.RemoveRange(assignedTasks);
+
+            await _context.SaveChangesAsync();
         }
 
         // ================= MANAGER VISIBILITY (Manager login) =================

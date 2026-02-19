@@ -46,7 +46,7 @@ namespace UserRoles.Controllers
                 return View(model);
 
             var user = await userManager.FindByEmailAsync(model.Email);
-            if (user == null || user.IsDeleted)
+            if (user == null)
             {
                 ModelState.AddModelError("", "Invalid login attempt.");
                 return View(model);
