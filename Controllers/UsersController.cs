@@ -337,10 +337,12 @@ namespace UserRoles.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // ✅ NOW SAFE TO DELETE
-            await _userManager.DeleteAsync(manager);
+            // ✅ NOW SAFE TO SOFT DELETE
+            manager.IsDeleted = true;
+            await _userManager.UpdateSecurityStampAsync(manager);
+            await _userManager.UpdateAsync(manager);
 
-            TempData["Success"] = "Manager deleted and users reassigned successfully.";
+            TempData["Success"] = "Manager deactivated and users reassigned successfully.";
             return RedirectToAction(nameof(Managers));
         }
 
@@ -1004,7 +1006,9 @@ namespace UserRoles.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            await _userManager.DeleteAsync(user);
+            user.IsDeleted = true;
+            await _userManager.UpdateSecurityStampAsync(user);
+            await _userManager.UpdateAsync(user);
             return Ok();            
         }
 
@@ -1236,8 +1240,10 @@ namespace UserRoles.Controllers
                 return RedirectToAction(nameof(Managers));
             }
 
-            // ✅ SAFE DELETE FOR NORMAL USERS
-            await _userManager.DeleteAsync(user);
+            // ✅ SAFE SOFT DELETE FOR NORMAL USERS
+            user.IsDeleted = true;
+            await _userManager.UpdateSecurityStampAsync(user);
+            await _userManager.UpdateAsync(user);
             return RedirectToAction(nameof(Index), new
             {
                 page,

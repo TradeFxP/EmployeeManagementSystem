@@ -46,5 +46,7 @@ namespace UserRoles.Models
         /// Expiry time for EmailChangeLoginCode (eg: now + 10 minutes).
         /// </summary>
         public DateTime? EmailChangeCodeExpiry { get; set; }
+
+        public bool IsDeleted { get; set; } = false;
     }
 }
