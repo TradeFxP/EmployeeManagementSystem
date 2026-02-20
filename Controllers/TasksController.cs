@@ -172,15 +172,25 @@ public class TasksController : Controller
 
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Manager,Sub-Manager")]
+    [Authorize]
     public async Task<IActionResult> AssignTask(int taskId, string userId)
     {
         if (string.IsNullOrEmpty(userId))
             return BadRequest("UserId is required");
 
-        var task = await _context.TaskItems.FindAsync(taskId);
+        var task = await _context.TaskItems.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId);
         if (task == null)
             return NotFound();
+
+        // Check permission: Admin or granted CanAssignTask
+        if (!User.IsInRole("Admin") && !await AuthorizeBoardAction(task.TeamName, "AssignTask"))
+        {
+            return Forbid();
+        }
+
+        // Re-fetch with tracking for update
+        var taskToUpdate = await _context.TaskItems.FindAsync(taskId);
+        if (taskToUpdate == null) return NotFound();
 
         var assignToUser = await _userManager.FindByIdAsync(userId);
         if (assignToUser == null)
@@ -191,11 +201,11 @@ public class TasksController : Controller
             return Unauthorized();
 
         // ✅ LOG ASSIGNMENT
-        await _historyService.LogAssignment(task.Id, assignToUser.Id, currentUser.Id);
+        await _historyService.LogAssignment(taskToUpdate.Id, assignToUser.Id, currentUser.Id);
 
-        task.AssignedToUserId = assignToUser.Id;
-        task.AssignedByUserId = currentUser.Id;
-        task.AssignedAt = DateTime.UtcNow;
+        taskToUpdate.AssignedToUserId = assignToUser.Id;
+        taskToUpdate.AssignedByUserId = currentUser.Id;
+        taskToUpdate.AssignedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
@@ -204,7 +214,7 @@ public class TasksController : Controller
             success = true,
             assignedTo = assignToUser.UserName,
             assignedBy = currentUser.UserName,
-            assignedAt = task.AssignedAt.Value.ToString("dd MMM yyyy, hh:mm tt")
+            assignedAt = taskToUpdate.AssignedAt.Value.ToString("dd MMM yyyy, hh:mm tt")
         });
     }
 
@@ -290,9 +300,7 @@ public class TasksController : Controller
 
         if (!string.IsNullOrEmpty(model.AssignedToUserId))
         {
-            if (User.IsInRole("Admin") ||
-                User.IsInRole("Manager") ||
-                User.IsInRole("SubManager"))
+            if (User.IsInRole("Admin") || await AuthorizeBoardAction(task.TeamName, "AssignTask"))
             {
                 if (task.AssignedToUserId != model.AssignedToUserId)
                 {
@@ -565,6 +573,12 @@ public class TasksController : Controller
             .OrderBy(u => u.UserName)
             .ToListAsync();
 
+        // Get all team names for the assignment dropdown
+        var allTeamNames = await _context.TeamColumns
+            .Select(c => c.TeamName)
+            .Distinct()
+            .ToListAsync();
+
         // Load active custom fields
         var customFields = await _context.TaskCustomFields
             .Where(f => f.IsActive && (string.IsNullOrEmpty(f.TeamName) || f.TeamName == team))
@@ -584,6 +598,7 @@ public class TasksController : Controller
             TeamName = team,
             Columns = columns,
             AssignableUsers = assignableUsers,
+            AllTeamNames = allTeamNames,
             CustomFields = customFields,
             UserPermissions = userPerms,
             TeamSettings = teamSettings
@@ -1218,6 +1233,13 @@ public class TasksController : Controller
         if (user == null)
             return Unauthorized();
 
+        // Check permission if not Admin
+        if (!User.IsInRole("Admin"))
+        {
+            if (!await AuthorizeBoardAction(task.TeamName, "AssignTask"))
+                return Forbid();
+        }
+
         // 1. Find the FIRST column for the target team
         var targetColumn = await _context.TeamColumns
             .Where(c => c.TeamName == model.TeamName)
@@ -1474,7 +1496,8 @@ public class TasksController : Controller
                 CanEditAllFields = p?.CanEditAllFields ?? false,
                 CanDeleteTask = p?.CanDeleteTask ?? false,
                 CanReviewTask = p?.CanReviewTask ?? false,
-                CanImportExcel = p?.CanImportExcel ?? false
+                CanImportExcel = p?.CanImportExcel ?? false,
+                CanAssignTask = p?.CanAssignTask ?? false
             });
         }
 
@@ -1525,8 +1548,13 @@ public class TasksController : Controller
         existing.CanDeleteTask = dto.CanDeleteTask;
         existing.CanReviewTask = dto.CanReviewTask;
         existing.CanImportExcel = dto.CanImportExcel;
+        existing.CanAssignTask = dto.CanAssignTask;
 
         await _context.SaveChangesAsync();
+
+        // Broadcast permission update to the user
+        await _hubContext.Clients.All.SendAsync("PermissionsUpdated", dto.UserId, dto.TeamName);
+
         return Ok(new { success = true });
     }
 
@@ -1554,6 +1582,7 @@ public class TasksController : Controller
             "DeleteTask" => perms.CanDeleteTask,
             "ReviewTask" => perms.CanReviewTask,
             "ImportExcel" => perms.CanImportExcel,
+            "AssignTask" => perms.CanAssignTask,
             _ => false
         };
     }

@@ -8,6 +8,9 @@ namespace UserRoles.ViewModels
         // ✅ Teams visible to the logged-in user
         public List<string> AvailableTeams { get; set; } = new();
 
+        // ✅ All team names for assignment dropdown
+        public List<string> AllTeamNames { get; set; } = new();
+
         // ✅ Columns shown on the board
         public List<TeamColumn> Columns { get; set; } = new();
 
