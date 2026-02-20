@@ -102,7 +102,58 @@
                                         }
                                     </div>
                                 }
+                             <!-- TOP ROW (New) -->
+                            @{
+                                var priorityBorderClass = task.Priority switch
+                                {
+                                    UserRoles.Models.Enums.TaskPriority.Low => "priority-low",
+                                    UserRoles.Models.Enums.TaskPriority.Medium => "priority-medium",
+                                    UserRoles.Models.Enums.TaskPriority.High => "priority-high",
+                                    UserRoles.Models.Enums.TaskPriority.Critical => "priority-critical",
+                                    _ => "priority-low"
+                                };
+                                var priorityLabel = task.Priority.ToString();
+                                var customPriority = task.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldName?.Trim()?.ToLower() == "priority")?.Value;
+                                var effectivePriorityLabel = !string.IsNullOrWhiteSpace(customPriority) ? customPriority : priorityLabel;
+                                var effectivePriorityClass = effectivePriorityLabel.ToLower() switch
+                                {
+                                    "low" => "priority-low",
+                                    "medium" => "priority-medium",
+                                    "high" => "priority-high",
+                                    "critical" => "priority-critical",
+                                    _ => priorityBorderClass
+                                };
+                            }
 
+                            @{
+                                DateTime? finalDueDate = task.DueDate;
+                                if (finalDueDate == null && task.CustomFieldValues != null)
+                                {
+                                    var cfDueDate = task.CustomFieldValues.FirstOrDefault(f => f.Field?.FieldName?.Trim().ToLower() == "due date")?.Value;
+                                    if (DateTime.TryParse(cfDueDate, out var parsedDate))
+                                    {
+                                        finalDueDate = parsedDate;
+                                    }
+                                }
+                            }
+
+                            <div class="d-flex flex-column gap-1 mb-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        @if (finalDueDate != null)
+                        {
+                            <span class="badge @effectivePriorityClass text-white" style="font-size: 0.7rem; padding: 2px 6px;">@effectivePriorityLabel.ToUpper()</span>
+                        }
+                        <span class="badge bg-light text-muted border small ms-auto" style="font-size: 0.7rem;">#@task.Id</span>
+                    </div>
+                
+                    @if (finalDueDate != null)
+                    {
+                        <span class="badge bg-light text-dark border small d-flex align-items-center gap-1" title="Due Date" style="font-size: 0.7rem; width: fit-content;">
+                            <i class="bi bi-calendar-event text-danger"></i>
+                            Due Date: @finalDueDate.Value.ToString("dd MMM, hh:mm tt")
+                        </span>
+                    }
+                </div>
                                 <!-- ADMIN ACTIONS -->
                                 @if (User.IsInRole("Admin"))
                                 {

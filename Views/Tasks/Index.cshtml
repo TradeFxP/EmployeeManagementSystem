@@ -370,6 +370,21 @@
                         </select>
                     </div>
 
+                    <div class="mb-3" id="groupCreateTaskDueDate" style="display: @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "block" : "none")">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label mb-0" id="labelCreateTaskDueDate">Due Date & Time</label>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Due Date" onclick="renameField('labelCreateTaskDueDate')">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-link text-danger p-0" title="Delete Due Date" onclick="hideField('groupCreateTaskDueDate')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <input type="datetime-local" id="taskDueDate" class="form-control" />
+                    </div>
+
                     @* <div class="mb-3">
                     <label class="form-label">Link to Project (optional - for auto ID)</label>
                     <select id="taskProjectId" class="form-select">
@@ -461,6 +476,20 @@
                                 <option value="2">High</option>
                                 <option value="3">Critical</option>
                             </select>
+                        </div>
+                        <div class="col-md-6 mb-3" id="groupEditTaskDueDate" style="display: @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "block" : "none")">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label mb-0" id="labelEditTaskDueDate">Due Date & Time</label>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Due Date" onclick="renameField('labelEditTaskDueDate')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Due Date" onclick="hideField('groupEditTaskDueDate')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="datetime-local" id="editTaskDueDate" class="form-control" />
                         </div>
                         <div class="col-md-6 mb-3" id="groupEditTaskAssignTo">
                              <div class="d-flex justify-content-between align-items-center mb-1">
@@ -590,6 +619,23 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- SYSTEM FIELDS VISIBILITY -->
+                    <div class="card mb-3 border-info shadow-sm">
+                        <div class="card-header bg-info text-white py-2">
+                            <i class="bi bi-toggle-on me-1"></i> System Fields Visibility
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="showPriorityCheckbox" @(Model?.TeamSettings?.IsPriorityVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                <label class="form-check-label" for="showPriorityCheckbox">Show Priority Dropdown & Badge</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="showDueDateCheckbox" @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                <label class="form-check-label" for="showDueDateCheckbox">Show Due Date Picker & Badge</label>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Existing Fields List -->
                     <h6 class="mb-3">Existing Fields</h6>
                     <div id="fieldsList" class="mb-4">
@@ -649,6 +695,343 @@
         </div>
     </div>
 
+    <!-- ═══════ EXCEL IMPORT MODAL ═══════ -->
+    <div class="modal fade" id="excelImportModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header" style="background: linear-gradient(135deg, #0d9488, #0891b2); border-radius: 16px 16px 0 0;">
+                    <h5 class="modal-title text-white">
+                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Tasks from Excel
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="resetExcelImport()"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <!-- Tab Navigation -->
+                    <ul class="nav nav-tabs px-4 pt-3" id="importTabs">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-tab="upload" onclick="switchImportTab('upload')">
+                                <i class="bi bi-cloud-arrow-up me-1"></i> Upload
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-tab="history" onclick="switchImportTab('history')">
+                                <i class="bi bi-clock-history me-1"></i> Import History
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- UPLOAD TAB -->
+                    <div id="importTab-upload" class="import-tab-content p-4">
+                        <input type="hidden" id="importTeamName" />
+
+                        <!-- Step 1: Upload Zone -->
+                        <div id="excelUploadStep">
+                            <div id="excelDropZone" class="excel-drop-zone"
+                                 ondrop="handleExcelDrop(event)"
+                                 ondragover="handleExcelDragOver(event)"
+                                 ondragleave="handleExcelDragLeave(event)">
+                                <div class="drop-zone-content">
+                                    <i class="bi bi-cloud-arrow-up-fill drop-zone-icon"></i>
+                                    <h5>Drag & Drop Excel File Here</h5>
+                                    <p class="text-muted mb-3">or click to browse — supports .xlsx files</p>
+                                    <label class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-folder2-open me-1"></i> Browse Files
+                                        <input type="file" id="excelFileInput" accept=".xlsx,.xls"
+                                               style="display:none;" onchange="handleExcelFileSelect(this)" />
+                                    </label>
+                                </div>
+                            </div>
+                            <div id="excelFileInfo" class="file-info-bar d-none">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-file-earmark-excel-fill text-success fs-4"></i>
+                                    <div>
+                                        <div class="fw-bold" id="excelFileName"></div>
+                                        <small class="text-muted" id="excelFileSize"></small>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="clearExcelFile()">
+                                    <i class="bi bi-x-lg"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Preview -->
+                        <div id="excelPreviewStep" class="d-none">
+                            <div class="preview-stats d-flex gap-3 mb-3">
+                                <div class="stat-card">
+                                    <i class="bi bi-table text-primary"></i>
+                                    <div>
+                                        <div class="stat-value" id="previewTotalRows">0</div>
+                                        <small class="text-muted">Total Rows</small>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <i class="bi bi-columns-gap text-info"></i>
+                                    <div>
+                                        <div class="stat-value" id="previewTotalCols">0</div>
+                                        <small class="text-muted">Columns</small>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <i class="bi bi-check-circle text-success"></i>
+                                    <div>
+                                        <div class="stat-value">Ready</div>
+                                        <small class="text-muted">Status</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Column Mapping -->
+                            <div class="mapping-section mb-3">
+                                <h6 class="fw-bold mb-2"><i class="bi bi-signpost-2 me-1"></i> Column Mapping</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">Title Column</label>
+                                        <select id="mappingTitleCol" class="form-select form-select-sm">
+                                            <option value="-1">Auto (first column)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">Description Column</label>
+                                        <select id="mappingDescCol" class="form-select form-select-sm">
+                                            <option value="-1">None</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">Target Board Column</label>
+                                        <select id="importTargetColumn" class="form-select form-select-sm">
+                                        </select>
+                                    </div>
+                                </div>
+                                <small class="text-muted mt-1 d-block">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    All other Excel columns will be created as custom fields on the board automatically.
+                                </small>
+                            </div>
+
+                            <!-- Preview Table -->
+                            <div class="preview-table-wrapper">
+                                <h6 class="fw-bold mb-2"><i class="bi bi-eye me-1"></i> Data Preview (first 5 rows)</h6>
+                                <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                                    <table class="table table-sm table-bordered table-hover mb-0" id="previewTable">
+                                        <thead id="previewTableHead" class="table-dark"></thead>
+                                        <tbody id="previewTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Progress -->
+                        <div id="excelProgressStep" class="d-none">
+                            <div class="text-center py-4">
+                                <div class="import-progress-circle mb-3">
+                                    <i class="bi bi-gear-fill spinning-icon"></i>
+                                </div>
+                                <h5 class="fw-bold" id="importProgressTitle">Importing Tasks...</h5>
+                                <p class="text-muted" id="importProgressSubtitle">Please wait while we process your Excel file</p>
+                                <div class="progress mt-3" style="height: 8px; border-radius: 4px;">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="importProgressBar"
+                                         role="progressbar" style="width: 0%; background: linear-gradient(135deg, #0d9488, #0891b2);"></div>
+                                </div>
+                                <small class="text-muted mt-2 d-block" id="importProgressText">Starting...</small>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Results -->
+                        <div id="excelResultStep" class="d-none">
+                            <div class="text-center py-3">
+                                <div id="resultIconSuccess" class="d-none">
+                                    <div class="result-icon result-success"><i class="bi bi-check-circle-fill"></i></div>
+                                    <h4 class="fw-bold text-success mt-2">Import Successful!</h4>
+                                </div>
+                                <div id="resultIconPartial" class="d-none">
+                                    <div class="result-icon result-warning"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                                    <h4 class="fw-bold text-warning mt-2">Import Completed with Errors</h4>
+                                </div>
+                                <div id="resultIconFail" class="d-none">
+                                    <div class="result-icon result-danger"><i class="bi bi-x-circle-fill"></i></div>
+                                    <h4 class="fw-bold text-danger mt-2">Import Failed</h4>
+                                </div>
+
+                                <div class="result-stats d-flex justify-content-center gap-4 mt-3 mb-3">
+                                    <div class="text-center">
+                                        <div class="fs-3 fw-bold text-success" id="resultSuccessCount">0</div>
+                                        <small class="text-muted">Imported</small>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="fs-3 fw-bold text-danger" id="resultErrorCount">0</div>
+                                        <small class="text-muted">Errors</small>
+                                    </div>
+                                    <div class="text-center">
+                                        <div class="fs-3 fw-bold text-info" id="resultDuration">0s</div>
+                                        <small class="text-muted">Duration</small>
+                                    </div>
+                                </div>
+
+                                <p class="text-muted" id="resultMessage"></p>
+
+                                <div id="resultErrors" class="d-none mt-3">
+                                    <h6 class="fw-bold text-danger"><i class="bi bi-bug me-1"></i> Error Details</h6>
+                                    <div class="bg-light border rounded p-2 text-start small" id="resultErrorList"
+                                         style="max-height: 120px; overflow-y: auto;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HISTORY TAB -->
+                    <div id="importTab-history" class="import-tab-content p-4 d-none">
+                        <div id="importHistoryContent">
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="text-muted mt-2">Loading import history...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-0 px-4 pb-4">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" onclick="resetExcelImport()">Close</button>
+                    <button class="btn btn-primary px-4 d-none" id="btnPreviewExcel" onclick="previewExcelFile()">
+                        <i class="bi bi-eye me-1"></i> Preview Data
+                    </button>
+                    <button class="btn px-4 d-none" id="btnStartImport" onclick="startExcelImport()"
+                            style="background: linear-gradient(135deg, #0d9488, #0891b2); color: #fff; font-weight: 600;">
+                        <i class="bi bi-download me-1"></i> Import <span id="btnImportCount"></span> Tasks
+                    </button>
+                    <button class="btn btn-outline-primary px-4 d-none" id="btnImportMore" onclick="resetExcelImport()">
+                        <i class="bi bi-plus-lg me-1"></i> Import Another File
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* ═══════ EXCEL IMPORT MODAL STYLES ═══════ */
+        .excel-drop-zone {
+            border: 2px dashed #0d9488;
+            border-radius: 16px;
+            padding: 48px 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #f0fdfa, #ecfdf5);
+            cursor: pointer;
+        }
+        .excel-drop-zone.drag-over {
+            border-color: #0891b2;
+            background: linear-gradient(135deg, #ccfbf1, #cffafe);
+            transform: scale(1.01);
+        }
+        .drop-zone-icon {
+            font-size: 3rem;
+            color: #0d9488;
+            display: block;
+            margin-bottom: 12px;
+        }
+        .file-info-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f0fdfa;
+            border: 1px solid #99f6e4;
+            border-radius: 12px;
+            margin-top: 12px;
+        }
+        .stat-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8faff;
+            border: 1px solid #e8eaff;
+            border-radius: 10px;
+            padding: 12px 16px;
+            flex: 1;
+        }
+        .stat-card i { font-size: 1.5rem; }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: #1a1a2e; }
+        .mapping-section {
+            background: #f8f9ff;
+            border: 1px solid #e8eaff;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .preview-table-wrapper {
+            background: #fff;
+            border: 1px solid #e8eaff;
+            border-radius: 12px;
+            padding: 16px;
+        }
+        #previewTable th {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        #previewTable td {
+            font-size: 0.8rem;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .import-progress-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0d9488, #0891b2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+        .spinning-icon {
+            font-size: 2rem;
+            color: #fff;
+            animation: spin 2s linear infinite;
+        }
+        @@keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result-icon {
+            font-size: 3rem;
+        }
+        .result-success { color: #10b981; }
+        .result-warning { color: #f59e0b; }
+        .result-danger { color: #ef4444; }
+        .import-tab-content { min-height: 300px; }
+        .import-history-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8faff;
+            border: 1px solid #e8eaff;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+        .import-history-card:hover {
+            background: #eef2ff;
+            border-color: #c7d2fe;
+        }
+        #importTabs .nav-link {
+            color: #6b7280;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 8px 16px;
+        }
+        #importTabs .nav-link.active {
+            color: #0d9488;
+            border-bottom-color: #0d9488;
+            background: none;
+        }
+    </style>
+
 </div> <!-- /.app-wrapper -->
 
 <!-- Task History Modal -->
@@ -687,14 +1070,14 @@
                             <thead class="bg-light text-muted small text-uppercase fw-bold">
                                 <tr>
                                     <th class="ps-4 py-3">Member</th>
-                                    <th class="text-center">Add Col</th>
-                                    <th class="text-center">Rename</th>
-                                    <th class="text-center">Reorder</th>
-                                    <th class="text-center">Del Col</th>
-                                    <th class="text-center">Full Edit</th>
-                                    <th class="text-center">Delete Task</th>
-                                    <th class="text-center">Review</th>
-                                    <th class="text-center text-info">All</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Add Col</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Rename</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Reorder</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Del Col</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Delete Task</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Review</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Import Excel</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">All</th>
                                 </tr>
                             </thead>
                             <tbody id="permissionTableBody">
@@ -801,7 +1184,7 @@
             });
     }
 
-    function loadAdminTeamList() {
+    function loadAdminTeamList(autoLoadFirst = false) {
         const container = document.getElementById('adminTeamList');
         if (!container) return;
 
@@ -838,6 +1221,11 @@
                     document.querySelectorAll(`.team-btn[data-team="${currentTeamName}"]`)
                         .forEach(b => b.classList.add('active'));
                 }
+
+                // Auto-load first team if requested
+                if (autoLoadFirst && teams.length > 0) {
+                    loadTeamBoard(teams[0].name);
+                }
             });
     }
 
@@ -862,7 +1250,7 @@
     // Load initially if Admin
     document.addEventListener('DOMContentLoaded', function () {
         if (__isTasksAdmin) {
-            loadAdminTeamList();
+            loadAdminTeamList(true);
         }
     });
 
@@ -908,8 +1296,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-<script src="~/js/customFields.js"></script>
-<script src="~/js/taskHistory.js"></script>
 <script src="~/js/customFields.js"></script>
 <script src="~/js/taskHistory.js"></script>
 <script src="~/js/column_filter.js"></script>
@@ -1205,9 +1591,20 @@
                 return res.json();
             })
             .then(t => {
-                const priorityColors = { 'Low': 'secondary', 'Medium': 'info', 'High': 'warning', 'Critical': 'danger' };
+                const customPriorityObj = (t.customFields || []).find(f => f.fieldName && f.fieldName.trim().toLowerCase() === 'priority');
+                const effectivePriority = (customPriorityObj && customPriorityObj.value) ? customPriorityObj.value : t.priority;
+                
+                const priorityClassMap = { 'low': 'secondary', 'medium': 'info', 'high': 'warning', 'critical': 'danger' };
+                const priorityBadgeClass = priorityClassMap[effectivePriority.toLowerCase()] || 'secondary';
+                const priorityBadge = `<span class="badge bg-${priorityBadgeClass}">${escapeHtml(effectivePriority.toUpperCase())}</span>`;
+
+                const dueDateBadge = t.dueDate ? 
+                    `<span class="badge bg-light text-dark border d-flex align-items-center gap-1">
+                        <i class="bi bi-calendar-event text-danger"></i>
+                        Due Date: ${formatDate(t.dueDate)}
+                    </span>` : '';
+
                 const reviewColors = { 'Passed': 'success', 'Failed': 'danger', 'Pending': 'warning', 'None': 'secondary' };
-                const priorityBadge = `<span class="badge bg-${priorityColors[t.priority] || 'secondary'}">${escapeHtml(t.priority)}</span>`;
                 const reviewBadge = t.reviewStatus && t.reviewStatus !== 'None' ?
                     `<span class="badge bg-${reviewColors[t.reviewStatus] || 'secondary'}">${escapeHtml(t.reviewStatus)}</span>` : '';
 
@@ -1230,9 +1627,10 @@
 
                     <div class="mb-4">
                         <h4 class="mb-2">${escapeHtml(t.title)}</h4>
-                        <div class="d-flex gap-2 flex-wrap">
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
                             ${priorityBadge}
                             ${reviewBadge}
+                            ${dueDateBadge}
                             <span class="badge bg-light text-dark border">${escapeHtml(t.column || t.status)}</span>
                         </div>
                     </div>
@@ -1352,25 +1750,22 @@
 </script>
 
 <script>
+    // Load initially if Admin
     document.addEventListener('DOMContentLoaded', function () {
-    @if (isAdmin)
-    {
-        <text>
-                                                            // Admin: Auto-expand Team Tasks and load Development board
-                    const teamDropdown = document.getElementById('teamTasksDropdown');
-                    const teamArrow = document.getElementById('teamArrow');
-                    if (teamDropdown) teamDropdown.style.display = 'block';
-                    if (teamArrow) teamArrow.innerText = '▲';
-
-                    // load first team (Development)
-                    loadTeamBoard('Development');
-        </text>
+    @if (isAdmin) {
+         // Already handled by loadAdminTeamList(true) above
+         <text>
+             const teamDropdown = document.getElementById('teamTasksDropdown');
+             const teamArrow = document.getElementById('teamArrow');
+             if (teamDropdown) teamDropdown.style.display = 'block';
+             if (teamArrow) teamArrow.innerText = '▲';
+         </text>
     }
     else if (userTeams.Any())
     {
         var firstTeam = userTeams.First();
         <text>
-                                                            // User: Auto-expand My Team and load first assigned team
+                    // User: Auto-expand My Team and load first assigned team
                     const myDropdown = document.getElementById('myTasksDropdown');
                     const myArrow = document.getElementById('myTasksArrow');
                     if (myDropdown) myDropdown.style.display = 'block';
@@ -1388,14 +1783,18 @@
         document.getElementById('taskColumnId').value = columnId;
         document.getElementById('taskTitle').value = '';
         document.getElementById('taskDescription').value = '';
+        document.getElementById('taskPriority').value = '1';
+        document.getElementById('taskDueDate').value = '';
+
+        const team = window.currentTeamName;
 
         // Load projects into dropdown
         loadProjectsForTaskModal();
 
-        // Render custom fields into the modal (preserve any existing values)
+        // Render custom fields into the modal
         if (typeof renderCustomFieldInputs === 'function') {
             try {
-                renderCustomFieldInputs('customFieldsContainer', {});
+                renderCustomFieldInputs('customFieldsContainer', {}, team);
             } catch (e) { console.error(e); }
         }
 
@@ -1405,6 +1804,7 @@
     // ================= EDIT TASK MODAL =================
 
     function openEditTaskModal(taskId) {
+        const team = window.currentTeamName;
         // Fetch task details
         fetch(`/Tasks/GetTask?id=${taskId}`)
             .then(res => {
@@ -1418,10 +1818,11 @@
                 document.getElementById('editTaskDescription').value = task.description || "";
                 document.getElementById('editTaskPriority').value = task.priority;
                 document.getElementById('editTaskAssignedTo').value = task.assignedToUserId || "";
+                document.getElementById('editTaskDueDate').value = task.dueDate || "";
 
                 // Render Custom Fields with values
                 if (typeof renderCustomFieldInputs === 'function') {
-                    renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {});
+                    renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
                 }
 
                 // Show Modal
@@ -1435,13 +1836,16 @@
 
     function submitEditTask() {
         const taskId = parseInt(document.getElementById('editTaskId').value);
-        const title = document.getElementById('editTaskTitle').value.trim();
-        const description = document.getElementById('editTaskDescription').value.trim();
+        const titleEl = document.getElementById('editTaskTitle');
+        const title = titleEl ? titleEl.value.trim() : "";
+        
+        const descEl = document.getElementById('editTaskDescription');
+        const description = descEl ? descEl.value.trim() : "";
+        
         const priority = parseInt(document.getElementById('editTaskPriority').value);
         const assignedToUserId = document.getElementById('editTaskAssignedTo').value;
 
-        const titleEl = document.getElementById('editTaskTitle');
-        const titleVisible = titleEl && titleEl.closest('.mb-3').style.display !== 'none';
+        const titleVisible = titleEl && titleEl.closest('.mb-3') && titleEl.closest('.mb-3').style.display !== 'none';
 
         if (titleVisible && !title) {
             showToast("Title is required", "warning");
@@ -1453,16 +1857,16 @@
             return;
         }
 
+        const editDueDateVal = document.getElementById('editTaskDueDate') ? document.getElementById('editTaskDueDate').value : null;
+
         const data = {
             taskId: taskId,
             title: title,
             description: description,
             priority: priority,
+            dueDate: editDueDateVal || null,
             assignedToUserId: assignedToUserId, // Send assigned user
             customFieldValues: (typeof collectCustomFieldValues === 'function') ?
-                // Need to target the specific container or ensure helper works globally
-                // The helper targets 'customFieldsContainer' by default in customFields.js? 
-                // Wait, let me check customFields.js
                 collectCustomFieldValues('editCustomFieldsContainer') : {}
         };
 
@@ -1517,19 +1921,25 @@
 
         const titleEl = document.getElementById('taskTitle');
         const title = titleEl ? titleEl.value.trim() : "";
-        const titleVisible = titleEl && titleEl.closest('.mb-3').style.display !== 'none';
+        const titleVisible = titleEl && titleEl.closest('.mb-3') && titleEl.closest('.mb-3').style.display !== 'none';
 
         if (titleVisible && !title) {
             showToast("Title is required", "warning");
             return;
         }
 
+        const descEl = document.getElementById('taskDescription');
+        const description = descEl ? descEl.value.trim() : "";
+
+        const dueDateVal = document.getElementById('taskDueDate') ? document.getElementById('taskDueDate').value : null;
+
         const data = {
             columnId: parseInt(document.getElementById('taskColumnId').value),
             title: title,
-            description: document.getElementById('taskDescription').value.trim(),
+            description: description,
             projectId: projectId,
             priority: priority,
+            dueDate: dueDateVal || null,
             customFieldValues: (typeof collectCustomFieldValues === 'function') ? collectCustomFieldValues('customFieldsContainer') : {}
         };
 
@@ -2079,4 +2489,476 @@
         const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
         return tokenInput ? tokenInput.value : '';
     }
+
+    // ═══════════════════════════════════════════════════════
+    //  EXCEL IMPORT — JAVASCRIPT
+    // ═══════════════════════════════════════════════════════
+
+    let _excelFile = null;
+    let _previewData = null;
+
+    function openExcelImportModal(teamName) {
+        document.getElementById('importTeamName').value = teamName;
+        resetExcelImport();
+
+        // Populate target column dropdown from board columns
+        const colSelect = document.getElementById('importTargetColumn');
+        colSelect.innerHTML = '';
+        const columns = document.querySelectorAll('#kanbanBoard .kanban-column[data-column-id]');
+        columns.forEach(col => {
+            const colId = col.getAttribute('data-column-id');
+            const colName = col.getAttribute('data-column-name');
+            if (colId && colId !== 'history' && colName) {
+                const opt = document.createElement('option');
+                opt.value = colId;
+                opt.textContent = colName;
+                colSelect.appendChild(opt);
+            }
+        });
+
+        const modal = new bootstrap.Modal(document.getElementById('excelImportModal'));
+        modal.show();
+    }
+
+    function switchImportTab(tab) {
+        document.querySelectorAll('#importTabs .nav-link').forEach(btn => {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
+        });
+        document.querySelectorAll('.import-tab-content').forEach(el => el.classList.add('d-none'));
+        document.getElementById('importTab-' + tab).classList.remove('d-none');
+
+        if (tab === 'history') {
+            loadImportHistory();
+        }
+    }
+
+    function resetExcelImport() {
+        _excelFile = null;
+        _previewData = null;
+
+        // Reset file input
+        const fileInput = document.getElementById('excelFileInput');
+        if (fileInput) fileInput.value = '';
+
+        // Show upload, hide others
+        showStep('excelUploadStep');
+        hideStep('excelPreviewStep');
+        hideStep('excelProgressStep');
+        hideStep('excelResultStep');
+
+        // Reset file info
+        document.getElementById('excelFileInfo').classList.add('d-none');
+        document.getElementById('excelDropZone').style.display = '';
+
+        // Reset buttons
+        document.getElementById('btnPreviewExcel').classList.add('d-none');
+        document.getElementById('btnStartImport').classList.add('d-none');
+        document.getElementById('btnImportMore').classList.add('d-none');
+
+        // Reset tab
+        switchImportTab('upload');
+    }
+
+    function showStep(stepId) {
+        document.getElementById(stepId).classList.remove('d-none');
+    }
+    function hideStep(stepId) {
+        document.getElementById(stepId).classList.add('d-none');
+    }
+
+    // ─── Drag & Drop ───
+    function handleExcelDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('excelDropZone').classList.add('drag-over');
+    }
+    function handleExcelDragLeave(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('excelDropZone').classList.remove('drag-over');
+    }
+    function handleExcelDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('excelDropZone').classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            processExcelFile(files[0]);
+        }
+    }
+    function handleExcelFileSelect(input) {
+        if (input.files.length > 0) {
+            processExcelFile(input.files[0]);
+        }
+    }
+
+    function processExcelFile(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (ext !== 'xlsx' && ext !== 'xls') {
+            showToast('Only .xlsx and .xls files are supported', 'danger');
+            return;
+        }
+        _excelFile = file;
+
+        // Show file info
+        document.getElementById('excelDropZone').style.display = 'none';
+        document.getElementById('excelFileInfo').classList.remove('d-none');
+        document.getElementById('excelFileName').textContent = file.name;
+        document.getElementById('excelFileSize').textContent = formatFileSize(file.size);
+
+        // Show preview button
+        document.getElementById('btnPreviewExcel').classList.remove('d-none');
+    }
+
+    function clearExcelFile() {
+        _excelFile = null;
+        document.getElementById('excelDropZone').style.display = '';
+        document.getElementById('excelFileInfo').classList.add('d-none');
+        document.getElementById('btnPreviewExcel').classList.add('d-none');
+        const fileInput = document.getElementById('excelFileInput');
+        if (fileInput) fileInput.value = '';
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // ─── Preview ───
+    async function previewExcelFile() {
+        if (!_excelFile) return;
+
+        const btn = document.getElementById('btnPreviewExcel');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Analyzing...';
+
+        const formData = new FormData();
+        formData.append('file', _excelFile);
+        formData.append('teamName', document.getElementById('importTeamName').value);
+
+        try {
+            const response = await fetch('/ExcelImport/Preview', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                showToast(data.message || 'Preview failed', 'danger');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-eye me-1"></i> Preview Data';
+                return;
+            }
+
+            _previewData = data;
+
+            // Update stats
+            document.getElementById('previewTotalRows').textContent = data.totalRows;
+            document.getElementById('previewTotalCols').textContent = data.totalColumns;
+
+            // Populate column mapping dropdowns
+            populateMappingDropdowns(data.headers);
+
+            // Build preview table
+            buildPreviewTable(data.headers, data.sampleRows);
+
+            // Switch to preview step
+            hideStep('excelUploadStep');
+            showStep('excelPreviewStep');
+
+            // Show import button
+            btn.classList.add('d-none');
+            const importBtn = document.getElementById('btnStartImport');
+            importBtn.classList.remove('d-none');
+            document.getElementById('btnImportCount').textContent = data.totalRows;
+
+        } catch (err) {
+            showToast('Error previewing file: ' + err.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-eye me-1"></i> Preview Data';
+        }
+    }
+
+    function populateMappingDropdowns(headers) {
+        const titleSel = document.getElementById('mappingTitleCol');
+        const descSel = document.getElementById('mappingDescCol');
+
+        titleSel.innerHTML = '<option value="-1">Auto (first column)</option>';
+        descSel.innerHTML = '<option value="-1">None</option>';
+
+        headers.forEach((h, i) => {
+            titleSel.innerHTML += `<option value="${i}">${h}</option>`;
+            descSel.innerHTML += `<option value="${i}">${h}</option>`;
+        });
+    }
+
+    function buildPreviewTable(headers, rows) {
+        const thead = document.getElementById('previewTableHead');
+        const tbody = document.getElementById('previewTableBody');
+
+        // Header
+        let headerHtml = '<tr>';
+        headerHtml += '<th class="text-center" style="width: 30px;">#</th>';
+        headers.forEach(h => {
+            headerHtml += `<th>${escapeHtml(h)}</th>`;
+        });
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+
+        // Body
+        let bodyHtml = '';
+        rows.forEach((row, ri) => {
+            bodyHtml += '<tr>';
+            bodyHtml += `<td class="text-center text-muted">${ri + 1}</td>`;
+            row.forEach(cell => {
+                bodyHtml += `<td title="${escapeHtml(cell)}">${escapeHtml(cell)}</td>`;
+            });
+            bodyHtml += '</tr>';
+        });
+        tbody.innerHTML = bodyHtml;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ─── Import ───
+    async function startExcelImport() {
+        if (!_excelFile || !_previewData) return;
+
+        const teamName = document.getElementById('importTeamName').value;
+        const columnId = document.getElementById('importTargetColumn').value;
+        const titleCol = document.getElementById('mappingTitleCol').value;
+        const descCol = document.getElementById('mappingDescCol').value;
+
+        if (!columnId) {
+            showToast('Please select a target column', 'warning');
+            return;
+        }
+
+        // Switch to progress step
+        hideStep('excelPreviewStep');
+        showStep('excelProgressStep');
+        document.getElementById('btnStartImport').classList.add('d-none');
+
+        // Animate progress
+        const progressBar = document.getElementById('importProgressBar');
+        const progressText = document.getElementById('importProgressText');
+
+        let fakeProgress = 0;
+        const progressInterval = setInterval(() => {
+            if (fakeProgress < 90) {
+                fakeProgress += Math.random() * 3;
+                progressBar.style.width = Math.min(fakeProgress, 90) + '%';
+                progressText.textContent = `Processing... ${Math.floor(fakeProgress)}%`;
+            }
+        }, 500);
+
+        const formData = new FormData();
+        formData.append('file', _excelFile);
+        formData.append('teamName', teamName);
+        formData.append('columnId', columnId);
+        if (titleCol !== '-1') formData.append('titleColumnIndex', titleCol);
+        if (descCol !== '-1') formData.append('descriptionColumnIndex', descCol);
+
+        try {
+            const response = await fetch('/ExcelImport/Import', {
+                method: 'POST',
+                body: formData
+            });
+
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            progressText.textContent = 'Complete!';
+
+            const data = await response.json();
+
+            // Wait a moment then show results
+            setTimeout(() => {
+                showImportResults(data, response.ok);
+            }, 500);
+
+        } catch (err) {
+            clearInterval(progressInterval);
+            showImportResults({
+                success: false,
+                message: 'Network error: ' + err.message,
+                successCount: 0,
+                errorCount: 0,
+                durationMs: 0
+            }, false);
+        }
+    }
+
+    function showImportResults(data, isOk) {
+        hideStep('excelProgressStep');
+        showStep('excelResultStep');
+
+        // Show appropriate icon
+        document.getElementById('resultIconSuccess').classList.add('d-none');
+        document.getElementById('resultIconPartial').classList.add('d-none');
+        document.getElementById('resultIconFail').classList.add('d-none');
+
+        if (data.success && data.errorCount === 0) {
+            document.getElementById('resultIconSuccess').classList.remove('d-none');
+        } else if (data.success && data.errorCount > 0) {
+            document.getElementById('resultIconPartial').classList.remove('d-none');
+        } else {
+            document.getElementById('resultIconFail').classList.remove('d-none');
+        }
+
+        // Stats
+        document.getElementById('resultSuccessCount').textContent = data.successCount || 0;
+        document.getElementById('resultErrorCount').textContent = data.errorCount || 0;
+        document.getElementById('resultDuration').textContent =
+            data.durationMs ? (data.durationMs / 1000).toFixed(1) + 's' : '—';
+        document.getElementById('resultMessage').textContent = data.message || '';
+
+        // Errors
+        if (data.errors && data.errors.length > 0) {
+            document.getElementById('resultErrors').classList.remove('d-none');
+            document.getElementById('resultErrorList').innerHTML =
+                data.errors.map(e => `<div class="mb-1">${escapeHtml(e)}</div>`).join('');
+        } else {
+            document.getElementById('resultErrors').classList.add('d-none');
+        }
+
+        // Show import more button
+        document.getElementById('btnImportMore').classList.remove('d-none');
+
+        // Reload the board to show new tasks
+        if (data.success) {
+            const teamName = document.getElementById('importTeamName').value;
+            if (teamName && typeof loadTeamBoard === 'function') {
+                setTimeout(() => loadTeamBoard(teamName), 1000);
+            }
+        }
+    }
+
+    // ─── Import History ───
+    async function loadImportHistory() {
+        const teamName = document.getElementById('importTeamName').value;
+        const container = document.getElementById('importHistoryContent');
+
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="text-muted mt-2">Loading import history...</p>
+            </div>
+        `;
+
+        try {
+            const response = await fetch(`/ExcelImport/History?teamName=${encodeURIComponent(teamName)}`);
+            const data = await response.json();
+
+            if (!data.success || !data.logs || data.logs.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox text-muted" style="font-size: 2.5rem;"></i>
+                        <p class="text-muted mt-2">No imports yet for this board.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            data.logs.forEach(log => {
+                const statusClass = log.status === 'Completed' ? 'text-success' :
+                    log.status === 'Failed' ? 'text-danger' : 'text-warning';
+                const statusIcon = log.status === 'Completed' ? 'bi-check-circle-fill' :
+                    log.status === 'Failed' ? 'bi-x-circle-fill' : 'bi-exclamation-triangle-fill';
+
+                html += `
+                    <div class="import-history-card">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi bi-file-earmark-excel-fill text-success fs-4"></i>
+                            <div>
+                                <div class="fw-bold">${escapeHtml(log.fileName)}</div>
+                                <small class="text-muted">
+                                    ${log.importedAt} · by ${escapeHtml(log.importedBy)} · 
+                                    into <strong>${escapeHtml(log.columnName)}</strong>
+                                </small>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="text-center">
+                                <div class="fw-bold text-success">${log.successCount}</div>
+                                <small class="text-muted">OK</small>
+                            </div>
+                            <div class="text-center">
+                                <div class="fw-bold text-danger">${log.errorCount}</div>
+                                <small class="text-muted">Err</small>
+                            </div>
+                            <div class="text-center">
+                                <div class="fw-bold text-info">${log.durationMs ? (log.durationMs / 1000).toFixed(1) + 's' : '—'}</div>
+                                <small class="text-muted">Time</small>
+                            </div>
+                            <span class="${statusClass}"><i class="bi ${statusIcon}"></i></span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+        } catch (err) {
+            container.innerHTML = `
+                <div class="text-center py-4 text-danger">
+                    <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                    <p class="mt-2">Error loading history: ${escapeHtml(err.message)}</p>
+                </div>
+            `;
+        }
+    }
+
+    // Existing end of script
+</script>
+
+<script>
+// Function to clear all tasks in a specific column
+async function clearColumnTasks(columnId) {
+    if (!confirm('Are you sure you want to permanently delete ALL tasks in this column? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const resp = await fetch('/Tasks/DeleteAllTasksInColumn', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+            },
+            body: JSON.stringify(columnId)
+        });
+
+        if (!resp.ok) {
+            const txt = await resp.text();
+            throw new Error(txt || 'Failed to clear tasks');
+        }
+
+        const res = await resp.json();
+        if (typeof showToast === 'function') {
+            showToast(`✅ Successfully deleted ${res.count} tasks`, 'success');
+        }
+
+        // Refresh board
+        if (typeof loadTeamBoard === 'function' && window.currentTeamName) {
+            loadTeamBoard(window.currentTeamName);
+        }
+    } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') {
+            showToast(err.message, 'danger');
+        } else {
+            alert(err.message);
+        }
+    }
+}
 </script>

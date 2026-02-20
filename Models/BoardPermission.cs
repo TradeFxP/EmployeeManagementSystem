@@ -28,5 +28,6 @@ namespace UserRoles.Models
 
         // Workflow permissions
         public bool CanReviewTask { get; set; }
+        public bool CanImportExcel { get; set; }
     }
 }

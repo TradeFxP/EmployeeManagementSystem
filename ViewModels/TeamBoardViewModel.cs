@@ -25,5 +25,7 @@ namespace UserRoles.ViewModels
 
         // ✅ User's permissions for this board
         public BoardPermission? UserPermissions { get; set; }
+
+        public Team? TeamSettings { get; set; }
     }
 }

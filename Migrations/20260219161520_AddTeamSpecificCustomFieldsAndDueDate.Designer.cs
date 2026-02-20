@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260219161520_AddTeamSpecificCustomFieldsAndDueDate")]
+    partial class AddTeamSpecificCustomFieldsAndDueDate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -217,9 +220,6 @@ namespace UserRoles.Migrations
                     b.Property<bool>("CanEditAllFields")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("CanImportExcel")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("CanRenameColumn")
                         .HasColumnType("boolean");
 
@@ -379,62 +379,6 @@ namespace UserRoles.Migrations
                     b.HasIndex("ProjectId");
 
                     b.ToTable("Epics");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.ExcelImportLog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ColumnId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ColumnName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long?>("DurationMs")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("ErrorCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ErrorDetails")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("ImportedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ImportedByUserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("SuccessCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TeamName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("TotalRows")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ImportedByUserId");
-
-                    b.ToTable("ExcelImportLogs");
                 });
 
             modelBuilder.Entity("UserRoles.Models.Feature", b =>
@@ -812,16 +756,10 @@ namespace UserRoles.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsDescriptionVisible")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("IsDueDateVisible")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsPriorityVisible")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsTitleVisible")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
@@ -1082,17 +1020,6 @@ namespace UserRoles.Migrations
                     b.Navigation("CreatedByUser");
 
                     b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.ExcelImportLog", b =>
-                {
-                    b.HasOne("UserRoles.Models.Users", "ImportedByUser")
-                        .WithMany()
-                        .HasForeignKey("ImportedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ImportedByUser");
                 });
 
             modelBuilder.Entity("UserRoles.Models.Feature", b =>

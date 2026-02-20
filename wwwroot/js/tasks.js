@@ -151,11 +151,14 @@ async function openCreateTaskModal(columnId) {
     document.getElementById("taskTitle").value = "";
     document.getElementById("taskDescription").value = "";
     document.getElementById("taskPriority").value = "1"; // Default to Medium
+    document.getElementById("taskDueDate").value = "";
+
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
 
     // Render custom fields if available and wait for them to load
     if (typeof renderCustomFieldInputs === 'function') {
         try {
-            await renderCustomFieldInputs('customFieldsContainer');
+            await renderCustomFieldInputs('customFieldsContainer', {}, team);
         } catch (e) {
             console.error('Failed to render custom fields before showing modal', e);
         }
@@ -172,6 +175,7 @@ function submitCreateTask() {
     const columnId = document.getElementById("taskColumnId").value;
     const projectId = document.getElementById("taskProjectId")?.value || null;
     const priority = parseInt(document.getElementById("taskPriority").value);
+    const dueDate = document.getElementById("taskDueDate")?.value || null;
 
     if (!title) {
         showToast('Please enter a task title to continue.', 'warning');
@@ -202,6 +206,7 @@ function submitCreateTask() {
             description: description,
             projectId: projectId ? parseInt(projectId) : null,
             priority: priority,
+            dueDate: dueDate,
             customFieldValues: customFieldValues
         }),
         success: function (response) {
@@ -515,12 +520,26 @@ function openArchivedTaskDetail(taskId) {
         method: 'GET',
         data: { id: taskId },
         success: function (t) {
+            const customPriorityObj = (t.customFields || []).find(f => f.fieldName && f.fieldName.trim().toLowerCase() === 'priority');
+            const effectivePriority = (customPriorityObj && customPriorityObj.value) ? customPriorityObj.value : t.priority;
+
+            const priorityClassMap = { 'low': 'secondary', 'medium': 'info', 'high': 'warning', 'critical': 'danger' };
+            const priorityBadgeClass = priorityClassMap[effectivePriority.toLowerCase()] || 'secondary';
+            const priorityBadge = `<span class="badge bg-${priorityBadgeClass}">${escapeHtml(effectivePriority.toUpperCase())}</span>`;
+
+            const dueDateBadge = t.dueDate ?
+                `<span class="badge bg-light text-dark border d-flex align-items-center gap-1">
+                    <i class="bi bi-calendar-event text-danger"></i>
+                    Due Date: ${formatDate(t.dueDate)}
+                </span>` : '';
+
             body.innerHTML = `
                 <div class="mb-4">
                     <h4 class="mb-1">${escapeHtml(t.title)}</h4>
-                    <div class="d-flex gap-2 mt-2">
+                    <div class="d-flex gap-2 mt-2 flex-wrap align-items-center">
                         <span class="badge bg-success"><i class="bi bi-check-circle"></i> ${t.reviewStatus}</span>
-                        <span class="badge bg-secondary">${t.priority}</span>
+                        ${priorityBadge}
+                        ${dueDateBadge}
                     </div>
                 </div>
 

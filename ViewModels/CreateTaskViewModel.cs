@@ -7,8 +7,8 @@ namespace UserRoles.ViewModels
 
         public int ColumnId { get; set; }
 
-        public string Title { get; set; }
-        public string Description { get; set; }
+        public string? Title { get; set; }
+        public string? Description { get; set; }
 
         // Optional: Link task to a project for hierarchical ID generation
         public int? ProjectId { get; set; }
@@ -18,5 +18,7 @@ namespace UserRoles.ViewModels
         
         // Custom field values: FieldId -> Value
         public Dictionary<int, string>? CustomFieldValues { get; set; }
+
+        public DateTime? DueDate { get; set; }
     }
 }

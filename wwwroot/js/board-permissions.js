@@ -15,9 +15,7 @@ async function openBoardPermissionModal(teamName) {
 
 async function loadBoardPermissions(teamName) {
     const tbody = document.getElementById('permissionTableBody');
-    if (!tbody) return;
-
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5"><div class="spinner-border text-info mb-2"></div><div class="text-muted">Loading team members...</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center py-5"><div class="spinner-border text-info mb-2"></div><div class="text-muted">Loading team members...</div></td></tr>';
 
     try {
         const resp = await fetch(`/Tasks/GetBoardPermissions?team=${encodeURIComponent(teamName)}`);
@@ -26,7 +24,7 @@ async function loadBoardPermissions(teamName) {
 
         tbody.innerHTML = '';
         if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted"><i class="bi bi-person-x fs-2 d-block mb-2"></i>No users found for this team.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-5 text-muted"><i class="bi bi-person-x fs-2 d-block mb-2"></i>No users found for this team.</td></tr>';
             return;
         }
 
@@ -52,6 +50,7 @@ async function loadBoardPermissions(teamName) {
                 <td class="text-center">${renderSwitch(p.userId, 'canEditAllFields', p.canEditAllFields)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canDeleteTask', p.canDeleteTask)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canReviewTask', p.canReviewTask)}</td>
+                <td class="text-center">${renderSwitch(p.userId, 'canImportExcel', p.canImportExcel)}</td>
                 <td class="text-center">
                     <button class="btn btn-sm btn-link text-info p-0" onclick="grantAllBoardPermissions(this, '${p.userId}', '${teamName}')" title="Grant All Permissions">
                         <i class="bi bi-check-all fs-4"></i>
@@ -67,7 +66,7 @@ async function loadBoardPermissions(teamName) {
         });
 
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-danger text-center py-5">
+        tbody.innerHTML = `<tr><td colspan="9" class="text-danger text-center py-5">
             <i class="bi bi-exclamation-triangle fs-2 d-block mb-2"></i>
             Failed to load permissions: ${err.message}
         </td></tr>`;
@@ -108,7 +107,8 @@ async function updatePermission(checkbox, teamName) {
         canDeleteColumn: row.querySelector('[data-field="canDeleteColumn"]').checked,
         canEditAllFields: row.querySelector('[data-field="canEditAllFields"]').checked,
         canDeleteTask: row.querySelector('[data-field="canDeleteTask"]').checked,
-        canReviewTask: row.querySelector('[data-field="canReviewTask"]').checked
+        canReviewTask: row.querySelector('[data-field="canReviewTask"]').checked,
+        canImportExcel: row.querySelector('[data-field="canImportExcel"]').checked
     };
 
     checkbox.disabled = true;
@@ -152,7 +152,8 @@ async function grantAllBoardPermissions(btn, userId, teamName) {
         canDeleteColumn: true,
         canEditAllFields: true,
         canDeleteTask: true,
-        canReviewTask: true
+        canReviewTask: true,
+        canImportExcel: true
     };
 
     btn.disabled = true;

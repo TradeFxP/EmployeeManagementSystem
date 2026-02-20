@@ -40,6 +40,9 @@ namespace UserRoles.Data
         // Email Logs
         public DbSet<EmailLog> EmailLogs { get; set; }
 
+        // Excel Import Logs
+        public DbSet<ExcelImportLog> ExcelImportLogs { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

@@ -107,8 +107,8 @@ public class TasksController : Controller
 
         var task = new TaskItem
         {
-            Title = model.Title.Trim(),
-            Description = model.Description?.Trim(),
+            Title = model.Title?.Trim() ?? string.Empty,
+            Description = model.Description?.Trim() ?? string.Empty,
 
             ColumnId = column.Id,
             TeamName = column.TeamName,
@@ -126,15 +126,14 @@ public class TasksController : Controller
             AssignedToUserId = user.Id,      // creator owns initially
             AssignedByUserId = user.Id,      // 🔥 IMPORTANT
             AssignedAt = DateTime.UtcNow,    // 🔥 IMPORTANT
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            CurrentColumnEntryAt = DateTime.UtcNow, // Moved here!
+            DueDate = model.DueDate.HasValue ? DateTime.SpecifyKind(model.DueDate.Value, DateTimeKind.Utc) : null
         };
 
 
         _context.TaskItems.Add(task);
         await _context.SaveChangesAsync();
-
-        // Set column entry timestamp for time tracking
-        task.CurrentColumnEntryAt = DateTime.UtcNow;
 
         // Log task creation
         await _historyService.LogTaskCreated(task.Id, user.Id);
@@ -253,8 +252,8 @@ public class TasksController : Controller
         // 1. Title
         if (task.Title != model.Title?.Trim())
         {
-            await _historyService.LogTaskUpdated(task.Id, user.Id, "Title", task.Title, model.Title?.Trim());
-            task.Title = model.Title?.Trim();
+            await _historyService.LogTaskUpdated(task.Id, user.Id, "Title", task.Title, model.Title?.Trim() ?? string.Empty);
+            task.Title = model.Title?.Trim() ?? string.Empty;
         }
 
         // 2. Description
@@ -263,10 +262,21 @@ public class TasksController : Controller
             // Just logging that it changed, or the full value if needed. 
             // _historyService.LogTaskUpdated(task.Id, user.Id, "Description", task.Description, model.Description?.Trim());
             await _historyService.LogTaskUpdated(task.Id, user.Id, "Description", "Old Description", "New Description");
-            task.Description = model.Description?.Trim();
+            task.Description = model.Description?.Trim() ?? string.Empty;
         }
 
         task.UpdatedAt = DateTime.UtcNow;
+
+        if (task.DueDate != model.DueDate)
+        {
+            await _historyService.LogTaskUpdated(task.Id, user.Id, "Due Date", 
+                task.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None", 
+                model.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None");
+            
+            task.DueDate = model.DueDate.HasValue 
+                ? DateTime.SpecifyKind(model.DueDate.Value, DateTimeKind.Utc) 
+                : null;
+        }
 
         // 3. Update priority if provided
         if (model.Priority.HasValue)
@@ -383,6 +393,7 @@ public class TasksController : Controller
             description = task.Description,
             priority = (int)task.Priority,
             assignedToUserId = task.AssignedToUserId,
+            dueDate = task.DueDate?.ToString("yyyy-MM-ddTHH:mm"), // for datetime-local input
             // 2. Convert custom fields to dictionary for easy JS consumption
             customFieldValues = latestFieldValues
         };
@@ -426,6 +437,7 @@ public class TasksController : Controller
             task.AssignedAt,
             task.ReviewedAt,
             task.CompletedAt,
+            task.DueDate,
             CustomFields = task.CustomFieldValues?.Select(fv => new
             {
                 FieldName = fv.Field?.FieldName,
@@ -511,14 +523,34 @@ public class TasksController : Controller
      .ToListAsync();
 
 
-        // 🔥 FILTER TASKS BASED ON ROLE RULES
-        var visibleTasks = new List<TaskItem>();
+        // 🔥 PERFORMANCE OPTIMIZATION: Pre-fetch roles for all users involved to avoid N+1 queries in CanUserSeeTask
+        var usersToFetchRolesFor = allTasks.Select(t => t.CreatedByUserId).Distinct().ToList();
+        if (!usersToFetchRolesFor.Contains(user.Id)) usersToFetchRolesFor.Add(user.Id);
 
-        foreach (var task in allTasks)
+        var userRolesMap = new Dictionary<string, IList<string>>();
+        foreach (var uid in usersToFetchRolesFor)
         {
-            if (await CanUserSeeTask(task, user))
-                visibleTasks.Add(task);
+            var u = await _userManager.FindByIdAsync(uid);
+            if (u != null)
+            {
+                userRolesMap[uid] = await _userManager.GetRolesAsync(u);
+            }
         }
+
+        // 🔥 FILTER TASKS BASED ON ROLE RULES
+    // Pre-fetch hierarchy for visibility check
+    var userHierarchy = await _userManager.Users
+        .Select(u => new { u.Id, u.ManagerId })
+        .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+
+    var visibleTasks = new List<TaskItem>();
+    var viewerRoles = userRolesMap.ContainsKey(user.Id) ? userRolesMap[user.Id] : new List<string>();
+
+    foreach (var task in allTasks)
+    {
+        if (CanUserSeeTaskOptimized(task, user.Id, viewerRoles, userRolesMap, userHierarchy))
+            visibleTasks.Add(task);
+    }
 
         // Attach filtered tasks to columns
         foreach (var col in columns)
@@ -535,13 +567,17 @@ public class TasksController : Controller
 
         // Load active custom fields
         var customFields = await _context.TaskCustomFields
-            .Where(f => f.IsActive)
+            .Where(f => f.IsActive && (string.IsNullOrEmpty(f.TeamName) || f.TeamName == team))
             .OrderBy(f => f.Order)
             .ToListAsync();
 
+        var teamSettings = await _context.Teams.FirstOrDefaultAsync(t => t.Name == team);
+
         // ✅ 2. Build ViewModel AFTER data exists
         var userPerms = await _context.BoardPermissions
-            .FirstOrDefaultAsync(p => p.UserId == user.Id && p.TeamName == team);
+            .Where(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == team.ToLower().Trim())
+            .OrderByDescending(p => p.Id)
+            .FirstOrDefaultAsync();
 
         var vm = new TeamBoardViewModel
         {
@@ -549,7 +585,8 @@ public class TasksController : Controller
             Columns = columns,
             AssignableUsers = assignableUsers,
             CustomFields = customFields,
-            UserPermissions = userPerms
+            UserPermissions = userPerms,
+            TeamSettings = teamSettings
         };
 
         // ✅ 3. Return partial view
@@ -669,39 +706,94 @@ public class TasksController : Controller
         return Ok();
     }
 
-
-
-
-    private async Task<bool> CanUserSeeTask(TaskItem task, Users currentUser)
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> DeleteAllTasksInColumn([FromBody] int columnId)
     {
-        // Assigned user always sees
-        if (task.AssignedToUserId == currentUser.Id)
-            return true;
+        if (columnId <= 0) return BadRequest();
 
-        var viewerRoles = await _userManager.GetRolesAsync(currentUser);
+        var column = await _context.TeamColumns.FindAsync(columnId);
+        if (column == null) return NotFound();
 
+        // Check permission
+        if (!User.IsInRole("Admin"))
+        {
+            if (!await AuthorizeBoardAction(column.TeamName, "DeleteColumn")) // Reusing delete column permission for bulk delete
+                return Forbid();
+        }
+
+        var tasks = await _context.TaskItems
+            .Where(t => t.ColumnId == columnId)
+            .ToListAsync();
+
+        if (tasks.Any())
+        {
+            _context.TaskItems.RemoveRange(tasks);
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok(new { success = true, count = tasks.Count });
+    }
+
+    private bool CanUserSeeTaskOptimized(TaskItem task, string currentUserId, IList<string> viewerRoles, Dictionary<string, IList<string>> userRolesMap, Dictionary<string, string?> hierarchyMap)
+    {
         if (viewerRoles.Contains("Admin"))
             return true;
 
-        var creator = await _userManager.FindByIdAsync(task.CreatedByUserId);
-        if (creator == null)
-            return false;
+        // Creator and Assignee always see their tasks
+        if (task.CreatedByUserId == currentUserId || task.AssignedToUserId == currentUserId)
+            return true;
 
-        var creatorRoles = await _userManager.GetRolesAsync(creator);
-
-        bool isManager = viewerRoles.Contains("Manager");
-        bool isSubManager = viewerRoles.Contains("Sub-Manager");
-
-        if (creatorRoles.Contains("User"))
-            return isSubManager || isManager;
-
-        if (creatorRoles.Contains("Sub-Manager"))
-            return isManager;
-
-        if (creatorRoles.Contains("Manager"))
-            return isManager;
+        // Managerial Role Check (Hierarchy based)
+        bool isManagerOrSub = viewerRoles.Contains("Manager") || viewerRoles.Contains("Sub-Manager");
+        if (isManagerOrSub)
+        {
+            // Does the creator or assignee report to the current manager?
+            if (IsUnderManager(task.CreatedByUserId, currentUserId, hierarchyMap) || 
+                IsUnderManager(task.AssignedToUserId, currentUserId, hierarchyMap))
+            {
+                return true;
+            }
+        }
 
         return false;
+    }
+
+    private bool IsUnderManager(string? userId, string managerId, Dictionary<string, string?> hierarchyMap)
+    {
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(managerId)) return false;
+        
+        string? currentUserIdToCheck = userId;
+        int maxDepth = 20; // Safety against cycles
+        int depth = 0;
+        
+        while (hierarchyMap.TryGetValue(currentUserIdToCheck, out var parentId) && !string.IsNullOrEmpty(parentId) && depth < maxDepth)
+        {
+            if (parentId == managerId) return true;
+            currentUserIdToCheck = parentId;
+            depth++;
+        }
+        return false;
+    }
+
+    // Keep original for back-compat if needed elsewhere, but mark as obsolete or refactor
+    private async Task<bool> CanUserSeeTask(TaskItem task, Users currentUser)
+    {
+        if (task.AssignedToUserId == currentUser.Id) return true;
+        if (task.CreatedByUserId == currentUser.Id) return true;
+
+        var roles = await _userManager.GetRolesAsync(currentUser);
+        if (roles.Contains("Admin")) return true;
+
+        var userHierarchy = await _userManager.Users
+            .Select(u => new { u.Id, u.ManagerId })
+            .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+
+        var map = new Dictionary<string, IList<string>> { { currentUser.Id, roles } };
+        // We don't really need the userRolesMap for the new hierarchical logic unless we want to keep the old role logic
+        // but the requirement is "only to user and admin and their manager".
+        
+        return CanUserSeeTaskOptimized(task, currentUser.Id, roles, map, userHierarchy);
     }
 
 
@@ -1184,10 +1276,10 @@ public class TasksController : Controller
     [HttpGet]
     [Authorize]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public async Task<IActionResult> GetCustomFields()
+    public async Task<IActionResult> GetCustomFields(string? team)
     {
         var fields = await _context.TaskCustomFields
-            .Where(f => f.IsActive)
+            .Where(f => f.IsActive && (string.IsNullOrEmpty(f.TeamName) || f.TeamName == team))
             .OrderBy(f => f.Order)
             .Select(f => new
             {
@@ -1196,7 +1288,8 @@ public class TasksController : Controller
                 f.FieldType,
                 f.IsRequired,
                 f.DropdownOptions,
-                f.Order
+                f.Order,
+                f.TeamName
             })
             .ToListAsync();
 
@@ -1209,6 +1302,7 @@ public class TasksController : Controller
         public string FieldType { get; set; } = "Text";
         public bool IsRequired { get; set; } = false;
         public string? DropdownOptions { get; set; }
+        public string? TeamName { get; set; }
     }
 
     [HttpPost]
@@ -1235,7 +1329,8 @@ public class TasksController : Controller
             IsActive = true,
             Order = maxOrder + 1,
             CreatedByUserId = user.Id,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            TeamName = model.TeamName
         };
 
         _context.TaskCustomFields.Add(field);
@@ -1356,7 +1451,7 @@ public class TasksController : Controller
 
         var users = await _userManager.Users.OrderBy(u => u.UserName).ToListAsync();
         var perms = await _context.BoardPermissions
-            .Where(p => p.TeamName == team)
+            .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .ToListAsync();
 
         var result = new List<BoardPermissionDto>();
@@ -1378,7 +1473,8 @@ public class TasksController : Controller
                 CanDeleteColumn = p?.CanDeleteColumn ?? false,
                 CanEditAllFields = p?.CanEditAllFields ?? false,
                 CanDeleteTask = p?.CanDeleteTask ?? false,
-                CanReviewTask = p?.CanReviewTask ?? false
+                CanReviewTask = p?.CanReviewTask ?? false,
+                CanImportExcel = p?.CanImportExcel ?? false
             });
         }
 
@@ -1392,17 +1488,33 @@ public class TasksController : Controller
         if (dto == null || string.IsNullOrWhiteSpace(dto.UserId) || string.IsNullOrWhiteSpace(dto.TeamName))
             return BadRequest();
 
-        var existing = await _context.BoardPermissions
-            .FirstOrDefaultAsync(p => p.UserId == dto.UserId && p.TeamName == dto.TeamName);
+        // Get all records for this user/team robustly
+        var allExisting = await _context.BoardPermissions
+            .Where(p => p.UserId == dto.UserId && p.TeamName.ToLower().Trim() == dto.TeamName.ToLower().Trim())
+            .ToListAsync();
+
+        var existing = allExisting.OrderByDescending(p => p.Id).FirstOrDefault();
 
         if (existing == null)
         {
             existing = new BoardPermission
             {
                 UserId = dto.UserId,
-                TeamName = dto.TeamName
+                TeamName = dto.TeamName.Trim() // Sanitize on save
             };
             _context.BoardPermissions.Add(existing);
+        }
+        else
+        {
+            // Cleanup duplicates if they exist
+            if (allExisting.Count > 1)
+            {
+                var duplicates = allExisting.Where(p => p.Id != existing.Id).ToList();
+                _context.BoardPermissions.RemoveRange(duplicates);
+            }
+            
+            // Ensure team name is sanitized/standardized on the one we keep
+            existing.TeamName = dto.TeamName.Trim();
         }
 
         existing.CanAddColumn = dto.CanAddColumn;
@@ -1412,6 +1524,7 @@ public class TasksController : Controller
         existing.CanEditAllFields = dto.CanEditAllFields;
         existing.CanDeleteTask = dto.CanDeleteTask;
         existing.CanReviewTask = dto.CanReviewTask;
+        existing.CanImportExcel = dto.CanImportExcel;
 
         await _context.SaveChangesAsync();
         return Ok(new { success = true });
@@ -1425,7 +1538,9 @@ public class TasksController : Controller
         if (user == null) return false;
 
         var perms = await _context.BoardPermissions
-            .FirstOrDefaultAsync(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == teamName.ToLower().Trim());
+            .Where(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == teamName.ToLower().Trim())
+            .OrderByDescending(p => p.Id)
+            .FirstOrDefaultAsync();
 
         if (perms == null) return false;
 
@@ -1438,6 +1553,7 @@ public class TasksController : Controller
             "EditAllFields" => perms.CanEditAllFields,
             "DeleteTask" => perms.CanDeleteTask,
             "ReviewTask" => perms.CanReviewTask,
+            "ImportExcel" => perms.CanImportExcel,
             _ => false
         };
     }
@@ -1467,6 +1583,39 @@ public class TasksController : Controller
             }
             await _context.SaveChangesAsync();
         }
+    }
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> UpdateTeamSettings([FromBody] UpdateTeamSettingsRequest model)
+    {
+        if (model == null || string.IsNullOrWhiteSpace(model.TeamName))
+            return BadRequest();
+
+        var team = await _context.Teams.FirstOrDefaultAsync(t => t.Name == model.TeamName);
+        if (team == null)
+        {
+            // Create if missing (lazy initialization)
+            team = new Team { Name = model.TeamName };
+            _context.Teams.Add(team);
+        }
+
+        team.IsPriorityVisible = model.IsPriorityVisible;
+        team.IsDueDateVisible = model.IsDueDateVisible;
+        team.IsTitleVisible = model.IsTitleVisible;
+        team.IsDescriptionVisible = model.IsDescriptionVisible;
+
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true });
+    }
+
+    public class UpdateTeamSettingsRequest
+    {
+        public string TeamName { get; set; }
+        public bool IsPriorityVisible { get; set; }
+        public bool IsDueDateVisible { get; set; }
+        public bool IsTitleVisible { get; set; }
+        public bool IsDescriptionVisible { get; set; }
     }
 }
 
