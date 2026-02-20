@@ -9,32 +9,39 @@ async function refreshOpenModals() {
     window.customFieldsCache = null;
     const createEl = document.getElementById('customFieldsContainer');
     const editEl = document.getElementById('editCustomFieldsContainer');
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
     if (createEl) {
         const savedCreate = collectCustomFieldValues('customFieldsContainer');
-        await renderCustomFieldInputs('customFieldsContainer', savedCreate);
+        await renderCustomFieldInputs('customFieldsContainer', savedCreate, team);
     }
     if (editEl) {
         const savedEdit = collectCustomFieldValues('editCustomFieldsContainer');
-        await renderCustomFieldInputs('editCustomFieldsContainer', savedEdit);
+        await renderCustomFieldInputs('editCustomFieldsContainer', savedEdit, team);
     }
 }
 
 // Load custom fields from server
-async function loadCustomFields() {
+async function loadCustomFields(team) {
+    const cacheKey = team ? `fields_${team}` : 'fields_default';
+
     // Return cached if available
-    if (window.customFieldsCache !== null) {
-        console.log('Using cached custom fields:', window.customFieldsCache);
-        return window.customFieldsCache;
+    if (window.customFieldsCache && window.customFieldsCache[cacheKey]) {
+        console.log('Using cached custom fields for team:', team);
+        return window.customFieldsCache[cacheKey];
     }
 
+    window.customFieldsCache = window.customFieldsCache || {};
+
     try {
-        console.log('Fetching custom fields from server...');
-        const response = await fetch(`/Tasks/GetCustomFields?t=${new Date().getTime()}`);
+        console.log(`Fetching custom fields for team ${team}...`);
+        const url = team ? `/Tasks/GetCustomFields?team=${encodeURIComponent(team)}&t=${new Date().getTime()}` : `/Tasks/GetCustomFields?t=${new Date().getTime()}`;
+        const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to load custom fields');
 
-        window.customFieldsCache = await response.json();
-        console.log('Loaded custom fields:', window.customFieldsCache);
-        return window.customFieldsCache;
+        const fields = await response.json();
+        window.customFieldsCache[cacheKey] = fields;
+        console.log('Loaded custom fields:', fields);
+        return fields;
     } catch (error) {
         console.error('Error loading custom fields:', error);
         return [];
@@ -42,7 +49,7 @@ async function loadCustomFields() {
 }
 
 // Render custom field inputs in a form - NOW ASYNC
-async function renderCustomFieldInputs(containerId, existingValues = {}) {
+async function renderCustomFieldInputs(containerId, existingValues = {}, team = null) {
     const container = document.getElementById(containerId);
     if (!container) {
         console.error('Container not found:', containerId);
@@ -50,7 +57,7 @@ async function renderCustomFieldInputs(containerId, existingValues = {}) {
     }
 
     // Always load fresh fields
-    const fields = await loadCustomFields();
+    const fields = await loadCustomFields(team);
 
     container.innerHTML = '';
 
@@ -156,18 +163,14 @@ async function renderCustomFieldInputs(containerId, existingValues = {}) {
         input.dataset.required = field.isRequired;
         input.value = existingValues[field.id] || '';
 
-        if (field.isRequired) {
-            input.required = true;
-        }
-
-        fieldGroup.appendChild(input);
+        fieldGroup.appendChild(input); // Add this!
         container.appendChild(fieldGroup);
     });
 
     // Add "Add Field" button at the bottom (All Roles)
     {
         const addBtnContainer = document.createElement('div');
-        addBtnContainer.className = 'mt-3 pt-2 border-top text-center';
+        addBtnContainer.className = 'mt-3 pt-2 border-top text-center d-flex justify-content-center gap-2';
 
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
@@ -175,6 +178,8 @@ async function renderCustomFieldInputs(containerId, existingValues = {}) {
         addBtn.innerHTML = '<i class="bi bi-plus-lg"></i> Add New Field';
         addBtn.onclick = (e) => { e.preventDefault(); addNewCustomField(); };
         addBtnContainer.appendChild(addBtn);
+
+        // Remove duplicate manageBtn from here as it's in the modal footer
 
         container.appendChild(addBtnContainer);
     }
@@ -187,13 +192,15 @@ async function addNewCustomField() {
     if (!name) return;
 
     try {
+        const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
         const response = await fetch('/Tasks/CreateCustomField', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 fieldName: name,
                 fieldType: 'Text', // Default to Text for inline simplicity
-                isRequired: false
+                isRequired: false,
+                teamName: teamName
             })
         });
 
@@ -282,7 +289,12 @@ function validateCustomFields(containerId = 'customFieldsContainer') {
     const container = document.getElementById(containerId);
     if (!container) return true;
 
-    for (const field of window.customFieldsCache) {
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+    const cacheKey = team ? `fields_${team}` : 'fields_default';
+    const fields = window.customFieldsCache ? window.customFieldsCache[cacheKey] : null;
+    if (!fields) return true;
+
+    for (const field of fields) {
         if (field.isRequired) {
             // Find input within the container
             const input = container.querySelector(`[data-field-id="${field.id}"]`);
@@ -303,18 +315,22 @@ function validateCustomFields(containerId = 'customFieldsContainer') {
 
 function openManageFieldsModal() {
     const modal = new bootstrap.Modal(document.getElementById('manageFieldsModal'));
-    loadFieldsList();
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+    loadFieldsList(team);
     modal.show();
 }
 
-async function loadFieldsList() {
+async function loadFieldsList(team) {
     const container = document.getElementById('fieldsList');
     if (!container) return;
 
     try {
         // Force fresh load for manage fields modal
-        window.customFieldsCache = null;
-        const fields = await loadCustomFields();
+        if (window.customFieldsCache) {
+            const cacheKey = team ? `fields_${team}` : 'fields_default';
+            delete window.customFieldsCache[cacheKey];
+        }
+        const fields = await loadCustomFields(team);
 
         if (fields.length === 0) {
             container.innerHTML = '<div class="text-muted">No custom fields yet. Add one below.</div>';
@@ -363,6 +379,7 @@ async function createNewField() {
     const fieldName = document.getElementById('newFieldName').value.trim();
     const fieldType = document.getElementById('newFieldType').value;
     const isRequired = document.getElementById('newFieldRequired').checked;
+    const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
 
     if (!fieldName) {
         alert('Field name is required');
@@ -389,7 +406,8 @@ async function createNewField() {
                 fieldName: fieldName,
                 fieldType: fieldType,
                 isRequired: isRequired,
-                dropdownOptions: dropdownOptions
+                dropdownOptions: dropdownOptions,
+                teamName: teamName
             })
         });
 
@@ -431,10 +449,15 @@ async function deleteField(fieldId) {
         if (!response.ok) throw new Error('Failed to delete field');
 
         // Clear cache
-        window.customFieldsCache = null;
+        if (window.customFieldsCache) {
+            const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+            const cacheKey = team ? `fields_${team}` : 'fields_default';
+            delete window.customFieldsCache[cacheKey];
+        }
 
         // Reload list
-        await loadFieldsList();
+        const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
+        await loadFieldsList(teamName);
 
         // ✅ Re-render fields in task modals IMMEDIATELY
         await refreshOpenModals();
@@ -477,8 +500,13 @@ async function changeFieldType(fieldId, currentType) {
         if (!response.ok) throw new Error('Failed to update field type');
 
         // Clear cache and reload
-        customFieldsCache = null;
-        await loadFieldsList();
+        if (window.customFieldsCache) {
+            const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+            const cacheKey = team ? `fields_${team}` : 'fields_default';
+            delete window.customFieldsCache[cacheKey];
+        }
+        const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
+        await loadFieldsList(teamName);
         await refreshOpenModals();
 
         if (typeof showToast === 'function') showToast(`✅ Field type changed to ${newType}`, 'success');
@@ -491,7 +519,8 @@ async function changeFieldType(fieldId, currentType) {
 // Load custom fields on page load
 document.addEventListener('DOMContentLoaded', function () {
     console.log('DOMContentLoaded - loading custom fields...');
-    loadCustomFields();
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+    loadCustomFields(team);
 });
 
 async function editDropdownOptions(fieldId, currentOptions) {
@@ -510,11 +539,49 @@ async function editDropdownOptions(fieldId, currentOptions) {
 
         if (!response.ok) throw new Error('Failed to update options');
 
-        window.customFieldsCache = null;
-        await loadFieldsList();
+        if (window.customFieldsCache) {
+            const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+            const cacheKey = team ? `fields_${team}` : 'fields_default';
+            delete window.customFieldsCache[cacheKey];
+        }
+        const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
+        await loadFieldsList(teamName);
         await refreshOpenModals();
 
     } catch (error) {
         alert('Error updating options: ' + error.message);
+    }
+}
+
+async function updateTeamSettings() {
+    const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
+    const isPriorityVisible = document.getElementById('showPriorityCheckbox').checked;
+    const isDueDateVisible = document.getElementById('showDueDateCheckbox').checked;
+
+    if (!teamName) return;
+
+    try {
+        const response = await fetch('/Tasks/UpdateTeamSettings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                teamName: teamName,
+                isPriorityVisible: isPriorityVisible,
+                isDueDateVisible: isDueDateVisible
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to update team settings');
+
+        if (typeof showToast === 'function') showToast('✅ Team settings updated!', 'success');
+
+        // Refresh board to show/hide fields
+        const currentTeam = document.getElementById('kanbanBoard')?.dataset.teamName;
+        if (currentTeam && window.loadTeamBoard) {
+            window.loadTeamBoard(currentTeam);
+        }
+
+    } catch (error) {
+        alert('Error updating settings: ' + error.message);
     }
 }

@@ -13,5 +13,6 @@ namespace UserRoles.DTOs
         public bool CanEditAllFields { get; set; }
         public bool CanDeleteTask { get; set; }
         public bool CanReviewTask { get; set; }
+        public bool CanImportExcel { get; set; }
     }
 }

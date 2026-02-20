@@ -17,6 +17,9 @@ namespace UserRoles.Models
         // Soft delete support
         public bool IsActive { get; set; } = true;
         
+        // Team association (for team-specific fields)
+        public string? TeamName { get; set; }
+        
         // Display order
         public int Order { get; set; }
         

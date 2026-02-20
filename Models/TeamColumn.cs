@@ -7,10 +7,10 @@ namespace UserRoles.Models
         public int Id { get; set; }
 
         // Development / Testing / Sales
-        public string TeamName { get; set; }
+        public string TeamName { get; set; } = string.Empty;
 
         // ToDo, To Test, Leads, Follow Up, etc.
-        public string ColumnName { get; set; }
+        public string ColumnName { get; set; } = string.Empty;
 
         // Order in board (left → right)
         public int Order { get; set; }

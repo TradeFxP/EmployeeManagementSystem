@@ -25,11 +25,20 @@
             </button>
             <button class="btn btn-sm btn-archive-glow"
                     onclick="archiveCompletedTasks('@Model.TeamName')"
-                    title="Archive all completed & passed tasks">
+                    title="Archive all completed &amp; passed tasks">
                 <i class="bi bi-archive me-1"></i> Archive Completed
             </button>
         }
         
+        @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanImportExcel == true))
+        {
+            <button class="btn btn-sm btn-import-excel"
+                    onclick="openExcelImportModal('@Model.TeamName')"
+                    title="Import tasks from Excel file">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import Excel
+            </button>
+        }
+
         @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanAddColumn == true))
         {
             <button class="btn btn-sm btn-add-col"
@@ -190,6 +199,13 @@
                             <i class="bi bi-pencil"></i>
                         </button>
                     }
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteTask == true))
+                    {
+                        <button class="header-icon-btn text-warning" title="Clear All Tasks" 
+                                onclick="clearColumnTasks(@column.Id); event.stopPropagation();">
+                            <i class="bi bi-eraser"></i>
+                        </button>
+                    }
                     @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteColumn == true))
                     {
                         <button class="header-icon-btn text-danger" title="Delete" onclick="confirmDeleteColumn(@column.Id); event.stopPropagation();">
@@ -259,13 +275,51 @@
                              onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@task.Id)">
 
                             <!-- TOP ROW: Priority (left) + Task ID + Review Status (right) -->
-                            <div class="card-top-row">
-                                <span class="priority-pill @priorityBorderClass">@priorityLabel</span>
+                            <div class="card-top-row flex-column align-items-start gap-1">
+                                <div class="d-flex align-items-center w-100">
+                                    @{
+                                        var customPriority = task.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldName?.Trim()?.ToLower() == "priority")?.Value;
+                                        var effectivePriorityLabel = !string.IsNullOrWhiteSpace(customPriority) ? customPriority : priorityLabel;
+                                        var effectivePriorityClass = effectivePriorityLabel.ToLower() switch
+                                        {
+                                            "low" => "priority-low",
+                                            "medium" => "priority-medium",
+                                            "high" => "priority-high",
+                                            "critical" => "priority-critical",
+                                            _ => priorityBorderClass
+                                        };
+                                    }
+
+                                    @if (Model.TeamSettings?.IsPriorityVisible ?? true)
+                                    {
+                                        <span class="priority-pill @effectivePriorityClass">@effectivePriorityLabel.ToUpper()</span>
+                                    }
+                                    <div class="d-flex align-items-center gap-1 ms-auto">
+                                        <span class="badge bg-light text-muted border small" style="font-size: 0.7rem;">#@task.Id</span>
+                                    </div>
+                                </div>
+
+                                    @{
+                                        DateTime? finalDueDate = task.DueDate;
+                                        if (finalDueDate == null && task.CustomFieldValues != null)
+                                        {
+                                            var cfDueDate = task.CustomFieldValues.FirstOrDefault(f => f.Field?.FieldName?.Trim().ToLower() == "due date")?.Value;
+                                            if (DateTime.TryParse(cfDueDate, out var parsedDate))
+                                            {
+                                                finalDueDate = parsedDate;
+                                            }
+                                        }
+                                    }
+
+                                    @if ((Model.TeamSettings?.IsDueDateVisible ?? true) && finalDueDate != null)
+                                    {
+                                        <span class="badge bg-light text-dark border d-flex align-items-center gap-1 small w-100" title="Due Date" style="font-size: 0.75rem; justify-content: flex-start;">
+                                            <i class="bi bi-calendar-event text-danger"></i>
+                                            Due Date: @finalDueDate.Value.ToString("dd MMM, hh:mm tt")
+                                        </span>
+                                    }
 
                                 <div class="d-flex align-items-center gap-1 ms-auto">
-                                    <!-- TASK ID CHIP -->
-                                    <span class="task-id-chip" title="Task ID">#@task.Id</span>
-
                                     <span class="review-badge review-badge-fail" style="display: @(isFailed ? "inline-flex" : "none")">
                                         <i class="bi bi-x-circle-fill"></i> FAIL
                                     </span>
@@ -279,7 +333,13 @@
                             </div>
 
                             <!-- TITLE -->
-                            <div class="task-title-text mt-2">@task.Title</div>
+                            @if (Model.TeamSettings?.IsTitleVisible ?? true)
+                            {
+                                @if (!string.IsNullOrWhiteSpace(task.Title) && task.Title != "Untitled Task")
+                                {
+                                    <div class="task-title-text mt-2">@task.Title</div>
+                                }
+                            }
 
                             <!-- FAIL NOTE -->
                             @if (isFailed && !string.IsNullOrWhiteSpace(task.ReviewNote))
@@ -307,13 +367,9 @@
                                                 {
                                                     <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
                                                 }
-                                                else if (fv.Field.FieldType == "Date" && DateTime.TryParse(fv.Value, out var sd))
-                                                {
-                                                    <span>@sd.ToString("dd MMM yyyy")</span>
-                                                }
                                                 else
                                                 {
-                                                    <span>@fv.Value</span>
+                                                     <span>@fv.Value</span>
                                                 }
                                             </div>
                                         }
@@ -535,6 +591,21 @@
     }
     .btn-add-col:hover {
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        transform: translateY(-1px);
+        color: #fff;
+    }
+    .btn-import-excel {
+        background: linear-gradient(135deg, #0d9488, #0891b2);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        padding: 6px 14px;
+        transition: all 0.3s ease;
+    }
+    .btn-import-excel:hover {
+        box-shadow: 0 4px 15px rgba(13, 148, 136, 0.4);
         transform: translateY(-1px);
         color: #fff;
     }
