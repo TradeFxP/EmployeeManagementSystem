@@ -99,13 +99,30 @@
      data-perm-delete-col="@((Model.UserPermissions?.CanDeleteColumn ?? false) ? "true" : "false")"
      data-perm-edit-tasks="@((Model.UserPermissions?.CanEditAllFields ?? false) ? "true" : "false")"
      data-perm-delete-task="@((Model.UserPermissions?.CanDeleteTask ?? false) ? "true" : "false")"
-     data-perm-review-task="@((Model.UserPermissions?.CanReviewTask ?? false) ? "true" : "false")">
+     data-perm-review-task="@((Model.UserPermissions?.CanReviewTask ?? false) ? "true" : "false")"
+     data-perm-assign-task="@((Model.UserPermissions?.CanAssignTask ?? false) ? "true" : "false")">
 
     <!-- ================= FOCUSED TASK PANEL ================= -->
     <div id="focusedTaskPanel" class="focused-task-panel d-none">
         <input type="hidden" id="focusedTaskId" />
         <div class="card p-4 shadow-sm">
-            <h5>Task Details</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Task Details</h5>
+                <div class="modal-action-buttons mb-0 border-0 p-0 shadow-none">
+                    <button class="modal-action-btn btn-modal-history" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="History" onclick="openTaskHistoryFromModal(document.getElementById('focusedTaskId').value)">
+                        <i class="bi bi-clock-history"></i>
+                    </button>
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanAssignTask == true))
+                    {
+                        <button class="modal-action-btn btn-modal-assign" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="Assign" onclick="showAssignUIFromModal(document.getElementById('focusedTaskId').value)">
+                            <i class="bi bi-person-plus"></i>
+                        </button>
+                    }
+                    <button class="modal-action-btn btn-modal-edit" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="Edit" onclick="openEditTaskFromModal(document.getElementById('focusedTaskId').value)">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
+                </div>
+            </div>
             <div class="mb-3">
                 <label class="form-label">Title</label>
                 <input id="focusedTaskTitle" class="form-control" />
@@ -119,10 +136,13 @@
                     </button>
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Assign to</label>
-                <select id="focusedTaskAssignUser" class="form-select"></select>
-            </div>
+            @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanAssignTask == true))
+            {
+                <div class="mb-3" id="focusedTaskAssignContainer">
+                    <label class="form-label">Assign to</label>
+                    <select id="focusedTaskAssignUser" class="form-select"></select>
+                </div>
+            }
             <div class="text-muted small mb-3">
                 <div id="taskCreatedInfo"></div>
             </div>
@@ -141,7 +161,7 @@
     {
         var colNameLower = column.ColumnName?.Trim().ToLower();
         var isReviewCol = colNameLower == "review";
-        var isCompletedCol = colNameLower == "completed";
+        var isCompletedCol = colNameLower == "completed" || colNameLower == "complete" || colNameLower == "done";
         var taskCount = column.Tasks?.Count ?? 0;
         var colAccentClass = isReviewCol ? "col-review" : isCompletedCol ? "col-completed" : "";
 
@@ -178,7 +198,7 @@
 
                 <div class="d-flex align-items-center gap-1">
                     <!-- ADD TASK -->
-                    @if (!isCompletedCol && (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User")))
+                    @if (!isCompletedCol && (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager") || User.IsInRole("SubManager") || User.IsInRole("User")))
                     {
                         <button class="header-icon-btn" title="Add task"
                                 onclick="openCreateTaskModal(@column.Id); event.stopPropagation();">
@@ -420,10 +440,21 @@
                                     <i class="bi bi-person-plus-fill me-1"></i> Quick Assign
                                 </div>
                                 <select class="form-select form-select-sm task-assign-select mb-2" data-task-id="@task.Id">
-                                    <option value="">-- Select Member --</option>
-                                    @foreach (var u in Model.AssignableUsers)
+                                    <option value="">-- Select Member or Team --</option>
+                                    <optgroup label="Members">
+                                        @foreach (var u in Model.AssignableUsers)
+                                        {
+                                            <option value="user:@u.Id" selected="@(task.AssignedToUserId == u.Id)">@u.UserName</option>
+                                        }
+                                    </optgroup>
+                                    @if (Model.AllTeamNames != null && Model.AllTeamNames.Any())
                                     {
-                                        <option value="@u.Id" selected="@(task.AssignedToUserId == u.Id)">@u.UserName</option>
+                                        <optgroup label="Teams">
+                                            @foreach (var tName in Model.AllTeamNames.Where(n => n != Model.TeamName))
+                                            {
+                                                <option value="team:@tName">@tName</option>
+                                            }
+                                        </optgroup>
                                     }
                                 </select>
                                 <div class="d-flex gap-2 justify-content-end">
@@ -439,15 +470,23 @@
                                 <button class="action-btn action-btn-info" title="View Task History"
                                         onclick="openTaskHistoryModal(@task.Id); event.stopPropagation();">
                                     <i class="bi bi-clock-history"></i>
-                                    
                                 </button>
 
-                                <button class="action-btn action-btn-secondary action-btn-assign" title="Assign Task"
-                                        data-task-id="@task.Id"
-                                        style="display: @(!isReviewCol && !isCompletedCol ? "inline-flex" : "none")"
-                                        onclick="showAssignUI(@task.Id); event.stopPropagation();">
-                                    <i class="bi bi-person-plus"></i> 
+                                <button class="action-btn action-btn-edit" title="Edit Task"
+                                        style="display: @(!isCompletedCol || User.IsInRole("Admin") || (Model.UserPermissions?.CanEditAllFields == true) ? "inline-flex" : "none")"
+                                        onclick="openEditTaskModal(@task.Id); event.stopPropagation();">
+                                    <i class="bi bi-pencil-square"></i>
                                 </button>
+
+                                @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanAssignTask == true))
+                                {
+                                    <button class="action-btn action-btn-secondary action-btn-assign" title="Assign Task"
+                                            data-task-id="@task.Id"
+                                            style="display: @(!isCompletedCol ? "inline-flex" : "none")"
+                                            onclick="showAssignUI(@task.Id); event.stopPropagation();">
+                                        <i class="bi bi-person-plus"></i>
+                                    </button>
+                                }
 
                                 @* ADMIN / GRANTED: Review button rendered if user has perms, display toggled by column *@
                                 @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanReviewTask == true))
@@ -455,7 +494,7 @@
                                     <button class="action-btn action-btn-warning action-btn-review" title="Review Task"
                                             style="display: @(isReviewCol && isPending ? "inline-flex" : "none")"
                                             onclick="openReviewModal(@task.Id, '@task.Title.Replace("'", "\\'")'); event.stopPropagation();">
-                                        <i class="bi bi-clipboard-check"></i> 
+                                        <i class="bi bi-clipboard-check"></i>
                                     </button>
                                 }
 
@@ -465,15 +504,9 @@
                                     <button class="action-btn action-btn-success action-btn-archive" title="Archive Task"
                                             style="display: @(isCompletedCol && isPassed ? "inline-flex" : "none")"
                                             onclick="archiveSingleTask(@task.Id); event.stopPropagation();">
-                                        <i class="bi bi-archive"></i> 
+                                        <i class="bi bi-archive"></i>
                                     </button>
                                 }
-
-                                <button class="action-btn action-btn-edit" title="Edit Task"
-                                        style="display: @(!isReviewCol && !isCompletedCol ? "inline-flex" : "none")"
-                                        onclick="openEditTaskModal(@task.Id); event.stopPropagation();">
-                                    <i class="bi bi-pencil-square"></i>
-                                </button>
 
                                 @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteTask == true))
                                 {

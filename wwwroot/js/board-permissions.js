@@ -51,6 +51,7 @@ async function loadBoardPermissions(teamName) {
                 <td class="text-center">${renderSwitch(p.userId, 'canDeleteTask', p.canDeleteTask)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canReviewTask', p.canReviewTask)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canImportExcel', p.canImportExcel)}</td>
+                <td class="text-center">${renderSwitch(p.userId, 'canAssignTask', p.canAssignTask)}</td>
                 <td class="text-center">
                     <button class="btn btn-sm btn-link text-info p-0" onclick="grantAllBoardPermissions(this, '${p.userId}', '${teamName}')" title="Grant All Permissions">
                         <i class="bi bi-check-all fs-4"></i>
@@ -108,7 +109,8 @@ async function updatePermission(checkbox, teamName) {
         canEditAllFields: row.querySelector('[data-field="canEditAllFields"]').checked,
         canDeleteTask: row.querySelector('[data-field="canDeleteTask"]').checked,
         canReviewTask: row.querySelector('[data-field="canReviewTask"]').checked,
-        canImportExcel: row.querySelector('[data-field="canImportExcel"]').checked
+        canImportExcel: row.querySelector('[data-field="canImportExcel"]').checked,
+        canAssignTask: row.querySelector('[data-field="canAssignTask"]').checked
     };
 
     checkbox.disabled = true;
@@ -153,7 +155,8 @@ async function grantAllBoardPermissions(btn, userId, teamName) {
         canEditAllFields: true,
         canDeleteTask: true,
         canReviewTask: true,
-        canImportExcel: true
+        canImportExcel: true,
+        canAssignTask: true
     };
 
     btn.disabled = true;

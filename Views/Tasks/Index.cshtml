@@ -1,4 +1,6 @@
 ﻿@using UserRoles.ViewModels
+@using UserRoles.Models
+@inject Microsoft.AspNetCore.Identity.UserManager<Users> UserManager
 
 @model UserRoles.ViewModels.TeamBoardViewModel
 
@@ -179,6 +181,7 @@
     <!-- ═══════ JS: EXPOSE USER ROLE ═══════ -->
     <script>
         var currentUserRole = '@(User.IsInRole("Admin") ? "Admin" : User.IsInRole("Manager") ? "Manager" : User.IsInRole("Sub-Manager") ? "Sub-Manager" : "User")';
+        var isAdmin = @(User.IsInRole("Admin") ? "true" : "false");
     </script>
 
     <!-- ═══════ REVIEW TASK MODAL (ADMIN ONLY) ═══════ -->
@@ -1074,9 +1077,11 @@
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Rename</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Reorder</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Del Col</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Edit All</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Delete Task</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Review</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Import Excel</th>
+                                    <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Assign</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">All</th>
                                 </tr>
                             </thead>
@@ -1409,6 +1414,19 @@
         handleTaskReviewedUpdate(data);
     });
 
+    taskHubConnection.on("PermissionsUpdated", function (userId, teamName) {
+        console.log("Permissions updated received for:", userId, teamName);
+        const currentUserId = '@UserManager.GetUserId(User)';
+        if (userId === currentUserId && window.currentTeamName && window.currentTeamName.toLowerCase().trim() === teamName.toLowerCase().trim()) {
+            if (typeof loadTeamBoard === "function") {
+                loadTeamBoard(window.currentTeamName);
+                if (typeof showToast === "function") {
+                    showToast("🔔 Your board permissions have been updated.", "info");
+                }
+            }
+        }
+    });
+
     taskHubConnection.start()
         .then(() => {
             console.log("SignalR Connected");
@@ -1609,17 +1627,21 @@
                     `<span class="badge bg-${reviewColors[t.reviewStatus] || 'secondary'}">${escapeHtml(t.reviewStatus)}</span>` : '';
 
                 const colName = (t.column || t.status || "").toLowerCase().trim();
-                const isRestricted = colName === 'review' || colName === 'completed';
+                const isCompleted = colName === 'completed' || colName === 'complete' || colName === 'done';
+                const isReview = colName === 'review';
 
                 body.innerHTML = `
                     <div class="modal-action-buttons">
                         <button class="modal-action-btn btn-modal-history" title="History" onclick="openTaskHistoryFromModal(${t.id})">
                             <i class="bi bi-clock-history"></i>
                         </button>
-                        ${!isRestricted ? `
+                        
+                        ${(isAdmin || document.getElementById('kanbanBoard')?.dataset.permAssignTask === 'true') && !isCompleted ? `
                         <button class="modal-action-btn btn-modal-assign" title="Assign" onclick="showAssignUIFromModal(${t.id})">
                             <i class="bi bi-person-plus"></i>
-                        </button>
+                        </button>` : ''}
+
+                        ${!isCompleted || isAdmin ? `
                         <button class="modal-action-btn btn-modal-edit" title="Edit" onclick="openEditTaskFromModal(${t.id})">
                             <i class="bi bi-pencil-square"></i>
                         </button>` : ''}
@@ -2136,71 +2158,7 @@
 
 
 
-    function showAssignDropdown(taskId) {
-
-        // Hide all other assign containers
-        document.querySelectorAll('.task-assign-container').forEach(c => {
-            c.classList.add('d-none');
-        });
-
-        // Show current task assign UI
-        const container = document.querySelector(
-            `.task-assign-container[data-task-id='${taskId}']`
-        );
-
-        if (container) {
-            container.classList.remove('d-none');
-        }
-    }
-
-    function cancelAssignTask(taskId) {
-        const container = document.querySelector(
-            `.task-assign-container[data-task-id='${taskId}']`
-        );
-
-        if (container) {
-            container.classList.add('d-none');
-        }
-    }
-
-
-    function confirmAssignTask(taskId) {
-
-        const select = document.querySelector(
-            `.task-assign-select[data-task-id='${taskId}']`
-        );
-
-        if (!select || !select.value) {
-            alert("Please select a user");
-            return;
-        }
-
-        const userId = select.value;
-
-        fetch('/Tasks/AssignTask', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: `taskId=${taskId}&userId=${userId}`
-        })
-            .then(res => {
-                if (!res.ok) throw new Error();
-                return res.json();
-            })
-            .then(result => {
-
-                // Optional toast (you already have this)
-                showAssignToast(userId, result.assignedBy, result.assignedAt);
-
-                // Hide assign UI
-                cancelAssignTask(taskId);
-
-                // Reload board to reflect assignment
-                loadTeamBoard(currentTeamName);
-            })
-            .catch(() => showToast('Failed to assign task — please try again.', 'danger'));
-    }
+    // Unified assignment logic moved to tasks.js
 
 
     function enableTaskDragDrop() {

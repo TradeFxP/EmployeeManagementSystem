@@ -273,22 +273,38 @@ function cancelAssignTask(taskId) {
 function confirmAssignTask(taskId) {
     const card = $(`.task-card[data-task-id="${taskId}"]`);
     const select = card.find('.task-assign-select');
-    const userId = select.val();
+    const rawValue = select.val();
 
-    if (!userId) {
-        showToast('Please select a team member to assign this task.', 'warning');
+    if (!rawValue) {
+        showToast('Please select a team member or a team to assign this task.', 'warning');
         return;
     }
+
+    // Determine if it's a user or team assignment
+    const type = rawValue.split(':')[0]; // 'user' or 'team'
+    const id = rawValue.split(':')[1];
 
     // Show loading state on button
     const saveBtn = card.find('.task-assign-panel button.btn-primary');
     const originalHtml = saveBtn.html();
     saveBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
 
-    $.post("/Tasks/AssignTask", { taskId: taskId, userId: userId })
-        .done(function (response) {
+    let url = "/Tasks/AssignTask";
+    let payload = { taskId: taskId, userId: id };
+
+    if (type === 'team') {
+        url = "/Tasks/AssignTaskToTeam";
+        payload = { taskId: taskId, teamName: id };
+    }
+
+    $.ajax({
+        url: url,
+        type: "POST",
+        contentType: (type === 'team') ? "application/json" : "application/x-www-form-urlencoded",
+        data: (type === 'team') ? JSON.stringify(payload) : payload,
+        success: function (response) {
             if (response.success) {
-                showToast('✅ Task successfully assigned!', 'success');
+                showToast('✅ Task successfully moved/assigned!', 'success');
 
                 // Hide panel and restore buttons immediately for responsiveness
                 cancelAssignTask(taskId);
@@ -296,6 +312,9 @@ function confirmAssignTask(taskId) {
                 // Refresh board data
                 if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
                     loadTeamBoard(currentTeamName);
+                } else if (typeof loadTeamBoard === 'function') {
+                    // Fallback to reload if active team name not set
+                    location.reload();
                 } else {
                     location.reload();
                 }
@@ -303,11 +322,13 @@ function confirmAssignTask(taskId) {
                 showToast(response.message || 'Failed to assign task.', 'danger');
                 saveBtn.prop('disabled', false).html(originalHtml);
             }
-        })
-        .fail(function () {
-            showToast('Error: Could not reach the server.', 'danger');
+        },
+        error: function (xhr) {
+            const msg = xhr.responseText || 'Error: Could not reach the server.';
+            showToast(msg, 'danger');
             saveBtn.prop('disabled', false).html(originalHtml);
-        });
+        }
+    });
 }
 
 // ═══════════════════════════════════════════════
