@@ -1414,6 +1414,21 @@
         handleTaskReviewedUpdate(data);
     });
 
+    taskHubConnection.on("TaskRemoved", function (data) {
+        console.log("Task removed received:", data);
+        handleTaskRemovedUpdate(data);
+    });
+
+    taskHubConnection.on("TaskAdded", function (data) {
+        console.log("Task added received:", data);
+        handleTaskAddedUpdate(data);
+    });
+
+    taskHubConnection.on("TaskAssigned", function (data) {
+        console.log("Task assigned received:", data);
+        handleTaskAssignedUpdate(data);
+    });
+
     taskHubConnection.on("PermissionsUpdated", function (userId, teamName) {
         console.log("Permissions updated received for:", userId, teamName);
         const currentUserId = '@UserManager.GetUserId(User)';
@@ -1512,6 +1527,55 @@
                 });
             }
         }
+    }
+
+    function handleTaskRemovedUpdate(data) {
+        const card = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+        if (card) {
+            card.remove();
+            updateColumnCounts();
+            showToast(`Task #${data.taskId} moved to another team`, 'info');
+        }
+    }
+
+    function handleTaskAddedUpdate(data) {
+        // Prevent duplicates
+        if (document.querySelector(`.task-card[data-task-id="${data.taskId}"]`)) return;
+
+        fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to fetch card");
+                return res.text();
+            })
+            .then(html => {
+                const targetColumn = document.querySelector(`.kanban-column[data-column-id="${data.columnId}"]`);
+                if (!targetColumn) return;
+
+                const taskList = targetColumn.querySelector('.kanban-tasks');
+                if (!taskList) return;
+
+                taskList.insertAdjacentHTML('afterbegin', html);
+                updateColumnCounts();
+                showToast(`New task #${data.taskId} added to this board`, 'success');
+            })
+            .catch(err => console.error("Error adding task:", err));
+    }
+
+    function handleTaskAssignedUpdate(data) {
+        const card = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+        if (!card) return;
+
+        fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
+            .then(res => res.text())
+            .then(html => {
+                // Replace entire card to ensure all UI elements are correct
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                const newCard = tempDiv.firstElementChild;
+                card.parentNode.replaceChild(newCard, card);
+                showToast(`Task #${data.taskId} assigned to ${data.assignedTo}`, 'success');
+            })
+            .catch(err => console.error("Error updating assigned task:", err));
     }
 
     function loadTeamBoard(team) {

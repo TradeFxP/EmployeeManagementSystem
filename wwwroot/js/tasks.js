@@ -304,20 +304,12 @@ function confirmAssignTask(taskId) {
         data: (type === 'team') ? JSON.stringify(payload) : payload,
         success: function (response) {
             if (response.success) {
-                showToast('✅ Task successfully moved/assigned!', 'success');
+                showToast('✅ Task successfully assigned!', 'success');
 
                 // Hide panel and restore buttons immediately for responsiveness
                 cancelAssignTask(taskId);
 
-                // Refresh board data
-                if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) {
-                    loadTeamBoard(currentTeamName);
-                } else if (typeof loadTeamBoard === 'function') {
-                    // Fallback to reload if active team name not set
-                    location.reload();
-                } else {
-                    location.reload();
-                }
+                // Board will update automatically via SignalR broadcast
             } else {
                 showToast(response.message || 'Failed to assign task.', 'danger');
                 saveBtn.prop('disabled', false).html(originalHtml);
