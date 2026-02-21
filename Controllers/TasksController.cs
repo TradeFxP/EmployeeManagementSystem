@@ -167,8 +167,43 @@ public class TasksController : Controller
     }
 
 
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetTaskCardPartial(int taskId)
+    {
+        var task = await _context.TaskItems
+            .Include(t => t.CreatedByUser)
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.AssignedByUser)
+            .Include(t => t.ReviewedByUser)
+            .Include(t => t.CompletedByUser)
+            .Include(t => t.CustomFieldValues)
+                .ThenInclude(cfv => cfv.Field)
+            .FirstOrDefaultAsync(t => t.Id == taskId);
 
+        if (task == null) return NotFound();
 
+        var team = await _context.Teams.FirstOrDefaultAsync(t => t.Name == task.TeamName);
+        var users = await _userManager.Users.ToListAsync();
+
+        ViewData["TeamSettings"] = team;
+        ViewData["ColumnName"] = (await _context.TeamColumns.FindAsync(task.ColumnId))?.ColumnName;
+        ViewData["AssignableUsers"] = users;
+        
+        // Load permissions for this user on this team
+        var currentUser = await _userManager.GetUserAsync(User);
+        BoardPermission? permissions = null;
+        if (currentUser != null)
+        {
+            permissions = await _context.BoardPermissions
+                .Where(p => p.UserId == currentUser.Id && p.TeamName.ToLower().Trim() == task.TeamName.ToLower().Trim())
+                .OrderByDescending(p => p.Id)
+                .FirstOrDefaultAsync();
+        }
+        ViewData["UserPermissions"] = permissions;
+
+        return PartialView("_TaskCard", task);
+    }
 
 
     [HttpPost]
@@ -178,19 +213,17 @@ public class TasksController : Controller
         if (string.IsNullOrEmpty(userId))
             return BadRequest("UserId is required");
 
-        var task = await _context.TaskItems.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId);
-        if (task == null)
-            return NotFound();
+        // userId format might be "user:ID" or just "ID"
+        if (userId.StartsWith("user:")) userId = userId.Substring(5);
+
+        var taskToUpdate = await _context.TaskItems.FindAsync(taskId);
+        if (taskToUpdate == null) return NotFound();
 
         // Check permission: Admin or granted CanAssignTask
-        if (!User.IsInRole("Admin") && !await AuthorizeBoardAction(task.TeamName, "AssignTask"))
+        if (!User.IsInRole("Admin") && !await AuthorizeBoardAction(taskToUpdate.TeamName, "AssignTask"))
         {
             return Forbid();
         }
-
-        // Re-fetch with tracking for update
-        var taskToUpdate = await _context.TaskItems.FindAsync(taskId);
-        if (taskToUpdate == null) return NotFound();
 
         var assignToUser = await _userManager.FindByIdAsync(userId);
         if (assignToUser == null)
@@ -200,21 +233,70 @@ public class TasksController : Controller
         if (currentUser == null)
             return Unauthorized();
 
+        var oldTeam = taskToUpdate.TeamName;
+        var oldColumnId = taskToUpdate.ColumnId;
+
+        // ✅ Check if target user belongs to a different team
+        var targetUserTeam = await _context.UserTeams
+            .Where(ut => ut.UserId == userId)
+            .FirstOrDefaultAsync();
+
+        bool teamChanged = false;
+        if (targetUserTeam != null && targetUserTeam.TeamName != taskToUpdate.TeamName)
+        {
+            // Cross-team assignment: move task to target user's team
+            var newTeam = targetUserTeam.TeamName;
+            var targetColumn = await _context.TeamColumns
+                .Where(c => c.TeamName == newTeam)
+                .OrderBy(c => c.Order)
+                .FirstOrDefaultAsync();
+
+            if (targetColumn != null)
+            {
+                taskToUpdate.TeamName = newTeam;
+                taskToUpdate.ColumnId = targetColumn.Id;
+                teamChanged = true;
+            }
+        }
+
         // ✅ LOG ASSIGNMENT
         await _historyService.LogAssignment(taskToUpdate.Id, assignToUser.Id, currentUser.Id);
 
         taskToUpdate.AssignedToUserId = assignToUser.Id;
         taskToUpdate.AssignedByUserId = currentUser.Id;
         taskToUpdate.AssignedAt = DateTime.UtcNow;
+        taskToUpdate.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+
+        // 🚀 BROADCAST SIGNALR
+        if (teamChanged)
+        {
+            // Remove from old team board
+            await _hubContext.Clients.Group(oldTeam).SendAsync("TaskRemoved", new { taskId = taskId, teamName = oldTeam });
+            // Add to new team board
+            await _hubContext.Clients.Group(taskToUpdate.TeamName).SendAsync("TaskAdded", new { taskId = taskId, teamName = taskToUpdate.TeamName, columnId = taskToUpdate.ColumnId });
+        }
+        else
+        {
+            // Simple update for same team
+            await _hubContext.Clients.Group(taskToUpdate.TeamName).SendAsync("TaskAssigned", new
+            {
+                taskId = taskId,
+                assignedTo = assignToUser.UserName,
+                assignedBy = currentUser.Email,
+                assignedAt = taskToUpdate.AssignedAt.Value.ToString("dd MMM yyyy, hh:mm tt")
+            });
+        }
 
         return Ok(new
         {
             success = true,
             assignedTo = assignToUser.UserName,
             assignedBy = currentUser.UserName,
-            assignedAt = taskToUpdate.AssignedAt.Value.ToString("dd MMM yyyy, hh:mm tt")
+            assignedAt = taskToUpdate.AssignedAt.Value.ToString("dd MMM yyyy, hh:mm tt"),
+            teamMoved = teamChanged,
+            newTeam = taskToUpdate.TeamName
         });
     }
 

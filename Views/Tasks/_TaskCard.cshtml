@@ -1,0 +1,264 @@
+@using UserRoles.Models
+@model UserRoles.Models.TaskItem
+
+@{
+    var teamSettings = ViewData["TeamSettings"] as UserRoles.Models.Team;
+    var userPermissions = ViewData["UserPermissions"] as UserRoles.Models.BoardPermission;
+    var assignableUsers = ViewData["AssignableUsers"] as List<UserRoles.Models.Users> ?? new List<UserRoles.Models.Users>();
+    
+    var colName = ViewData["ColumnName"] as string;
+    var colNameLower = colName?.Trim().ToLower();
+    var isReviewCol = colNameLower == "review";
+    var isCompletedCol = colNameLower == "completed" || colNameLower == "complete" || colNameLower == "done";
+
+    var reviewStatusInt = (int)Model.ReviewStatus;
+    var isPassed = Model.ReviewStatus == UserRoles.Models.Enums.ReviewStatus.Passed;
+    var isFailed = Model.ReviewStatus == UserRoles.Models.Enums.ReviewStatus.Failed;
+    var isPending = Model.ReviewStatus == UserRoles.Models.Enums.ReviewStatus.Pending;
+
+    var priorityBorderClass = Model.Priority switch
+    {
+        UserRoles.Models.Enums.TaskPriority.Low => "priority-low",
+        UserRoles.Models.Enums.TaskPriority.Medium => "priority-medium",
+        UserRoles.Models.Enums.TaskPriority.High => "priority-high",
+        UserRoles.Models.Enums.TaskPriority.Critical => "priority-critical",
+        _ => "priority-low"
+    };
+
+    var priorityLabel = Model.Priority switch
+    {
+        UserRoles.Models.Enums.TaskPriority.Low => "Low",
+        UserRoles.Models.Enums.TaskPriority.Medium => "Medium",
+        UserRoles.Models.Enums.TaskPriority.High => "High",
+        UserRoles.Models.Enums.TaskPriority.Critical => "Critical",
+        _ => "Low"
+    };
+
+    var reviewCardClass = isFailed ? "task-failed" : isPassed ? "task-passed" : "";
+}
+
+<div class="task-card @priorityBorderClass @reviewCardClass"
+     draggable="true"
+     data-task-id="@Model.Id"
+     data-column-id="@Model.ColumnId"
+     data-priority="@((int)Model.Priority)"
+     data-created-at="@Model.CreatedAt.ToString("o")"
+     data-assigned-to-id="@(Model.AssignedToUserId ?? "")"
+     data-assigned-by-admin="@(Model.AssignedByUser != null && Model.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
+     data-review-status="@reviewStatusInt"
+     onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@Model.Id)">
+
+    <!-- TOP ROW: Priority (left) + Task ID + Review Status (right) -->
+    <div class="card-top-row flex-column align-items-start gap-1">
+        <div class="d-flex align-items-center w-100">
+            @{
+                var customPriority = Model.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldName?.Trim()?.ToLower() == "priority")?.Value;
+                var effectivePriorityLabel = !string.IsNullOrWhiteSpace(customPriority) ? customPriority : priorityLabel;
+                var effectivePriorityClass = effectivePriorityLabel.ToLower() switch
+                {
+                    "low" => "priority-low",
+                    "medium" => "priority-medium",
+                    "high" => "priority-high",
+                    "critical" => "priority-critical",
+                    _ => priorityBorderClass
+                };
+            }
+
+            @if (teamSettings?.IsPriorityVisible ?? true)
+            {
+                <span class="priority-pill @effectivePriorityClass">@effectivePriorityLabel.ToUpper()</span>
+            }
+            <div class="d-flex align-items-center gap-1 ms-auto">
+                <span class="badge bg-light text-muted border small" style="font-size: 0.7rem;">#@Model.Id</span>
+            </div>
+        </div>
+
+        @{
+            DateTime? finalDueDate = Model.DueDate;
+            if (finalDueDate == null && Model.CustomFieldValues != null)
+            {
+                var cfDueDate = Model.CustomFieldValues.FirstOrDefault(f => f.Field?.FieldName?.Trim().ToLower() == "due date")?.Value;
+                if (DateTime.TryParse(cfDueDate, out var parsedDate))
+                {
+                    finalDueDate = parsedDate;
+                }
+            }
+        }
+
+        @if ((teamSettings?.IsDueDateVisible ?? true) && finalDueDate != null)
+        {
+            <span class="badge bg-light text-dark border d-flex align-items-center gap-1 small w-100" title="Due Date" style="font-size: 0.75rem; justify-content: flex-start;">
+                <i class="bi bi-calendar-event text-danger"></i>
+                Due Date: @finalDueDate.Value.ToString("dd MMM, hh:mm tt")
+            </span>
+        }
+
+        <div class="d-flex align-items-center gap-1 ms-auto">
+            <span class="review-badge review-badge-fail" style="display: @(isFailed ? "inline-flex" : "none")">
+                <i class="bi bi-x-circle-fill"></i> FAIL
+            </span>
+            <span class="review-badge review-badge-pass" style="display: @(isPassed ? "inline-flex" : "none")">
+                <i class="bi bi-check-circle-fill"></i> PASS
+            </span>
+            <span class="review-badge review-badge-pending" style="display: @(isPending && isReviewCol ? "inline-flex" : "none")">
+                <i class="bi bi-hourglass-split"></i> PENDING
+            </span>
+        </div>
+    </div>
+
+    <!-- TITLE -->
+    @if (teamSettings?.IsTitleVisible ?? true)
+    {
+        @if (!string.IsNullOrWhiteSpace(Model.Title) && Model.Title != "Untitled Task")
+        {
+            <div class="task-title-text mt-2">@Model.Title</div>
+        }
+    }
+
+    <!-- FAIL NOTE -->
+    @if (isFailed && !string.IsNullOrWhiteSpace(Model.ReviewNote))
+    {
+        <div class="review-note-callout mt-2">
+            <i class="bi bi-chat-left-text me-1"></i>
+            <span>@Model.ReviewNote</span>
+        </div>
+    }
+
+    <!-- DESCRIPTION -->
+    <div class="task-desc-text mt-1">@Model.Description</div>
+
+    <!-- CUSTOM FIELDS -->
+    @if (Model.CustomFieldValues != null && Model.CustomFieldValues.Any())
+    {
+        <div class="custom-fields-summary mt-2">
+            @foreach (var fv in Model.CustomFieldValues.Take(2))
+            {
+                @if (fv.Field != null && fv.Field.IsActive)
+                {
+                    <div class="cf-row">
+                        <span class="cf-label">@fv.Field.FieldName:</span>
+                        @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
+                        {
+                            <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
+                        }
+                        else
+                        {
+                            <span>@fv.Value</span>
+                        }
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    <!-- METADATA -->
+    <div class="task-meta mt-2">
+        <div><i class="bi bi-person-circle me-1"></i>@Model.CreatedByUser?.UserName</div>
+        <div><i class="bi bi-calendar3 me-1"></i>@Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+
+        @if (Model.UpdatedAt != null)
+        {
+            <div><i class="bi bi-pencil-square me-1"></i>@Model.UpdatedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+        }
+    </div>
+
+    @if (Model.AssignedToUser != null && Model.AssignedAt != null)
+    {
+        <div class="assigned-info-block mt-2" data-task-id="@Model.Id">
+            <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@Model.AssignedToUser.UserName</strong></div>
+            @if (Model.AssignedByUser != null)
+            {
+                <div class="assigned-row"><span class="label">By:</span> <strong>@Model.AssignedByUser.Email</strong></div>
+            }
+            <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+        </div>
+    }
+
+    @if (Model.ReviewedByUser != null && Model.ReviewedAt != null)
+    {
+        <div class="task-meta mt-1">
+            <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@Model.ReviewedByUser.UserName</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+        </div>
+    }
+
+    @if (Model.CompletedByUser != null && Model.CompletedAt != null)
+    {
+        <div class="task-meta mt-1">
+            <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@Model.CompletedByUser.UserName</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+        </div>
+    }
+
+    <!-- PREMIUM ASSIGN UI -->
+    <div class="task-assign-panel d-none" data-task-id="@Model.Id">
+        <div class="assign-panel-header mb-2">
+            <i class="bi bi-person-plus-fill me-1"></i> Quick Assign
+        </div>
+        <select class="form-select form-select-sm task-assign-select mb-2" data-task-id="@Model.Id">
+            <option value="">-- Select Member --</option>
+            <optgroup label="Members">
+                @foreach (var u in assignableUsers)
+                {
+                    <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">@u.UserName</option>
+                }
+            </optgroup>
+        </select>
+        <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-xs btn-link text-secondary text-decoration-none" onclick="cancelAssignTask(@Model.Id)">Cancel</button>
+            <button class="btn btn-xs btn-primary px-3 shadow-sm" onclick="confirmAssignTask(@Model.Id)">
+                <i class="bi bi-check2 me-1"></i> Save
+            </button>
+        </div>
+    </div>
+
+    <!-- ⚙️ Actions -->
+    <div class="task-actions mt-2">
+        <button class="action-btn action-btn-info" title="View Task History"
+                onclick="openTaskHistoryModal(@Model.Id); event.stopPropagation();">
+            <i class="bi bi-clock-history"></i>
+        </button>
+
+        <button class="action-btn action-btn-edit" title="Edit Task"
+                style="display: @(!isCompletedCol || User.IsInRole("Admin") || (userPermissions?.CanEditAllFields == true) ? "inline-flex" : "none")"
+                onclick="openEditTaskModal(@Model.Id); event.stopPropagation();">
+            <i class="bi bi-pencil-square"></i>
+        </button>
+
+        @if (User.IsInRole("Admin") || (userPermissions?.CanAssignTask == true))
+        {
+            <button class="action-btn action-btn-secondary action-btn-assign" title="Assign Task"
+                    data-task-id="@Model.Id"
+                    style="display: @(!isCompletedCol ? "inline-flex" : "none")"
+                    onclick="showAssignUI(@Model.Id); event.stopPropagation();">
+                <i class="bi bi-person-plus"></i>
+            </button>
+        }
+
+        @* ADMIN / GRANTED: Review button rendered if user has perms, display toggled by column *@
+        @if (User.IsInRole("Admin") || (userPermissions?.CanReviewTask == true))
+        {
+            <button class="action-btn action-btn-warning action-btn-review" title="Review Task"
+                    style="display: @(isReviewCol && isPending ? "inline-flex" : "none")"
+                    onclick="openReviewModal(@Model.Id, '@Model.Title.Replace("'", "\\'")'); event.stopPropagation();">
+                <i class="bi bi-clipboard-check"></i>
+            </button>
+        }
+
+        @* ADMIN / GRANTED: Archive button rendered if user has perms, display toggled by column *@
+        @if (User.IsInRole("Admin") || (userPermissions?.CanReviewTask == true))
+        {
+            <button class="action-btn action-btn-success action-btn-archive" title="Archive Task"
+                    style="display: @(isCompletedCol && isPassed ? "inline-flex" : "none")"
+                    onclick="archiveSingleTask(@Model.Id); event.stopPropagation();">
+                <i class="bi bi-archive"></i>
+            </button>
+        }
+
+        @if (User.IsInRole("Admin") || (userPermissions?.CanDeleteTask == true))
+        {
+            <button class="action-btn action-btn-danger" title="Delete"
+                    onclick="deleteTask(@Model.Id); event.stopPropagation();">
+                <i class="bi bi-trash3"></i>
+            </button>
+        }
+    </div>
+</div>
