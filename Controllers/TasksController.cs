@@ -1720,6 +1720,37 @@ public class TasksController : Controller
         return Ok(new { success = true });
     }
 
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> UploadCustomFieldImage(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file uploaded");
+
+        if (file.Length > 5 * 1024 * 1024)
+            return BadRequest("File size exceeds 5MB limit");
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        var extension = Path.GetExtension(file.FileName).ToLower();
+        if (!allowedExtensions.Contains(extension))
+            return BadRequest("Invalid file type");
+
+        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "customfields");
+        if (!Directory.Exists(uploadsDir))
+            Directory.CreateDirectory(uploadsDir);
+
+        var fileName = $"{Guid.NewGuid()}{extension}";
+        var filePath = Path.Combine(uploadsDir, fileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var url = $"/uploads/customfields/{fileName}";
+        return Ok(new { success = true, url = url });
+    }
+
     public class UpdateTeamSettingsRequest
     {
         public string TeamName { get; set; }
