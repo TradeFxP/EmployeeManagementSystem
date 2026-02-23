@@ -182,14 +182,16 @@ namespace UserRoles.Services
 
         public async Task LogArchivedToHistory(int taskId, string userId)
         {
-            _context.TaskHistories.Add(new TaskHistory
+            var history = new TaskHistory
             {
                 TaskId = taskId,
                 ChangeType = TaskHistoryChangeType.ArchivedToHistory,
-                ChangedByUserId = userId,
+                ChangedByUserId = userId == "System" ? null : userId,
                 ChangedAt = DateTime.UtcNow,
-                Details = "Task archived to history"
-            });
+                Details = userId == "System" ? "System: Task archived to history" : "Task archived to history"
+            };
+
+            _context.TaskHistories.Add(history);
             await _context.SaveChangesAsync();
         }
 

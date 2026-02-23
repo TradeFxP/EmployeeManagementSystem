@@ -614,8 +614,14 @@ public class TasksController : Controller
 
 
         // 🔥 PERFORMANCE OPTIMIZATION: Pre-fetch roles for all users involved to avoid N+1 queries in CanUserSeeTask
-        var usersToFetchRolesFor = allTasks.Select(t => t.CreatedByUserId).Distinct().ToList();
-        if (!usersToFetchRolesFor.Contains(user.Id)) usersToFetchRolesFor.Add(user.Id);
+        var usersToFetchRolesFor = allTasks
+            .Select(t => t.CreatedByUserId)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct()
+            .ToList();
+        
+        if (user != null && !usersToFetchRolesFor.Contains(user.Id)) 
+            usersToFetchRolesFor.Add(user.Id);
 
         var userRolesMap = new Dictionary<string, IList<string>>();
         foreach (var uid in usersToFetchRolesFor)
@@ -630,6 +636,7 @@ public class TasksController : Controller
         // 🔥 FILTER TASKS BASED ON ROLE RULES
     // Pre-fetch hierarchy for visibility check
     var userHierarchy = await _userManager.Users
+        .Where(u => u.Id != null)
         .Select(u => new { u.Id, u.ManagerId })
         .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
 
@@ -670,8 +677,8 @@ public class TasksController : Controller
         var teamSettings = await _context.Teams.FirstOrDefaultAsync(t => t.Name == team);
 
         // ✅ 2. Build ViewModel AFTER data exists
-        var userPerms = await _context.BoardPermissions
-            .Where(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == team.ToLower().Trim())
+        var userPerms = user == null ? null : await _context.BoardPermissions
+            .Where(p => p.UserId == user.Id && p.TeamName != null && p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .OrderByDescending(p => p.Id)
             .FirstOrDefaultAsync();
 
@@ -1718,6 +1725,37 @@ public class TasksController : Controller
 
         await _context.SaveChangesAsync();
         return Ok(new { success = true });
+    }
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> UploadCustomFieldImage(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file uploaded");
+
+        if (file.Length > 5 * 1024 * 1024)
+            return BadRequest("File size exceeds 5MB limit");
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        var extension = Path.GetExtension(file.FileName).ToLower();
+        if (!allowedExtensions.Contains(extension))
+            return BadRequest("Invalid file type");
+
+        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "customfields");
+        if (!Directory.Exists(uploadsDir))
+            Directory.CreateDirectory(uploadsDir);
+
+        var fileName = $"{Guid.NewGuid()}{extension}";
+        var filePath = Path.Combine(uploadsDir, fileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var url = $"/uploads/customfields/{fileName}";
+        return Ok(new { success = true, url = url });
     }
 
     public class UpdateTeamSettingsRequest

@@ -122,6 +122,11 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                 input.type = 'date';
                 input.className = 'form-control';
                 break;
+            case 'Time':
+                input = document.createElement('input');
+                input.type = 'time';
+                input.className = 'form-control';
+                break;
             case 'DateTime':
                 input = document.createElement('input');
                 input.type = 'datetime-local';
@@ -149,6 +154,42 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                     } else {
                         input.innerHTML = `<option value="">-- No Options --</option>`;
                     }
+                }
+                break;
+            case 'Image':
+                {
+                    const imageFields = fields.filter(f => f.fieldType === 'Image');
+                    const filledImages = imageFields.filter(f => existingValues[f.id]).length;
+                    const fieldIndex = imageFields.indexOf(field) + 1;
+
+                    input = document.createElement('div');
+                    input.className = 'image-field-container mb-2';
+                    const currentValue = existingValues[field.id] || '';
+
+                    let previewHtml = '';
+                    if (currentValue) {
+                        previewHtml = `
+                            <div class="mb-2 p-1 border rounded bg-light d-flex align-items-center gap-2">
+                                <img src="${currentValue}" class="rounded" style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;" onclick="window.open('${currentValue}', '_blank')" />
+                                <small class="text-muted flex-grow-1 overflow-hidden text-truncate">${currentValue.split('/').pop()}</small>
+                                <button type="button" class="btn btn-xs btn-outline-danger p-0" style="width:24px; height:24px;" onclick="removeFieldImage(${field.id}, '${containerId}')">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+
+                    const countLabel = imageFields.length > 1 ? `<div class="text-end small text-muted mb-1">${filledImages}/${imageFields.length} images added</div>` : '';
+
+                    input.innerHTML = `
+                        ${countLabel}
+                        ${previewHtml}
+                        <div class="input-group input-group-sm">
+                            <input type="file" class="form-control" accept="image/*" onchange="uploadFieldImage(this, ${field.id}, '${containerId}')" />
+                            <span class="input-group-text d-none" id="loader_${field.id}"><span class="spinner-border spinner-border-sm"></span></span>
+                        </div>
+                        <input type="hidden" id="field_${field.id}" data-field-id="${field.id}" data-required="${field.isRequired}" value="${currentValue}" />
+                    `;
                 }
                 break;
             default: // Text
@@ -339,7 +380,7 @@ async function loadFieldsList(team) {
 
 
         container.innerHTML = fields.map(f => `
-            <div class="field-item mb-3 border rounded shadow-sm overflow-hidden" data-field-id="${f.id}">
+            <div class="field-item mb-3 border rounded shadow-sm bg-white overflow-hidden" id="field_item_${f.id}">
                 <div class="bg-light p-2 border-bottom d-flex justify-content-between align-items-center">
                     <div>
                         <strong class="text-primary">${f.fieldName}</strong>
@@ -347,20 +388,54 @@ async function loadFieldsList(team) {
                         ${f.isRequired ? '<span class="badge bg-warning text-dark ms-1">Required</span>' : ''}
                     </div>
                     <div class="d-flex gap-1">
-                        <button class="btn btn-xs btn-outline-primary" onclick="changeFieldType(${f.id}, '${f.fieldType}'); event.stopPropagation();" title="Change Type">
-                            <i class="bi bi-arrow-repeat"></i>
+                        <button class="btn btn-xs btn-outline-primary" onclick="toggleFieldEditor(${f.id})" title="Edit Field">
+                            <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-xs btn-outline-danger" onclick="deleteField(${f.id}); event.stopPropagation();">
+                        <button class="btn btn-xs btn-outline-danger" onclick="deleteField(${f.id})" title="Delete Field">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
                 </div>
+                
+                <!-- Inline Editor (Hidden by default) -->
+                <div id="editor_${f.id}" class="p-3 border-top bg-light d-none">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="small text-muted mb-1">Field Name</label>
+                            <input type="text" id="edit_name_${f.id}" class="form-control form-control-sm" value="${f.fieldName}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small text-muted mb-1">Field Type</label>
+                            <select id="edit_type_${f.id}" class="form-select form-select-sm" onchange="toggleEditOptionsSection(${f.id})">
+                                <option value="Text" ${f.fieldType === 'Text' ? 'selected' : ''}>Text</option>
+                                <option value="Number" ${f.fieldType === 'Number' ? 'selected' : ''}>Number</option>
+                                <option value="Date" ${f.fieldType === 'Date' ? 'selected' : ''}>Date</option>
+                                <option value="Time" ${f.fieldType === 'Time' ? 'selected' : ''}>Time</option>
+                                <option value="DateTime" ${f.fieldType === 'DateTime' ? 'selected' : ''}>Date & Time</option>
+                                <option value="Dropdown" ${f.fieldType === 'Dropdown' ? 'selected' : ''}>Dropdown</option>
+                                <option value="Image" ${f.fieldType === 'Image' ? 'selected' : ''}>Image (Max 3, 5MB)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="edit_options_section_${f.id}" class="${f.fieldType === 'Dropdown' ? '' : 'd-none'} mb-2">
+                        <label class="small text-muted mb-1">Dropdown Choices (comma-separated)</label>
+                        <textarea id="edit_options_${f.id}" class="form-control form-control-sm" rows="2">${f.dropdownOptions || ''}</textarea>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="edit_required_${f.id}" ${f.isRequired ? 'checked' : ''}>
+                        <label class="form-check-label small" for="edit_required_${f.id}">Mark as Required</label>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <button class="btn btn-sm btn-secondary" onclick="toggleFieldEditor(${f.id})">Cancel</button>
+                        <button class="btn btn-sm btn-primary" onclick="saveFieldChanges(${f.id})">Save Changes</button>
+                    </div>
+                </div>
+
                 ${f.fieldType === 'Dropdown' ? `
                     <div class="p-2 small bg-white">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="text-muted"><i class="bi bi-list-check me-1"></i>Options:</span>
-                            <button class="btn btn-xs btn-link p-0" onclick="editDropdownOptions(${f.id}, '${f.dropdownOptions || ''}')">Edit Options</button>
-                        </div>
                         <div class="d-flex flex-wrap gap-1">
                             ${(f.dropdownOptions || "").split(',').filter(o => o).map(o => `<span class="badge bg-light text-dark border">${o}</span>`).join('') || '<span class="text-danger italic">No options defined</span>'}
                         </div>
@@ -469,23 +544,35 @@ async function deleteField(fieldId) {
     }
 }
 
-async function changeFieldType(fieldId, currentType) {
-    const types = ['Text', 'Number', 'Date', 'DateTime'];
-    const typeLabels = { 'Text': 'Text', 'Number': 'Number', 'Date': 'Date', 'DateTime': 'Date & Time' };
+function toggleFieldEditor(fieldId) {
+    const editor = document.getElementById(`editor_${fieldId}`);
+    if (editor) {
+        editor.classList.toggle('d-none');
+    }
+}
 
-    const options = types.map((t, i) => `${i + 1}. ${typeLabels[t]}${t === currentType ? ' (current)' : ''}`).join('\n');
-    const choice = prompt(`Select new field type:\n${options}\n\nEnter number (1-${types.length}):`);
+function toggleEditOptionsSection(fieldId) {
+    const type = document.getElementById(`edit_type_${fieldId}`).value;
+    const section = document.getElementById(`edit_options_section_${fieldId}`);
+    if (section) {
+        if (type === 'Dropdown') {
+            section.classList.remove('d-none');
+        } else {
+            section.classList.add('d-none');
+        }
+    }
+}
 
-    if (!choice) return;
+async function saveFieldChanges(fieldId) {
+    const name = document.getElementById(`edit_name_${fieldId}`).value.trim();
+    const type = document.getElementById(`edit_type_${fieldId}`).value;
+    const isRequired = document.getElementById(`edit_required_${fieldId}`).checked;
+    const options = document.getElementById(`edit_options_${fieldId}`).value.trim();
 
-    const index = parseInt(choice) - 1;
-    if (isNaN(index) || index < 0 || index >= types.length) {
-        alert('Invalid selection');
+    if (!name) {
+        alert("Field name is required");
         return;
     }
-
-    const newType = types[index];
-    if (newType === currentType) return;
 
     try {
         const response = await fetch('/Tasks/UpdateCustomField', {
@@ -493,26 +580,81 @@ async function changeFieldType(fieldId, currentType) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 fieldId: fieldId,
-                fieldType: newType
+                fieldName: name,
+                fieldType: type,
+                isRequired: isRequired,
+                dropdownOptions: options
             })
         });
 
-        if (!response.ok) throw new Error('Failed to update field type');
+        if (!response.ok) throw new Error('Failed to update field');
 
-        // Clear cache and reload
-        if (window.customFieldsCache) {
-            const team = document.getElementById('kanbanBoard')?.dataset.teamName;
-            const cacheKey = team ? `fields_${team}` : 'fields_default';
-            delete window.customFieldsCache[cacheKey];
-        }
+        window.customFieldsCache = null;
         const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
         await loadFieldsList(teamName);
         await refreshOpenModals();
 
-        if (typeof showToast === 'function') showToast(`✅ Field type changed to ${newType}`, 'success');
+        if (typeof showToast === 'function') showToast("✅ Field updated successfully", "success");
 
     } catch (error) {
-        alert('Error changing field type: ' + error.message);
+        alert("Error updating field: " + error.message);
+    }
+}
+
+async function uploadFieldImage(input, fieldId, containerId) {
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+
+    // 5MB Limit
+    if (file.size > 5 * 1024 * 1024) {
+        alert("Image size exceeds 5MB limit.");
+        input.value = "";
+        return;
+    }
+
+    const loader = document.getElementById(`loader_${fieldId}`);
+    if (loader) loader.classList.remove('d-none');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/Tasks/UploadCustomFieldImage', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) throw new Error('Upload failed');
+        const data = await response.json();
+
+        if (data.success) {
+            // Update hidden input
+            const hiddenInput = document.getElementById(`field_${fieldId}`);
+            if (hiddenInput) {
+                hiddenInput.value = data.url;
+                // Re-render to show preview
+                const container = document.getElementById(containerId);
+                const values = collectCustomFieldValues(containerId);
+                const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+                await renderCustomFieldInputs(containerId, values, team);
+            }
+        }
+    } catch (error) {
+        alert("Error uploading image: " + error.message);
+    } finally {
+        if (loader) loader.classList.add('d-none');
+    }
+}
+
+async function removeFieldImage(fieldId, containerId) {
+    const hiddenInput = document.getElementById(`field_${fieldId}`);
+    if (hiddenInput) {
+        hiddenInput.value = "";
+        // Re-render
+        const values = collectCustomFieldValues(containerId);
+        const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+        await renderCustomFieldInputs(containerId, values, team);
     }
 }
 
@@ -523,35 +665,6 @@ document.addEventListener('DOMContentLoaded', function () {
     loadCustomFields(team);
 });
 
-async function editDropdownOptions(fieldId, currentOptions) {
-    const newOptions = prompt("Edit choices (comma-separated):", currentOptions);
-    if (newOptions === null || newOptions === currentOptions) return;
-
-    try {
-        const response = await fetch('/Tasks/UpdateCustomField', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fieldId: fieldId,
-                dropdownOptions: newOptions
-            })
-        });
-
-        if (!response.ok) throw new Error('Failed to update options');
-
-        if (window.customFieldsCache) {
-            const team = document.getElementById('kanbanBoard')?.dataset.teamName;
-            const cacheKey = team ? `fields_${team}` : 'fields_default';
-            delete window.customFieldsCache[cacheKey];
-        }
-        const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
-        await loadFieldsList(teamName);
-        await refreshOpenModals();
-
-    } catch (error) {
-        alert('Error updating options: ' + error.message);
-    }
-}
 
 async function updateTeamSettings() {
     const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
