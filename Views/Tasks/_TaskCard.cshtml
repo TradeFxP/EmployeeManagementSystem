@@ -44,7 +44,7 @@
      data-priority="@((int)Model.Priority)"
      data-created-at="@Model.CreatedAt.ToString("o")"
      data-assigned-to-id="@(Model.AssignedToUserId ?? "")"
-     data-assigned-by-admin="@(Model.AssignedByUser != null && Model.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
+     data-assigned-by-admin="@(Model.AssignedByUser?.Email != null && Model.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
      data-review-status="@reviewStatusInt"
      onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@Model.Id)">
 
@@ -238,7 +238,7 @@
         {
             <button class="action-btn action-btn-warning action-btn-review" title="Review Task"
                     style="display: @(isReviewCol && isPending ? "inline-flex" : "none")"
-                    onclick="openReviewModal(@Model.Id, '@Model.Title.Replace("'", "\\'")'); event.stopPropagation();">
+                    onclick="openReviewModal(@Model.Id, '@(Model.Title?.Replace("'", "\\'"))'); event.stopPropagation();">
                 <i class="bi bi-clipboard-check"></i>
             </button>
         }
