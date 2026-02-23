@@ -44,6 +44,7 @@
      data-priority="@((int)Model.Priority)"
      data-created-at="@Model.CreatedAt.ToString("o")"
      data-assigned-to-id="@(Model.AssignedToUserId ?? "")"
+     data-assigned-by-user-id="@(Model.AssignedByUserId ?? "")"
      data-assigned-by-admin="@(Model.AssignedByUser?.Email != null && Model.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
      data-review-status="@reviewStatusInt"
      onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@Model.Id)">
@@ -153,7 +154,7 @@
 
     <!-- METADATA -->
     <div class="task-meta mt-2">
-        <div><i class="bi bi-person-circle me-1"></i>@Model.CreatedByUser?.UserName</div>
+        <div><i class="bi bi-person-circle me-1"></i>@(string.IsNullOrEmpty(Model.CreatedByUser?.Name) ? Model.CreatedByUser?.UserName : Model.CreatedByUser.Name)</div>
         <div><i class="bi bi-calendar3 me-1"></i>@Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
 
         @if (Model.UpdatedAt != null)
@@ -165,10 +166,10 @@
     @if (Model.AssignedToUser != null && Model.AssignedAt != null)
     {
         <div class="assigned-info-block mt-2" data-task-id="@Model.Id">
-            <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@Model.AssignedToUser.UserName</strong></div>
+            <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@(string.IsNullOrEmpty(Model.AssignedToUser.Name) ? Model.AssignedToUser.UserName : Model.AssignedToUser.Name)</strong></div>
             @if (Model.AssignedByUser != null)
             {
-                <div class="assigned-row"><span class="label">By:</span> <strong>@Model.AssignedByUser.Email</strong></div>
+                <div class="assigned-row"><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
             }
             <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
         </div>
@@ -177,14 +178,14 @@
     @if (Model.ReviewedByUser != null && Model.ReviewedAt != null)
     {
         <div class="task-meta mt-1">
-            <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@Model.ReviewedByUser.UserName</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+            <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@(string.IsNullOrEmpty(Model.ReviewedByUser?.Name) ? Model.ReviewedByUser?.UserName : Model.ReviewedByUser.Name)</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
         </div>
     }
 
     @if (Model.CompletedByUser != null && Model.CompletedAt != null)
     {
         <div class="task-meta mt-1">
-            <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@Model.CompletedByUser.UserName</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+            <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@(string.IsNullOrEmpty(Model.CompletedByUser?.Name) ? Model.CompletedByUser?.UserName : Model.CompletedByUser.Name)</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
         </div>
     }
 
@@ -198,7 +199,7 @@
             <optgroup label="Members">
                 @foreach (var u in assignableUsers)
                 {
-                    <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">@u.UserName</option>
+                    <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                 }
             </optgroup>
         </select>

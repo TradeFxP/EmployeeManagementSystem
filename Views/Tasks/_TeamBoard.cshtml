@@ -76,14 +76,17 @@
                 <option value="">All Assignees</option>
                 @foreach (var u in Model.AssignableUsers)
                 {
-                    <option value="@u.Id">@u.UserName</option>
+                    <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                 }
             </select>
         </div>
         <div class="col-12 col-md-3">
             <select id="adminAssignedFilter" class="form-select filter-select" onchange="filterBoardTasks()">
                 <option value="">Filter By Assignor</option>
-                <option value="Admin">Assigned by Admin</option>
+                @foreach (var u in Model.Assignors)
+                {
+                    <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                }
                 <option value="All">Show All</option>
             </select>
         </div>

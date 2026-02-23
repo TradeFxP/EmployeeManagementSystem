@@ -28,6 +28,9 @@ namespace UserRoles.ViewModels
 
         // ✅ User's permissions for this board
         public BoardPermission? UserPermissions { get; set; }
+        
+        // Users who can appear in the "Filter By Assignor" dropdown
+        public List<Users> Assignors { get; set; } = new();
 
         public Team? TeamSettings { get; set; }
     }
