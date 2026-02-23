@@ -1736,77 +1736,101 @@
                     `;
                 }
 
+                const prioMap = {
+                    'critical': { color: '#ef4444', bg: '#ef444415', border: '#ef444440', icon: 'bi-exclamation-triangle-fill' },
+                    'high': { color: '#f59e0b', bg: '#f59e0b15', border: '#f59e0b40', icon: 'bi-arrow-up-circle-fill' },
+                    'medium': { color: '#3b82f6', bg: '#3b82f615', border: '#3b82f640', icon: 'bi-dash-circle-fill' },
+                    'low': { color: '#94a3b8', bg: '#94a3b815', border: '#94a3b840', icon: 'bi-arrow-down-circle-fill' }
+                };
+                const prio = prioMap[effectivePriority.toLowerCase()] || prioMap['low'];
+
+                const getInitials = (name) => {
+                    if (!name) return '?';
+                    const parts = name.replace(/[^a-zA-Z ]/g, '').trim().split(' ');
+                    return parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
+                };
+
                 body.innerHTML = `
-                    <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
-                        <h4 class="mb-0">${escapeHtml(t.title)}</h4>
+                    <!-- Title + Badges -->
+                    <div style="border-left: 5px solid ${prio.color}; padding-left: 16px; margin-bottom: 16px;">
+                        <h4 style="font-weight: 700; color: #1e293b; margin: 0 0 8px 0; font-size: 1.5rem;">${escapeHtml(t.title)}</h4>
                         <div class="d-flex gap-2 flex-wrap align-items-center">
-                            ${priorityBadge}
+                            <span style="background: ${prio.bg}; color: ${prio.color}; border: 1px solid ${prio.border}; padding: 3px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <i class="bi ${prio.icon}" style="margin-right: 4px;"></i>${escapeHtml(effectivePriority.toUpperCase())}
+                            </span>
                             ${reviewBadge}
-                            ${dueDateBadge}
-                            <span class="badge bg-light text-dark border">${escapeHtml(t.column || t.status)}</span>
+                            <span style="background: #f1f5f9; color: #475569; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #e2e8f0;">${escapeHtml(t.column || t.status)}</span>
+                            ${t.dueDate ? `<span style="color: #dc2626; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #fecaca; background: #fef2f2;"><i class="bi bi-calendar-event" style="margin-right: 4px;"></i>${formatDate(t.dueDate)}</span>` : ''}
                         </div>
                     </div>
 
-                    ${t.description ? `<div class="mb-3"><h6 class="text-muted">Description</h6><p class="mb-2">${escapeHtml(t.description)}</p></div>` : ''}
+                    <!-- Description -->
+                    ${t.description ? `
+                    <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 6px;"><i class="bi bi-text-paragraph me-1"></i>Description</div>
+                        <p style="margin: 0; color: #475569; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(t.description)}</p>
+                    </div>` : ''}
 
+                    <!-- Custom Fields -->
                     ${t.customFields && t.customFields.length > 0 ? `
-                        <div class="mb-3">
-                            <h6 class="text-muted mb-2">Custom Fields</h6>
+                    <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 8px;"><i class="bi bi-grid-3x3-gap me-1"></i>Details</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
                             ${t.customFields.map(f => {
                                 const isImage = f.value && (f.value.startsWith('/uploads/') || f.value.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/));
-                                return `
-                                    <div class="small mb-2">
-                                        <strong>${escapeHtml(f.fieldName || '')}:</strong>
-                                        ${isImage ? `
-                                            <div class="mt-1">
-                                                <img src="${f.value}" class="rounded border shadow-sm" style="max-width: 150px; max-height: 150px; cursor: pointer; object-fit: contain;" onclick="window.open('${f.value}', '_blank')" />
-                                            </div>
-                                        ` : `<span>${escapeHtml(f.value || '')}</span>`}
-                                    </div>
-                                `;
+                                return `<div style="background: #fff; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                    <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">${escapeHtml(f.fieldName || '')}</div>
+                                    ${isImage ? `<img src="${f.value}" style="max-width: 100px; max-height: 80px; cursor: pointer; object-fit: contain; margin-top: 4px; border-radius: 6px;" onclick="window.open('${f.value}', '_blank')" />` 
+                                    : `<div style="font-weight: 600; color: #334155; font-size: 0.85rem; margin-top: 2px;">${escapeHtml(f.value || '—')}</div>`}
+                                </div>`;
                             }).join('')}
                         </div>
-                    ` : ''}
+                    </div>` : ''}
 
-                    ${t.reviewNote ? `<div class="mb-3"><h6 class="text-muted">Review Note</h6><div class="alert alert-warning py-2 mb-0">${escapeHtml(t.reviewNote)}</div></div>` : ''}
+                    <!-- Review Note -->
+                    ${t.reviewNote ? `
+                    <div style="background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 10px 14px; margin-bottom: 14px;">
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #d97706; margin-bottom: 4px;"><i class="bi bi-chat-left-dots-fill me-1"></i>Review Note</div>
+                        <div style="color: #92400e; font-size: 0.85rem;">${escapeHtml(t.reviewNote)}</div>
+                    </div>` : ''}
 
-                    <div class="border-top pt-3 mb-3">
-                        <h6 class="text-muted mb-2">Timeline</h6>
-                        <div class="small">
-                            ${t.createdAt ? `<div class="mb-1"><i class="bi bi-plus-circle text-primary me-2"></i>Created: ${formatDate(t.createdAt)}</div>` : ''}
-                            ${t.assignedAt ? `<div class="mb-1"><i class="bi bi-person text-info me-2"></i>Assigned: ${formatDate(t.assignedAt)}</div>` : ''}
-                            ${t.reviewedAt ? `<div class="mb-1"><i class="bi bi-clipboard-check text-warning me-2"></i>Reviewed: ${formatDate(t.reviewedAt)}</div>` : ''}
-                            ${t.completedAt ? `<div class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Completed: ${formatDate(t.completedAt)}</div>` : ''}
-                        </div>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <div class="border rounded p-2">
-                                <small class="text-muted d-block">Created By</small>
-                                <strong>${escapeHtml(t.createdBy || 'N/A')}</strong>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="border rounded p-2">
-                                <small class="text-muted d-block">Assigned To</small>
-                                <strong>${escapeHtml(t.assignedTo || 'Unassigned')}</strong>
+                    <!-- Timeline + People side by side -->
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; border: 1px solid #f1f5f9; height: 100%;">
+                                <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px;"><i class="bi bi-clock-history me-1"></i>Timeline</div>
+                                <div style="position: relative; padding-left: 20px;">
+                                    <div style="position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: #e2e8f0;"></div>
+                                    ${t.createdAt ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #6366f1;"></div><strong>Created</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.createdAt)}</span></div>` : ''}
+                                    ${t.assignedAt ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #06b6d4;"></div><strong>Assigned</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.assignedAt)}</span></div>` : ''}
+                                    ${t.reviewedAt ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></div><strong>Reviewed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.reviewedAt)}</span></div>` : ''}
+                                    ${t.completedAt ? `<div style="position: relative; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></div><strong>Completed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.completedAt)}</span></div>` : ''}
+                                </div>
                             </div>
                         </div>
-                        ${t.assignedBy ? `
-                        <div class="col-6">
-                            <div class="border rounded p-2">
-                                <small class="text-muted d-block">Assigned By</small>
-                                <strong>${escapeHtml(t.assignedBy)}</strong>
+                        <div class="col-md-6">
+                            <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; border: 1px solid #f1f5f9; height: 100%;">
+                                <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px;"><i class="bi bi-people me-1"></i>People</div>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.createdBy)}</div>
+                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Created By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.createdBy || 'N/A')}</div></div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #06b6d4, #0891b2); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.assignedTo)}</div>
+                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Assigned To</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.assignedTo || 'Unassigned')}</div></div>
+                                    </div>
+                                    ${t.assignedBy ? `<div class="d-flex align-items-center gap-2">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #64748b, #475569); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.assignedBy)}</div>
+                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Assigned By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.assignedBy)}</div></div>
+                                    </div>` : ''}
+                                    ${t.reviewedBy ? `<div class="d-flex align-items-center gap-2">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.reviewedBy)}</div>
+                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Reviewed By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.reviewedBy)}</div></div>
+                                    </div>` : ''}
+                                </div>
                             </div>
-                        </div>` : ''}
-                        ${t.reviewedBy ? `
-                        <div class="col-6">
-                            <div class="border rounded p-2">
-                                <small class="text-muted d-block">Reviewed By</small>
-                                <strong>${escapeHtml(t.reviewedBy)}</strong>
-                            </div>
-                        </div>` : ''}
+                        </div>
                     </div>
                 `;
             })
