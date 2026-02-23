@@ -657,10 +657,48 @@ public class TasksController : Controller
                 .ToList();
         }
 
-        // ✅ 1. Load assignable users FIRST
-        var assignableUsers = await _userManager.Users
-            .OrderBy(u => u.UserName)
-            .ToListAsync();
+        // ✅ 1. Load assignable users and assignors based on role/hierarchy
+        var allUsers = await _userManager.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync();
+        var assignableUsers = new List<Users>();
+        var assignors = new List<Users>();
+
+        // We need hierarchy map for visibility check
+        var fullHierarchy = allUsers.Where(u => !string.IsNullOrEmpty(u.Id)).ToDictionary(u => u.Id, u => u.ParentUserId);
+        
+        // Roles for everyone for filtering
+        var allUserRoles = new Dictionary<string, string>();
+        foreach(var u in allUsers)
+        {
+            var r = await _userManager.GetRolesAsync(u);
+            allUserRoles[u.Id] = r.FirstOrDefault() ?? "User";
+        }
+
+        if (viewerRoles.Contains("Admin"))
+        {
+            assignableUsers = allUsers;
+            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+        }
+        else if (viewerRoles.Contains("Manager"))
+        {
+            // Managers see: self + descendants (sub-managers and users under them)
+            assignableUsers = allUsers.Where(u => u.Id == user.Id || IsUnderManager(u.Id, user.Id, fullHierarchy)).ToList();
+            // Managers see assignors: Admins
+            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin").ToList();
+        }
+        else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
+        {
+            // Sub-Managers see: self + users under them
+            assignableUsers = allUsers.Where(u => u.Id == user.Id || IsUnderManager(u.Id, user.Id, fullHierarchy)).ToList();
+            // Sub-Managers see assignors: Admins + Managers
+            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+        }
+        else // User
+        {
+            // Users see: self
+            assignableUsers = allUsers.Where(u => u.Id == user.Id).ToList();
+            // Users see assignors: Everyone (Admins, Managers, Sub-Managers)
+            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+        }
 
         // Get all team names for the assignment dropdown
         var allTeamNames = await _context.TeamColumns
@@ -687,6 +725,7 @@ public class TasksController : Controller
             TeamName = team,
             Columns = columns,
             AssignableUsers = assignableUsers,
+            Assignors = assignors,
             AllTeamNames = allTeamNames,
             CustomFields = customFields,
             UserPermissions = userPerms,
@@ -1569,8 +1608,10 @@ public class TasksController : Controller
 
         foreach (var u in users)
         {
-            var p = perms.FirstOrDefault(x => x.UserId == u.Id);
             var roles = await _userManager.GetRolesAsync(u);
+            if (roles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
+            
+            var p = perms.FirstOrDefault(x => x.UserId == u.Id);
             
             result.Add(new BoardPermissionDto
             {

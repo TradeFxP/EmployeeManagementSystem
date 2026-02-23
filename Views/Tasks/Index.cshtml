@@ -512,7 +512,7 @@
                                 {
                                     foreach (var u in Model.AssignableUsers)
                                     {
-                                        <option value="@u.Id">@u.UserName</option>
+                                        <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                                     }
                                 }
                             </select>
@@ -560,7 +560,7 @@
                         {
                             foreach (var u in Model.AssignableUsers)
                             {
-                                <option value="@u.Id">@u.UserName</option>
+                                <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                             }
                         }
                         else
@@ -2439,15 +2439,15 @@
             const cardAssigneeId = card.dataset.assignedToId || "";
             const matchesAssignee = !assigneeFilter || cardAssigneeId === assigneeFilter;
 
-            // 4. Assigned by Admin
-            const isAdminAssigned = card.dataset.assignedByAdmin === "true";
-            let matchesAdmin = true;
-            if (adminFilter === "Admin") {
-                matchesAdmin = isAdminAssigned;
+            // 4. Filter by Assignor
+            const cardAssignorId = card.dataset.assignedByUserId || "";
+            let matchesAssignor = true;
+            if (adminFilter && adminFilter !== "All") {
+                matchesAssignor = cardAssignorId === adminFilter;
             }
 
             // Combine all
-            if (matchesSearch && matchesPriority && matchesAssignee && matchesAdmin) {
+            if (matchesSearch && matchesPriority && matchesAssignee && matchesAssignor) {
                 card.style.display = "block";
                 card.classList.remove('d-none'); // Ensure no d-none override
             } else {

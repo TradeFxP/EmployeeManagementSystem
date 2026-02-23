@@ -283,12 +283,7 @@
                                                                         onclick="openRoleModal('@smUser.Id','@smUser.Name','User'); event.stopPropagation();">🔄</button>
                                                             }
                                                             <button class="action-btn" onclick="loadReports('@smUser.Id'); event.stopPropagation();">📊</button>
-                                                            @if (currentRole == "Admin")
-                                                            {
-                                                                <button class="action-btn role-change-btn"
-                                                                        title="Change Role"
-                                                                        onclick="openRoleModal('@smUser.Id','@smUser.Name','User'); event.stopPropagation();">🔄</button>
-                                                            }
+                                                            
                                                         </div>
                                                     </div>
                                                 </div>
