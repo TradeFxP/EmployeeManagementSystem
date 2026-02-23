@@ -57,7 +57,13 @@ function applyColumnFilter(columnId) {
         const isMatch = title.includes(searchTerm) || desc.includes(searchTerm);
 
         // Show/Hide based on match
-        card.style.display = isMatch ? 'block' : 'none';
+        if (isMatch) {
+            card.style.display = 'block';
+            card.classList.remove('d-none');
+        } else {
+            card.style.display = 'none';
+            card.classList.add('d-none');
+        }
 
         return isMatch;
     });
@@ -92,4 +98,9 @@ function applyColumnFilter(columnId) {
 
     // Re-inject into DOM
     cards.forEach(card => container.appendChild(card));
+
+    // ✅ Update the count badges for all columns
+    if (typeof updateColumnCounts === 'function') {
+        updateColumnCounts();
+    }
 }

@@ -1517,6 +1517,7 @@
         }
 
         updateColumnCounts();
+        if (typeof filterBoardTasks === 'function') filterBoardTasks();
         showToast(`Task #${data.taskId} moved to ${data.columnName}`, 'info');
     }
 
@@ -1555,6 +1556,7 @@
         if (card) {
             card.remove();
             updateColumnCounts();
+            if (typeof filterBoardTasks === 'function') filterBoardTasks();
             showToast(`Task #${data.taskId} moved to another team`, 'info');
         }
     }
@@ -1577,6 +1579,7 @@
 
                 taskList.insertAdjacentHTML('afterbegin', html);
                 updateColumnCounts();
+                if (typeof filterBoardTasks === 'function') filterBoardTasks();
                 showToast(`New task #${data.taskId} added to this board`, 'success');
             })
             .catch(err => console.error("Error adding task:", err));
@@ -1594,6 +1597,10 @@
                 tempDiv.innerHTML = html;
                 const newCard = tempDiv.firstElementChild;
                 card.parentNode.replaceChild(newCard, card);
+                
+                // Re-apply filters to correctly show/hide the updated card
+                if (typeof filterBoardTasks === 'function') filterBoardTasks();
+
                 showToast(`Task #${data.taskId} assigned to ${data.assignedTo}`, 'success');
             })
             .catch(err => console.error("Error updating assigned task:", err));
@@ -2497,11 +2504,15 @@
             // Combine all
             if (matchesSearch && matchesPriority && matchesAssignee && matchesAssignor) {
                 card.style.display = "block";
-                card.classList.remove('d-none'); // Ensure no d-none override
+                card.classList.remove('d-none');
             } else {
                 card.style.display = "none";
+                card.classList.add('d-none');
             }
         });
+
+        // ✅ Update the count badges to reflect the current filtered view
+        updateColumnCounts();
     }
 
     // ===== PERSISTENT FIELD SETTINGS (Title, Description, etc.) =====
