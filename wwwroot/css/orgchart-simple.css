@@ -26,9 +26,9 @@ body,
 
 /* ================= LEFT SIDEBAR ================= */
 .org-sidebar {
-    width: 290px;
-    min-width: 220px;
-    max-width: 320px;
+    width: 360px;
+    min-width: 250px;
+    max-width: 450px;
     background: #ffffff;
     border-right: 1px solid #e2e8f0;
     display: flex;
@@ -108,7 +108,7 @@ body,
 /* ================= NODE CONTENT (each row) ================= */
 .tree-content {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     padding: 8px 10px;
     margin-bottom: 2px;
@@ -234,10 +234,11 @@ body,
     font-size: 13px;
     font-weight: 600;
     color: #334155;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.3;
+    white-space: normal;
+    word-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.4;
+    margin-bottom: 2px;
 }
 
 .node-role {
@@ -268,9 +269,9 @@ body,
 
 /* Hover actions group (Edit / Delete / Report) */
 .hover-actions {
-    display: flex;
-    align-items: center;
-    gap: 2px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
