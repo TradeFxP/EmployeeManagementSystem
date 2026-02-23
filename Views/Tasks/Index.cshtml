@@ -55,6 +55,24 @@
         background-color: #fff7ed;
         color: #ea580c;
     }
+
+    .modal-action-btn-sm {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        font-size: 1.1rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .modal-action-btn-sm:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
 </style>
 
 <!-- MOBILE SIDEBAR OVERLAY -->
@@ -266,12 +284,13 @@
     <div class="modal fade" id="taskOverviewModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
-                <div class="modal-header"
+                <div class="modal-header d-flex align-items-center"
                     style="background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 16px 16px 0 0;">
-                    <h5 class="modal-title text-white">
+                    <h5 class="modal-title text-white mb-0">
                         <i class="bi bi-card-text me-2"></i>Task Overview
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <div id="taskOverviewActions" class="ms-auto d-flex gap-2 me-3"></div>
+                    <button type="button" class="btn-close btn-close-white ms-0" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-4" id="taskOverviewBody">
                     <div class="text-center py-4">
@@ -1664,7 +1683,10 @@
         if (isNaN(taskId)) return;
 
         const body = document.getElementById('taskOverviewBody');
+        const headerActions = document.getElementById('taskOverviewActions');
+
         body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+        if (headerActions) headerActions.innerHTML = '';
 
         const modal = new bootstrap.Modal(document.getElementById('taskOverviewModal'));
         modal.show();
@@ -1696,25 +1718,27 @@
                 const isCompleted = colName === 'completed' || colName === 'complete' || colName === 'done';
                 const isReview = colName === 'review';
 
-                body.innerHTML = `
-                    <div class="modal-action-buttons">
-                        <button class="modal-action-btn btn-modal-history" title="History" onclick="openTaskHistoryFromModal(${t.id})">
+                if (headerActions) {
+                    headerActions.innerHTML = `
+                        <button class="modal-action-btn-sm btn-modal-history" title="History" onclick="openTaskHistoryFromModal(${t.id})">
                             <i class="bi bi-clock-history"></i>
                         </button>
                         
                         ${(isAdmin || document.getElementById('kanbanBoard')?.dataset.permAssignTask === 'true') && !isCompleted ? `
-                        <button class="modal-action-btn btn-modal-assign" title="Assign" onclick="showAssignUIFromModal(${t.id})">
+                        <button class="modal-action-btn-sm btn-modal-assign" title="Assign" onclick="showAssignUIFromModal(${t.id})">
                             <i class="bi bi-person-plus"></i>
                         </button>` : ''}
 
                         ${!isCompleted || isAdmin ? `
-                        <button class="modal-action-btn btn-modal-edit" title="Edit" onclick="openEditTaskFromModal(${t.id})">
+                        <button class="modal-action-btn-sm btn-modal-edit" title="Edit" onclick="openEditTaskFromModal(${t.id})">
                             <i class="bi bi-pencil-square"></i>
                         </button>` : ''}
-                    </div>
+                    `;
+                }
 
-                    <div class="mb-4">
-                        <h4 class="mb-2">${escapeHtml(t.title)}</h4>
+                body.innerHTML = `
+                    <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+                        <h4 class="mb-0">${escapeHtml(t.title)}</h4>
                         <div class="d-flex gap-2 flex-wrap align-items-center">
                             ${priorityBadge}
                             ${reviewBadge}
@@ -1723,11 +1747,40 @@
                         </div>
                     </div>
 
-                    ${t.description ? `<div class="mb-3"><h6 class="text-muted">Description</h6><p class="mb-0">${escapeHtml(t.description)}</p></div>` : ''}
+                    ${t.description ? `<div class="mb-3"><h6 class="text-muted">Description</h6><p class="mb-2">${escapeHtml(t.description)}</p></div>` : ''}
+
+                    ${t.customFields && t.customFields.length > 0 ? `
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-2">Custom Fields</h6>
+                            ${t.customFields.map(f => {
+                                const isImage = f.value && (f.value.startsWith('/uploads/') || f.value.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/));
+                                return `
+                                    <div class="small mb-2">
+                                        <strong>${escapeHtml(f.fieldName || '')}:</strong>
+                                        ${isImage ? `
+                                            <div class="mt-1">
+                                                <img src="${f.value}" class="rounded border shadow-sm" style="max-width: 150px; max-height: 150px; cursor: pointer; object-fit: contain;" onclick="window.open('${f.value}', '_blank')" />
+                                            </div>
+                                        ` : `<span>${escapeHtml(f.value || '')}</span>`}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    ` : ''}
 
                     ${t.reviewNote ? `<div class="mb-3"><h6 class="text-muted">Review Note</h6><div class="alert alert-warning py-2 mb-0">${escapeHtml(t.reviewNote)}</div></div>` : ''}
 
-                    <div class="row g-3 mb-3">
+                    <div class="border-top pt-3 mb-3">
+                        <h6 class="text-muted mb-2">Timeline</h6>
+                        <div class="small">
+                            ${t.createdAt ? `<div class="mb-1"><i class="bi bi-plus-circle text-primary me-2"></i>Created: ${formatDate(t.createdAt)}</div>` : ''}
+                            ${t.assignedAt ? `<div class="mb-1"><i class="bi bi-person text-info me-2"></i>Assigned: ${formatDate(t.assignedAt)}</div>` : ''}
+                            ${t.reviewedAt ? `<div class="mb-1"><i class="bi bi-clipboard-check text-warning me-2"></i>Reviewed: ${formatDate(t.reviewedAt)}</div>` : ''}
+                            ${t.completedAt ? `<div class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Completed: ${formatDate(t.completedAt)}</div>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
                         <div class="col-6">
                             <div class="border rounded p-2">
                                 <small class="text-muted d-block">Created By</small>
@@ -1755,35 +1808,6 @@
                             </div>
                         </div>` : ''}
                     </div>
-
-                    <div class="border-top pt-3">
-                        <h6 class="text-muted mb-2">Timeline</h6>
-                        <div class="small">
-                            ${t.createdAt ? `<div class="mb-1"><i class="bi bi-plus-circle text-primary me-2"></i>Created: ${formatDate(t.createdAt)}</div>` : ''}
-                            ${t.assignedAt ? `<div class="mb-1"><i class="bi bi-person text-info me-2"></i>Assigned: ${formatDate(t.assignedAt)}</div>` : ''}
-                            ${t.reviewedAt ? `<div class="mb-1"><i class="bi bi-clipboard-check text-warning me-2"></i>Reviewed: ${formatDate(t.reviewedAt)}</div>` : ''}
-                            ${t.completedAt ? `<div class="mb-1"><i class="bi bi-check-circle text-success me-2"></i>Completed: ${formatDate(t.completedAt)}</div>` : ''}
-                        </div>
-                    </div>
-
-                    ${t.customFields && t.customFields.length > 0 ? `
-                        <div class="border-top pt-3 mt-3">
-                            <h6 class="text-muted mb-2">Custom Fields</h6>
-                            ${t.customFields.map(f => {
-                                const isImage = f.value && (f.value.startsWith('/uploads/') || f.value.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/));
-                                return `
-                                    <div class="small mb-2">
-                                        <strong>${escapeHtml(f.fieldName || '')}:</strong>
-                                        ${isImage ? `
-                                            <div class="mt-1">
-                                                <img src="${f.value}" class="rounded border shadow-sm" style="max-width: 150px; max-height: 150px; cursor: pointer; object-fit: contain;" onclick="window.open('${f.value}', '_blank')" />
-                                            </div>
-                                        ` : `<span>${escapeHtml(f.value || '')}</span>`}
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    ` : ''}
                 `;
             })
             .catch(() => {
