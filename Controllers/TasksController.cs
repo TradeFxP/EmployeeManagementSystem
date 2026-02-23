@@ -673,29 +673,25 @@ public class TasksController : Controller
             allUserRoles[u.Id] = r.FirstOrDefault() ?? "User";
         }
 
+        // Show all users for assignment regardless of role
+        assignableUsers = allUsers;
+
         if (viewerRoles.Contains("Admin"))
         {
-            assignableUsers = allUsers;
             assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
         }
         else if (viewerRoles.Contains("Manager"))
         {
-            // Managers see: self + descendants (sub-managers and users under them)
-            assignableUsers = allUsers.Where(u => u.Id == user.Id || IsUnderManager(u.Id, user.Id, fullHierarchy)).ToList();
             // Managers see assignors: Admins
             assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin").ToList();
         }
         else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
         {
-            // Sub-Managers see: self + users under them
-            assignableUsers = allUsers.Where(u => u.Id == user.Id || IsUnderManager(u.Id, user.Id, fullHierarchy)).ToList();
             // Sub-Managers see assignors: Admins + Managers
             assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
         }
         else // User
         {
-            // Users see: self
-            assignableUsers = allUsers.Where(u => u.Id == user.Id).ToList();
             // Users see assignors: Everyone (Admins, Managers, Sub-Managers)
             assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
         }
