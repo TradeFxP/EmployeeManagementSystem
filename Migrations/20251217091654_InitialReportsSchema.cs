@@ -10,9 +10,9 @@ namespace UserRoles.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
+            /* migrationBuilder.DropForeignKey(
                 name: "FK_DailyReports_AspNetUsers_ApplicationUserId",
-                table: "DailyReports");
+                table: "DailyReports"); */
 
             migrationBuilder.RenameColumn(
                 name: "AdminComment",
@@ -46,13 +46,13 @@ namespace UserRoles.Migrations
                 oldType: "character varying(300)",
                 oldMaxLength: 300);
 
-            migrationBuilder.AddForeignKey(
+            /* migrationBuilder.AddForeignKey(
                 name: "FK_DailyReports_AspNetUsers_ApplicationUserId",
                 table: "DailyReports",
                 column: "ApplicationUserId",
                 principalTable: "AspNetUsers",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.Cascade);
+                onDelete: ReferentialAction.Cascade); */
         }
     }
 }
