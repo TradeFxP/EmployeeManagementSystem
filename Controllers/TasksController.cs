@@ -724,10 +724,21 @@ public class TasksController : Controller
             filteredAssignees.Add(user);
         }
 
+        // Role priority for sorting: Admin (1), Manager (2), Sub-Manager (3), User (4)
+        var rolePriority = new Dictionary<string, int>
+        {
+            { "Admin", 1 },
+            { "Manager", 2 },
+            { "Sub-Manager", 3 },
+            { "User", 4 }
+        };
+
         // ✅ Apply Team Filter: "show only fronted team" (the selected team members only)
         filteredAssignees = filteredAssignees
             .DistinctBy(u => u.Id)
             .Where(u => teamUserIds.Contains(u.Id))
+            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles.ContainsKey(u.Id) ? allUserRoles[u.Id] : "User", 99))
+            .ThenBy(u => u.Name ?? u.UserName)
             .ToList();
 
         // Also restrict assignableUsers (Quick Assign) to the team members
@@ -742,9 +753,13 @@ public class TasksController : Controller
         }
 
         // ✅ 2. Define Assignors (Who can assign tasks)
-        // Includes anyone with Admin, Manager, or Sub-Manager role
-        assignors = allUsers.Where(u => allUserRoles.ContainsKey(u.Id) && 
-            (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager")).ToList();
+        // Includes anyone with Admin, Manager, or Sub-Manager role, sorted by priority
+        assignors = allUsers
+            .Where(u => allUserRoles.ContainsKey(u.Id) && 
+                (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
+            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles[u.Id], 99))
+            .ThenBy(u => u.Name ?? u.UserName)
+            .ToList();
 
         // ✅ 3. Define Assignable Users (Who can be assigned tasks)
         // Includes team members AND anyone with a management role (Admin, Manager, Sub-Manager)

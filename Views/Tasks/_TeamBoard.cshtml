@@ -79,7 +79,8 @@
                 <option value="">All Assignees</option>
                 @foreach (var u in Model.FilteredAssignees)
                 {
-                    <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                    var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
+                    <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                 }
             </select>
         </div>
@@ -89,7 +90,7 @@
                 @foreach (var u in Model.Assignors)
                 {
                     var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                    <option value="@u.Id">@role: @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                    <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                 }
                 <option value="All">Show All</option>
             </select>
