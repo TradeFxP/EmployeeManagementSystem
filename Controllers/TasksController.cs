@@ -600,17 +600,21 @@ public class TasksController : Controller
             })
             .ToList();
 
-        // Load all tasks for team (with users and custom field values) — exclude archived
+        // Load all tasks:
+        // 1. Tasks in this team
+        // 2. Tasks assigned BY this user (cross-team tracking)
+        // 3. Tasks assigned TO this user (cross-team tracking)
         var allTasks = await _context.TaskItems
-     .Where(t => t.TeamName == team && !t.IsArchived)
-     .Include(t => t.CreatedByUser)
-     .Include(t => t.AssignedToUser)
-     .Include(t => t.AssignedByUser)
-     .Include(t => t.ReviewedByUser)
-     .Include(t => t.CompletedByUser)
-     .Include(t => t.CustomFieldValues)
-        .ThenInclude(v => v.Field)
-     .ToListAsync();
+            .Where(t => (t.TeamName == team || t.AssignedByUserId == user.Id || t.AssignedToUserId == user.Id) && !t.IsArchived)
+            .Include(t => t.CreatedByUser)
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.AssignedByUser)
+            .Include(t => t.ReviewedByUser)
+            .Include(t => t.CompletedByUser)
+            .Include(t => t.Column) // Included for cross-team mapping if needed
+            .Include(t => t.CustomFieldValues)
+                .ThenInclude(v => v.Field)
+            .ToListAsync();
 
 
         // 🔥 PERFORMANCE OPTIMIZATION: Pre-fetch roles for all users involved to avoid N+1 queries in CanUserSeeTask
@@ -652,13 +656,25 @@ public class TasksController : Controller
         // Attach filtered tasks to columns
         foreach (var col in columns)
         {
+            var targetColName = col.ColumnName?.Trim().ToLower();
+
+            // Task belongs here if:
+            // 1. It is explicitly in this column
+            // 2. Cross-team tracking: It matches the column name (History/Review/Completed mapping)
             col.Tasks = visibleTasks
-                .Where(t => t.ColumnId == col.Id)
+                .Where(t => t.ColumnId == col.Id || (t.TeamName != team && t.Column?.ColumnName?.Trim().ToLower() == targetColName))
                 .ToList();
         }
 
         // ✅ 1. Load assignable users and assignors based on role/hierarchy
         var allUsers = await _userManager.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync();
+        
+        // Fetch UserIds belonging to the current team
+        var teamUserIds = await _context.UserTeams
+            .Where(ut => ut.TeamName == team)
+            .Select(ut => ut.UserId)
+            .ToListAsync();
+
         var assignableUsers = new List<Users>();
         var assignors = new List<Users>();
 
@@ -670,31 +686,72 @@ public class TasksController : Controller
         foreach(var u in allUsers)
         {
             var r = await _userManager.GetRolesAsync(u);
-            allUserRoles[u.Id] = r.FirstOrDefault() ?? "User";
+            var primaryRole = r.FirstOrDefault() ?? "User";
+
+            // Prioritize Sub-Manager for display. 
+            // In this system, a Sub-Manager often has the Identity role "Manager" but has a ParentUserId.
+            if (r.Contains("Sub-Manager") || r.Contains("SubManager") || (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId)))
+                allUserRoles[u.Id] = "Sub-Manager";
+            else if (primaryRole == "Manager")
+                allUserRoles[u.Id] = "Manager";
+            else
+                allUserRoles[u.Id] = primaryRole;
         }
 
-        // Show all users for assignment regardless of role
-        assignableUsers = allUsers;
-
+        // Populate FilteredAssignees for the top-level board filter (Hierarchical + Team restricted)
+        var filteredAssignees = new List<Users>();
         if (viewerRoles.Contains("Admin"))
         {
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+            filteredAssignees = allUsers;
         }
         else if (viewerRoles.Contains("Manager"))
         {
-            // Managers see assignors: Admins
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin").ToList();
+            filteredAssignees.Add(user);
+            var directSubordinates = allUsers.Where(u => u.ParentUserId == user.Id).ToList();
+            filteredAssignees.AddRange(directSubordinates);
+            foreach (var sub in directSubordinates)
+            {
+                filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == sub.Id));
+            }
         }
         else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
         {
-            // Sub-Managers see assignors: Admins + Managers
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+            filteredAssignees.Add(user);
+            filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == user.Id));
         }
-        else // User
+        else
         {
-            // Users see assignors: Everyone (Admins, Managers, Sub-Managers)
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+            filteredAssignees.Add(user);
         }
+
+        // ✅ Apply Team Filter: "show only fronted team" (the selected team members only)
+        filteredAssignees = filteredAssignees
+            .DistinctBy(u => u.Id)
+            .Where(u => teamUserIds.Contains(u.Id))
+            .ToList();
+
+        // Also restrict assignableUsers (Quick Assign) to the team members
+        assignableUsers = allUsers.Where(u => teamUserIds.Contains(u.Id)).ToList();
+
+        // Role mapping for FE logic
+        var feUserRolesMap = new Dictionary<string, string>();
+        foreach(var u in allUsers)
+        {
+            if (allUserRoles.ContainsKey(u.Id))
+                feUserRolesMap[u.Id] = allUserRoles[u.Id];
+        }
+
+        // ✅ 2. Define Assignors (Who can assign tasks)
+        // Includes anyone with Admin, Manager, or Sub-Manager role
+        assignors = allUsers.Where(u => allUserRoles.ContainsKey(u.Id) && 
+            (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager")).ToList();
+
+        // ✅ 3. Define Assignable Users (Who can be assigned tasks)
+        // Includes team members AND anyone with a management role (Admin, Manager, Sub-Manager)
+        assignableUsers = @allUsers.Where(u => 
+            teamUserIds.Contains(u.Id) || 
+            (allUserRoles.ContainsKey(u.Id) && (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
+        ).ToList();
 
         // Get all team names for the assignment dropdown
         var allTeamNames = await _context.TeamColumns
@@ -721,11 +778,13 @@ public class TasksController : Controller
             TeamName = team,
             Columns = columns,
             AssignableUsers = assignableUsers,
+            FilteredAssignees = filteredAssignees,
             Assignors = assignors,
             AllTeamNames = allTeamNames,
             CustomFields = customFields,
             UserPermissions = userPerms,
-            TeamSettings = teamSettings
+            TeamSettings = teamSettings,
+            UserRolesMap = feUserRolesMap
         };
 
         // ✅ 3. Return partial view
@@ -879,8 +938,8 @@ public class TasksController : Controller
         if (viewerRoles.Contains("Admin"))
             return true;
 
-        // Creator and Assignee always see their tasks
-        if (task.CreatedByUserId == currentUserId || task.AssignedToUserId == currentUserId)
+        // Creator, Assignee, and Assignor always see their tasks
+        if (task.CreatedByUserId == currentUserId || task.AssignedToUserId == currentUserId || task.AssignedByUserId == currentUserId)
             return true;
 
         // Managerial Role Check (Hierarchy based)

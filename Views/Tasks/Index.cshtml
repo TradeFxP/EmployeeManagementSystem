@@ -529,9 +529,29 @@
                                 <option value="">-- Unassigned --</option>
                                 @if (Model != null && Model.AssignableUsers != null)
                                 {
-                                    foreach (var u in Model.AssignableUsers)
+                                    var managementUsers = Model.AssignableUsers.Where(u => Model.UserRolesMap.ContainsKey(u.Id) && 
+                                        (Model.UserRolesMap[u.Id] == "Admin" || Model.UserRolesMap[u.Id] == "Manager" || Model.UserRolesMap[u.Id] == "Sub-Manager")).ToList();
+                                    var regularMembers = Model.AssignableUsers.Except(managementUsers).ToList();
+
+                                    @if (managementUsers.Any())
                                     {
-                                        <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                        <optgroup label="Management">
+                                            @foreach (var u in managementUsers)
+                                            {
+                                                var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
+                                                <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                            }
+                                        </optgroup>
+                                    }
+
+                                    @if (regularMembers.Any())
+                                    {
+                                        <optgroup label="Team Members">
+                                            @foreach (var u in regularMembers)
+                                            {
+                                                <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                            }
+                                        </optgroup>
                                     }
                                 }
                             </select>
@@ -574,21 +594,37 @@
                     <label class="form-label">Assign to</label>
                     <select id="assignUserSelect" class="form-select">
                         <option value="">-- Select User --</option>
-
                         @if (Model != null && Model.AssignableUsers != null && Model.AssignableUsers.Any())
                         {
-                            foreach (var u in Model.AssignableUsers)
+                            var managementUsers = Model.AssignableUsers.Where(u => Model.UserRolesMap.ContainsKey(u.Id) && 
+                                (Model.UserRolesMap[u.Id] == "Admin" || Model.UserRolesMap[u.Id] == "Manager" || Model.UserRolesMap[u.Id] == "Sub-Manager")).ToList();
+                            var regularMembers = Model.AssignableUsers.Except(managementUsers).ToList();
+
+                            @if (managementUsers.Any())
                             {
-                                <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                <optgroup label="Management">
+                                    @foreach (var u in managementUsers)
+                                    {
+                                        var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
+                                        <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                    }
+                                </optgroup>
+                            }
+
+                            @if (regularMembers.Any())
+                            {
+                                <optgroup label="Team Members">
+                                    @foreach (var u in regularMembers)
+                                    {
+                                        <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                    }
+                                </optgroup>
                             }
                         }
                         else
                         {
                             <option disabled>No users available</option>
                         }
-
-
-
                     </select>
                 </div>
 
@@ -1518,6 +1554,7 @@
 
         updateColumnCounts();
         if (typeof filterBoardTasks === 'function') filterBoardTasks();
+        if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
         showToast(`Task #${data.taskId} moved to ${data.columnName}`, 'info');
     }
 
@@ -1557,6 +1594,7 @@
             card.remove();
             updateColumnCounts();
             if (typeof filterBoardTasks === 'function') filterBoardTasks();
+            if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
             showToast(`Task #${data.taskId} moved to another team`, 'info');
         }
     }
@@ -1580,6 +1618,7 @@
                 taskList.insertAdjacentHTML('afterbegin', html);
                 updateColumnCounts();
                 if (typeof filterBoardTasks === 'function') filterBoardTasks();
+                if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
                 showToast(`New task #${data.taskId} added to this board`, 'success');
             })
             .catch(err => console.error("Error adding task:", err));
@@ -1600,6 +1639,7 @@
                 
                 // Re-apply filters to correctly show/hide the updated card
                 if (typeof filterBoardTasks === 'function') filterBoardTasks();
+                if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
 
                 showToast(`Task #${data.taskId} assigned to ${data.assignedTo}`, 'success');
             })
@@ -2496,9 +2536,42 @@
 
             // 4. Filter by Assignor
             const cardAssignorId = card.dataset.assignedByUserId || "";
+            const currentAssigneeId = card.dataset.assignedToId || "";
+            const rolesMap = window.userRolesMap || {};
+            const myId = window.currentUserId || "";
+            const myRole = rolesMap[myId] || "";
+
             let matchesAssignor = true;
-            if (adminFilter && adminFilter !== "All") {
-                matchesAssignor = cardAssignorId === adminFilter;
+            if (adminFilter && adminFilter !== "All" && adminFilter !== "") {
+                const selectedAssignorId = adminFilter;
+                const selectedAssignorRole = rolesMap[selectedAssignorId] || "";
+
+                if (myRole === "Admin") {
+                    // Admin sees tasks assigned BY the selected user
+                    matchesAssignor = (cardAssignorId === selectedAssignorId);
+                }
+                else if (myRole === "Manager") {
+                    if (selectedAssignorRole === "Admin") {
+                        // Manager sees tasks assigned BY Admin TO them
+                        matchesAssignor = (cardAssignorId === selectedAssignorId && currentAssigneeId === myId);
+                    } else {
+                        // Manager sees tasks assigned BY the selected user (themselves or other managers)
+                        matchesAssignor = (cardAssignorId === selectedAssignorId);
+                    }
+                }
+                else if (myRole === "Sub-Manager") {
+                    if (selectedAssignorRole === "Admin" || selectedAssignorRole === "Manager") {
+                        // Sub-Manager sees tasks assigned BY higher roles TO them
+                        matchesAssignor = (cardAssignorId === selectedAssignorId && currentAssigneeId === myId);
+                    } else {
+                        // Sub-Manager sees tasks assigned BY the selected user (could be another Sub-Manager)
+                        matchesAssignor = (cardAssignorId === selectedAssignorId);
+                    }
+                }
+                else { // Regular User
+                    // User sees tasks assigned TO them by the selected assignor
+                    matchesAssignor = (cardAssignorId === selectedAssignorId && currentAssigneeId === myId);
+                }
             }
 
             // Combine all

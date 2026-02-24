@@ -1,4 +1,7 @@
 ﻿@using UserRoles.ViewModels
+@using Microsoft.AspNetCore.Identity
+@using UserRoles.Models
+@inject UserManager<Users> UserManager
 @model TeamBoardViewModel
 
 <div class="board-top-bar d-flex justify-content-between align-items-center mb-3">
@@ -74,7 +77,7 @@
         <div class="col-6 col-md-3">
             <select id="assigneeFilter" class="form-select filter-select" onchange="filterBoardTasks()">
                 <option value="">All Assignees</option>
-                @foreach (var u in Model.AssignableUsers)
+                @foreach (var u in Model.FilteredAssignees)
                 {
                     <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                 }
@@ -82,10 +85,11 @@
         </div>
         <div class="col-12 col-md-3">
             <select id="adminAssignedFilter" class="form-select filter-select" onchange="filterBoardTasks()">
-                <option value="">Filter By Assignor</option>
+                <option value="">Tasks Assigned</option>
                 @foreach (var u in Model.Assignors)
                 {
-                    <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                    var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
+                    <option value="@u.Id">@role: @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                 }
                 <option value="All">Show All</option>
             </select>
@@ -104,6 +108,12 @@
      data-perm-delete-task="@((Model.UserPermissions?.CanDeleteTask ?? false) ? "true" : "false")"
      data-perm-review-task="@((Model.UserPermissions?.CanReviewTask ?? false) ? "true" : "false")"
      data-perm-assign-task="@((Model.UserPermissions?.CanAssignTask ?? false) ? "true" : "false")">
+
+    <script>
+        // Serialized role map for filtering logic
+        window.userRolesMap = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.UserRolesMap));
+        window.currentUserId = '@UserManager.GetUserId(User)';
+    </script>
 
     <!-- ================= FOCUSED TASK PANEL ================= -->
     <div id="focusedTaskPanel" class="focused-task-panel d-none">
@@ -265,7 +275,8 @@
                             { "ColumnName", column.ColumnName },
                             { "TeamSettings", Model.TeamSettings },
                             { "UserPermissions", Model.UserPermissions },
-                            { "AssignableUsers", Model.AssignableUsers }
+                            { "AssignableUsers", Model.AssignableUsers },
+                            { "UserRolesMap", Model.UserRolesMap }
                         })
                     }
                 </div>
@@ -644,8 +655,9 @@
     .card-top-row {
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        gap: 6px;
+        align-items: flex-start;
+        gap: 8px;
+        width: 100%;
     }
 
     /* ===== PRIORITY PILL (LEFT) ===== */
@@ -654,10 +666,12 @@
         font-weight: 700;
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        padding: 3px 10px;
-        border-radius: 20px;
+        padding: 2px 8px;
+        border-radius: 4px;
         color: #fff;
         border: none;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
     .priority-pill.priority-low {
         background: linear-gradient(135deg, #868e96, #6c757d);
@@ -683,6 +697,8 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
         animation: badgePop 0.4s ease-out;
     }
     .review-badge-fail {

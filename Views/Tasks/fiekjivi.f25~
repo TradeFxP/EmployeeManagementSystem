@@ -52,7 +52,7 @@
 
     <!-- TOP ROW: Due Date & Priority (left) + Task ID & Review Status (right) -->
     <div class="card-top-row d-flex align-items-start w-100">
-        <div class="d-flex flex-nowrap align-items-center gap-2">
+        <div class="d-flex flex-column align-items-start gap-1">
             @{
                 DateTime? finalDueDate = Model.DueDate;
                 if (finalDueDate == null && Model.CustomFieldValues != null)
@@ -67,9 +67,7 @@
 
             @if (finalDueDate != null)
             {
-                <span class="badge bg-light text-dark border d-flex align-items-center gap-1 small fw-normal" 
-                      title="Due Date" 
-                      style="font-size: 0.7rem; white-space: nowrap;">
+                <span class="badge bg-light text-dark border d-flex align-items-center gap-1 small" title="Due Date" style="font-size: 0.75rem;">
                     <i class="bi bi-calendar-event text-danger"></i>
                     @finalDueDate.Value.ToString("dd MMM, hh:mm tt")
                 </span>
@@ -88,22 +86,27 @@
                 };
             }
 
-            <span class="priority-pill @effectivePriorityClass">@effectivePriorityLabel.ToUpper()</span>
+            <span class="priority-pill @effectivePriorityClass" style="font-size: 0.65rem; padding: 2px 8px;">@effectivePriorityLabel.ToUpper()</span>
         </div>
 
         <div class="ms-auto d-flex flex-column align-items-end gap-1">
             <span class="badge bg-light text-muted border small" style="font-size: 0.7rem;">#@Model.Id</span>
             
-            
+            <!-- if (!string.IsNullOrEmpty(Model.TeamName) && ViewData["TeamName"] as string != Model.TeamName)
+            {
+                <span class="badge bg-soft-info border small" style="font-size: 0.6rem; color: #0891b2; background: rgba(8, 145, 178, 0.1);">
+                    <i class="bi bi-diagram-3-fill me-1"></i>Model.TeamName
+                </span>
+            } -->
             
             <div class="d-flex align-items-center gap-1">
-                <span class="review-badge review-badge-fail" style="@(isFailed ? "" : "display:none")">
+                <span class="review-badge review-badge-fail" style="display: @(isFailed ? "inline-flex" : "none")">
                     <i class="bi bi-x-circle-fill"></i> FAIL
                 </span>
-                <span class="review-badge review-badge-pass" style="@(isPassed ? "" : "display:none")">
+                <span class="review-badge review-badge-pass" style="display: @(isPassed ? "inline-flex" : "none")">
                     <i class="bi bi-check-circle-fill"></i> PASS
                 </span>
-                <span class="review-badge review-badge-pending" style="@(isPending && isReviewCol ? "" : "display:none")">
+                <span class="review-badge review-badge-pending" style="display: @(isPending && isReviewCol ? "inline-flex" : "none")">
                     <i class="bi bi-hourglass-split"></i> PENDING
                 </span>
             </div>
@@ -120,8 +123,8 @@
         </div>
     }
 
-    <!-- TITLE -->
-    <div class="task-title-text mt-2" style="font-size: 0.825rem; text-transform: lowercase;">@Model.Title</div>
+    <!-- TITLE (In place of Description) -->
+    <div class="task-title-text mt-2" style="font-size: 1.1rem; color: #1a1a2e; font-weight: 50;">@Model.Title</div>
 
     <!-- CUSTOM FIELDS -->
     @if (Model.CustomFieldValues != null && Model.CustomFieldValues.Any())
@@ -202,33 +205,12 @@
         </div>
         <select class="form-select form-select-sm task-assign-select mb-2" data-task-id="@Model.Id">
             <option value="">-- Select Member --</option>
-            @{
-                var roleMap = ViewData["UserRolesMap"] as Dictionary<string, string> ?? new Dictionary<string, string>();
-                var managementUsers = assignableUsers.Where(u => roleMap.ContainsKey(u.Id) && 
-                    (roleMap[u.Id] == "Admin" || roleMap[u.Id] == "Manager" || roleMap[u.Id] == "Sub-Manager")).ToList();
-                var regularMembers = assignableUsers.Except(managementUsers).ToList();
-            }
-            
-            @if (managementUsers.Any())
-            {
-                <optgroup label="Management">
-                    @foreach (var u in managementUsers)
-                    {
-                        var role = roleMap.ContainsKey(u.Id) ? roleMap[u.Id] : "User";
-                        <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
-                    }
-                </optgroup>
-            }
-
-            @if (regularMembers.Any())
-            {
-                <optgroup label="Team Members">
-                    @foreach (var u in regularMembers)
-                    {
-                        <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
-                    }
-                </optgroup>
-            }
+            <optgroup label="Members">
+                @foreach (var u in assignableUsers)
+                {
+                    <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                }
+            </optgroup>
         </select>
         <div class="d-flex gap-2 justify-content-end">
             <button class="btn btn-xs btn-link text-secondary text-decoration-none" onclick="cancelAssignTask(@Model.Id)">Cancel</button>
