@@ -1118,7 +1118,10 @@
     <div class="modal fade" id="boardPermissionModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
-                <div class="modal-header bg-dark text-white d-flex justify-content-between align-items-center" style="border-radius: 16px 16px 0 0;">
+                <div class="modal-header bg-dark text-white d-flex justify-content-between align-items-center" 
+                     style="border-radius: 16px 16px 0 0; cursor: pointer;" 
+                     ondblclick="bootstrap.Modal.getInstance(this.closest('.modal')).hide()"
+                     title="Double-click to close">
                     <h5 class="modal-title">
                         <i class="bi bi-shield-lock me-2 text-info"></i>Board Permissions
                     </h5>

@@ -43,7 +43,8 @@ function filterBoardPermissions() {
     if (filterValue === 'All') {
         renderBoardPermissionRows(rawBoardPermissions);
     } else {
-        const filtered = rawBoardPermissions.filter(p => p.role === filterValue);
+        // Always show Managers, regardless of the selected filter role
+        const filtered = rawBoardPermissions.filter(p => p.role === filterValue || p.role === 'Manager');
         renderBoardPermissionRows(filtered);
     }
 }

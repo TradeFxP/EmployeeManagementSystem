@@ -668,7 +668,7 @@ public class TasksController : Controller
 
         // ✅ 1. Load assignable users and assignors based on role/hierarchy
         var allUsers = await _userManager.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync();
-        
+
         // Fetch UserIds belonging to the current team
         var teamUserIds = await _context.UserTeams
             .Where(ut => ut.TeamName == team)
@@ -746,7 +746,7 @@ public class TasksController : Controller
 
         // Role mapping for FE logic
         var feUserRolesMap = new Dictionary<string, string>();
-        foreach(var u in allUsers)
+        foreach (var u in allUsers)
         {
             if (allUserRoles.ContainsKey(u.Id))
                 feUserRolesMap[u.Id] = allUserRoles[u.Id];
@@ -755,7 +755,7 @@ public class TasksController : Controller
         // ✅ 2. Define Assignors (Who can assign tasks)
         // Includes anyone with Admin, Manager, or Sub-Manager role, sorted by priority
         assignors = allUsers
-            .Where(u => allUserRoles.ContainsKey(u.Id) && 
+            .Where(u => allUserRoles.ContainsKey(u.Id) &&
                 (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
             .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles[u.Id], 99))
             .ThenBy(u => u.Name ?? u.UserName)
@@ -763,8 +763,8 @@ public class TasksController : Controller
 
         // ✅ 3. Define Assignable Users (Who can be assigned tasks)
         // Includes team members AND anyone with a management role (Admin, Manager, Sub-Manager)
-        assignableUsers = @allUsers.Where(u => 
-            teamUserIds.Contains(u.Id) || 
+        assignableUsers = @allUsers.Where(u =>
+            teamUserIds.Contains(u.Id) ||
             (allUserRoles.ContainsKey(u.Id) && (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
         ).ToList();
 
@@ -1674,6 +1674,12 @@ public class TasksController : Controller
             .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .ToListAsync();
 
+        // Get the set of user IDs that belong to this specific team
+        var teamUserIds = await _context.UserTeams
+            .Where(ut => ut.TeamName == team)
+            .Select(ut => ut.UserId)
+            .ToHashSetAsync();
+
         var result = new List<BoardPermissionDto>();
 
         foreach (var u in users)
@@ -1687,6 +1693,13 @@ public class TasksController : Controller
             {
                 primaryRole = "Sub Manager";
             }
+
+            // 🔒 Scoping rule:
+            // - Manager (no ParentUserId): always show — they oversee all teams
+            // - Sub Manager / User: only show if they belong to this team
+            bool isTopLevelManager = primaryRole == "Manager";
+            if (!isTopLevelManager && !teamUserIds.Contains(u.Id))
+                continue;
 
             var p = perms.FirstOrDefault(x => x.UserId == u.Id);
 
