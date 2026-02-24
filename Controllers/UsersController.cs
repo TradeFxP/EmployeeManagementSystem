@@ -900,6 +900,9 @@ namespace UserRoles.Controllers
                     Request.Scheme)!;
 
                 var currentUserId = _userManager.GetUserId(User);
+                var displayRole = addType == "SubManager" ? "Sub Manager" : targetRole;
+
+
 
                 var htmlBody = $@"
 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
@@ -909,8 +912,9 @@ namespace UserRoles.Controllers
   <table style='border-collapse: collapse; margin: 16px 0;'>
     <tr><td style='padding: 8px; font-weight: bold;'>Email:</td><td style='padding: 8px;'>{email}</td></tr>
     <tr><td style='padding: 8px; font-weight: bold;'>Temporary Password:</td><td style='padding: 8px;'>{password}</td></tr>
-    <tr><td style='padding: 8px; font-weight: bold;'>Role:</td><td style='padding: 8px;'>{targetRole}</td></tr>
+    <tr><td style='padding: 8px; font-weight: bold;'>Role:</td><td style='padding: 8px;'>{displayRole}</td></tr>
   </table>
+
   <p><a href='{loginUrl}' style='display: inline-block; background: #3498db; color: #fff; padding: 10px 24px; text-decoration: none; border-radius: 4px;'>Login Now</a></p>
   <hr style='margin: 24px 0; border: none; border-top: 1px solid #e0e0e0;' />
   <p>For security, we recommend changing your password immediately:</p>
