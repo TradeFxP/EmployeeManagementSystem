@@ -189,7 +189,7 @@ public class TasksController : Controller
         ViewData["TeamSettings"] = team;
         ViewData["ColumnName"] = (await _context.TeamColumns.FindAsync(task.ColumnId))?.ColumnName;
         ViewData["AssignableUsers"] = users;
-        
+
         // Load permissions for this user on this team
         var currentUser = await _userManager.GetUserAsync(User);
         BoardPermission? permissions = null;
@@ -361,12 +361,12 @@ public class TasksController : Controller
 
         if (task.DueDate != model.DueDate)
         {
-            await _historyService.LogTaskUpdated(task.Id, user.Id, "Due Date", 
-                task.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None", 
+            await _historyService.LogTaskUpdated(task.Id, user.Id, "Due Date",
+                task.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None",
                 model.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None");
-            
-            task.DueDate = model.DueDate.HasValue 
-                ? DateTime.SpecifyKind(model.DueDate.Value, DateTimeKind.Utc) 
+
+            task.DueDate = model.DueDate.HasValue
+                ? DateTime.SpecifyKind(model.DueDate.Value, DateTimeKind.Utc)
                 : null;
         }
 
@@ -619,8 +619,8 @@ public class TasksController : Controller
             .Where(id => !string.IsNullOrEmpty(id))
             .Distinct()
             .ToList();
-        
-        if (user != null && !usersToFetchRolesFor.Contains(user.Id)) 
+
+        if (user != null && !usersToFetchRolesFor.Contains(user.Id))
             usersToFetchRolesFor.Add(user.Id);
 
         var userRolesMap = new Dictionary<string, IList<string>>();
@@ -634,20 +634,20 @@ public class TasksController : Controller
         }
 
         // 🔥 FILTER TASKS BASED ON ROLE RULES
-    // Pre-fetch hierarchy for visibility check
-    var userHierarchy = await _userManager.Users
-        .Where(u => u.Id != null)
-        .Select(u => new { u.Id, u.ManagerId })
-        .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+        // Pre-fetch hierarchy for visibility check
+        var userHierarchy = await _userManager.Users
+            .Where(u => u.Id != null)
+            .Select(u => new { u.Id, u.ManagerId })
+            .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
 
-    var visibleTasks = new List<TaskItem>();
-    var viewerRoles = userRolesMap.ContainsKey(user.Id) ? userRolesMap[user.Id] : new List<string>();
+        var visibleTasks = new List<TaskItem>();
+        var viewerRoles = userRolesMap.ContainsKey(user.Id) ? userRolesMap[user.Id] : new List<string>();
 
-    foreach (var task in allTasks)
-    {
-        if (CanUserSeeTaskOptimized(task, user.Id, viewerRoles, userRolesMap, userHierarchy))
-            visibleTasks.Add(task);
-    }
+        foreach (var task in allTasks)
+        {
+            if (CanUserSeeTaskOptimized(task, user.Id, viewerRoles, userRolesMap, userHierarchy))
+                visibleTasks.Add(task);
+        }
 
         // Attach filtered tasks to columns
         foreach (var col in columns)
@@ -664,10 +664,10 @@ public class TasksController : Controller
 
         // We need hierarchy map for visibility check
         var fullHierarchy = allUsers.Where(u => !string.IsNullOrEmpty(u.Id)).ToDictionary(u => u.Id, u => u.ParentUserId);
-        
+
         // Roles for everyone for filtering
         var allUserRoles = new Dictionary<string, string>();
-        foreach(var u in allUsers)
+        foreach (var u in allUsers)
         {
             var r = await _userManager.GetRolesAsync(u);
             allUserRoles[u.Id] = r.FirstOrDefault() ?? "User";
@@ -888,7 +888,7 @@ public class TasksController : Controller
         if (isManagerOrSub)
         {
             // Does the creator or assignee report to the current manager?
-            if (IsUnderManager(task.CreatedByUserId, currentUserId, hierarchyMap) || 
+            if (IsUnderManager(task.CreatedByUserId, currentUserId, hierarchyMap) ||
                 IsUnderManager(task.AssignedToUserId, currentUserId, hierarchyMap))
             {
                 return true;
@@ -901,11 +901,11 @@ public class TasksController : Controller
     private bool IsUnderManager(string? userId, string managerId, Dictionary<string, string?> hierarchyMap)
     {
         if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(managerId)) return false;
-        
+
         string? currentUserIdToCheck = userId;
         int maxDepth = 20; // Safety against cycles
         int depth = 0;
-        
+
         while (hierarchyMap.TryGetValue(currentUserIdToCheck, out var parentId) && !string.IsNullOrEmpty(parentId) && depth < maxDepth)
         {
             if (parentId == managerId) return true;
@@ -931,7 +931,7 @@ public class TasksController : Controller
         var map = new Dictionary<string, IList<string>> { { currentUser.Id, roles } };
         // We don't really need the userRolesMap for the new hierarchical logic unless we want to keep the old role logic
         // but the requirement is "only to user and admin and their manager".
-        
+
         return CanUserSeeTaskOptimized(task, currentUser.Id, roles, map, userHierarchy);
     }
 
@@ -964,7 +964,7 @@ public class TasksController : Controller
         var sourceColName = task.Column?.ColumnName?.Trim().ToLower();
 
         // ═══════ ROLE-BASED RESTRICTIONS ═══════
-        
+
         // 1. COMPLETED column: ONLY Admin OR users with ReviewTask permission can move tasks here
         if (targetColName == "completed")
         {
@@ -1135,7 +1135,7 @@ public class TasksController : Controller
                 task.CompletedByUserId = task.AssignedToUserId;
                 task.CompletedAt = DateTime.UtcNow;
                 task.CurrentColumnEntryAt = DateTime.UtcNow;
-                
+
                 await _context.SaveChangesAsync();
 
                 // 🚀 BROADCAST UPDATE (Review Result)
@@ -1604,16 +1604,23 @@ public class TasksController : Controller
 
         foreach (var u in users)
         {
-            var roles = await _userManager.GetRolesAsync(u);
-            if (roles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
-            
+            var rawRoles = await _userManager.GetRolesAsync(u);
+            if (rawRoles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
+
+            string primaryRole = rawRoles.FirstOrDefault() ?? "User";
+            // Distinguish Sub Manager: role is "Manager" + has ParentUserId
+            if (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId))
+            {
+                primaryRole = "Sub Manager";
+            }
+
             var p = perms.FirstOrDefault(x => x.UserId == u.Id);
-            
+
             result.Add(new BoardPermissionDto
             {
                 UserId = u.Id,
                 UserName = u.UserName ?? "Unknown",
-                Role = roles.FirstOrDefault() ?? "No Role",
+                Role = primaryRole,
                 TeamName = team,
                 CanAddColumn = p?.CanAddColumn ?? false,
                 CanRenameColumn = p?.CanRenameColumn ?? false,
@@ -1627,7 +1634,20 @@ public class TasksController : Controller
             });
         }
 
-        return Ok(result);
+        // Sort: Manager (1) -> Sub Manager (2) -> User (3)
+        var rolePriority = new Dictionary<string, int>
+        {
+            { "Manager", 1 },
+            { "Sub Manager", 2 },
+            { "User", 3 }
+        };
+
+        var sortedResult = result
+            .OrderBy(r => rolePriority.GetValueOrDefault(r.Role, 99))
+            .ThenBy(r => r.UserName)
+            .ToList();
+
+        return Ok(sortedResult);
     }
 
     [Authorize(Roles = "Admin")]
@@ -1661,7 +1681,7 @@ public class TasksController : Controller
                 var duplicates = allExisting.Where(p => p.Id != existing.Id).ToList();
                 _context.BoardPermissions.RemoveRange(duplicates);
             }
-            
+
             // Ensure team name is sanitized/standardized on the one we keep
             existing.TeamName = dto.TeamName.Trim();
         }
@@ -1720,10 +1740,10 @@ public class TasksController : Controller
 
         var oldTasks = await _context.TaskItems
             .Include(t => t.Column)
-            .Where(t => t.TeamName == teamName 
-                     && !t.IsArchived 
-                     && t.Column.ColumnName.ToLower().Trim() == "completed" 
-                     && t.CompletedAt.HasValue 
+            .Where(t => t.TeamName == teamName
+                     && !t.IsArchived
+                     && t.Column.ColumnName.ToLower().Trim() == "completed"
+                     && t.CompletedAt.HasValue
                      && t.CompletedAt.Value < today)
             .ToListAsync();
 
