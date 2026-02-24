@@ -7,10 +7,8 @@
 <div class="board-top-bar d-flex justify-content-between align-items-center mb-3">
     <div class="d-flex align-items-center gap-3">
         <!-- 🔙 BACK TO BOARD -->
-        <button id="backToBoardBtn"
-                class="btn btn-sm btn-outline-primary"
-                style="display:none;"
-                onclick="resetBoardView()">
+        <button id="backToBoardBtn" class="btn btn-sm btn-outline-primary" style="display:none;"
+            onclick="resetBoardView()">
             <i class="bi bi-arrow-left"></i> Back
         </button>
         <h4 class="mb-0 board-title">
@@ -21,31 +19,27 @@
     <div class="d-flex gap-2">
         @if (User.IsInRole("Admin"))
         {
-            <button class="btn btn-sm btn-outline-info"
-                    onclick="openBoardPermissionModal('@Model.TeamName')"
-                    title="Manage Board Permissions">
+            <button class="btn btn-sm btn-outline-info" onclick="openBoardPermissionModal('@Model.TeamName')"
+                title="Manage Board Permissions">
                 <i class="bi bi-shield-lock me-1"></i> Permission
             </button>
-            <button class="btn btn-sm btn-archive-glow"
-                    onclick="archiveCompletedTasks('@Model.TeamName')"
-                    title="Archive all completed &amp; passed tasks">
+            <button class="btn btn-sm btn-archive-glow" onclick="archiveCompletedTasks('@Model.TeamName')"
+                title="Archive all completed &amp; passed tasks">
                 <i class="bi bi-archive me-1"></i> Archive Completed
             </button>
         }
-        
+
         @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanImportExcel == true))
         {
-            <button class="btn btn-sm btn-import-excel"
-                    onclick="openExcelImportModal('@Model.TeamName')"
-                    title="Import tasks from Excel file">
+            <button class="btn btn-sm btn-import-excel" onclick="openExcelImportModal('@Model.TeamName')"
+                title="Import tasks from Excel file">
                 <i class="bi bi-file-earmark-spreadsheet me-1"></i> Import Excel
             </button>
         }
 
         @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanAddColumn == true))
         {
-            <button class="btn btn-sm btn-add-col"
-                    onclick="openAddColumnModal('@Model.TeamName')">
+            <button class="btn btn-sm btn-add-col" onclick="openAddColumnModal('@Model.TeamName')">
                 <i class="bi bi-plus-lg me-1"></i> Add Column
             </button>
         }
@@ -58,11 +52,8 @@
         <div class="col-12 col-md-4">
             <div class="input-group search-input-group">
                 <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input type="text"
-                       id="taskSearchInput"
-                       class="form-control"
-                       placeholder="Search title, desc, fields..."
-                       oninput="filterBoardTasks()">
+                <input type="text" id="taskSearchInput" class="form-control" placeholder="Search title, desc, fields..."
+                    oninput="filterBoardTasks()">
             </div>
         </div>
         <div class="col-6 col-md-2">
@@ -99,16 +90,15 @@
 </div>
 
 <!-- KANBAN BOARD -->
-<div class="kanban-board" id="kanbanBoard"
-     data-team-name="@Model.TeamName"
-     data-perm-add-col="@((Model.UserPermissions?.CanAddColumn ?? false) ? "true" : "false")"
-     data-perm-rename-col="@((Model.UserPermissions?.CanRenameColumn ?? false) ? "true" : "false")"
-     data-perm-reorder-cols="@((Model.UserPermissions?.CanReorderColumns ?? false) ? "true" : "false")"
-     data-perm-delete-col="@((Model.UserPermissions?.CanDeleteColumn ?? false) ? "true" : "false")"
-     data-perm-edit-tasks="@((Model.UserPermissions?.CanEditAllFields ?? false) ? "true" : "false")"
-     data-perm-delete-task="@((Model.UserPermissions?.CanDeleteTask ?? false) ? "true" : "false")"
-     data-perm-review-task="@((Model.UserPermissions?.CanReviewTask ?? false) ? "true" : "false")"
-     data-perm-assign-task="@((Model.UserPermissions?.CanAssignTask ?? false) ? "true" : "false")">
+<div class="kanban-board" id="kanbanBoard" data-team-name="@Model.TeamName"
+    data-perm-add-col="@((Model.UserPermissions?.CanAddColumn ?? false) ? "true" : "false")"
+    data-perm-rename-col="@((Model.UserPermissions?.CanRenameColumn ?? false) ? "true" : "false")"
+    data-perm-reorder-cols="@((Model.UserPermissions?.CanReorderColumns ?? false) ? "true" : "false")"
+    data-perm-delete-col="@((Model.UserPermissions?.CanDeleteColumn ?? false) ? "true" : "false")"
+    data-perm-edit-tasks="@((Model.UserPermissions?.CanEditAllFields ?? false) ? "true" : "false")"
+    data-perm-delete-task="@((Model.UserPermissions?.CanDeleteTask ?? false) ? "true" : "false")"
+    data-perm-review-task="@((Model.UserPermissions?.CanReviewTask ?? false) ? "true" : "false")"
+    data-perm-assign-task="@((Model.UserPermissions?.CanAssignTask ?? false) ? "true" : "false")">
 
     <script>
         // Serialized role map for filtering logic
@@ -123,16 +113,22 @@
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Task Details</h5>
                 <div class="modal-action-buttons mb-0 border-0 p-0 shadow-none">
-                    <button class="modal-action-btn btn-modal-history" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="History" onclick="openTaskHistoryFromModal(document.getElementById('focusedTaskId').value)">
+                    <button class="modal-action-btn btn-modal-history"
+                        style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="History"
+                        onclick="openTaskHistoryFromModal(document.getElementById('focusedTaskId').value)">
                         <i class="bi bi-clock-history"></i>
                     </button>
                     @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanAssignTask == true))
                     {
-                        <button class="modal-action-btn btn-modal-assign" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="Assign" onclick="showAssignUIFromModal(document.getElementById('focusedTaskId').value)">
+                        <button class="modal-action-btn btn-modal-assign"
+                            style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="Assign"
+                            onclick="showAssignUIFromModal(document.getElementById('focusedTaskId').value)">
                             <i class="bi bi-person-plus"></i>
                         </button>
                     }
-                    <button class="modal-action-btn btn-modal-edit" style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="Edit" onclick="openEditTaskFromModal(document.getElementById('focusedTaskId').value)">
+                    <button class="modal-action-btn btn-modal-edit"
+                        style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="Edit"
+                        onclick="openEditTaskFromModal(document.getElementById('focusedTaskId').value)">
                         <i class="bi bi-pencil-square"></i>
                     </button>
                 </div>
@@ -179,9 +175,7 @@
         var taskCount = column.Tasks?.Count ?? 0;
         var colAccentClass = isReviewCol ? "col-review" : isCompletedCol ? "col-completed" : "";
 
-        <div class="kanban-column @colAccentClass"
-             data-column-id="@column.Id"
-             data-column-name="@column.ColumnName">
+        <div class="kanban-column @colAccentClass" data-column-id="@column.Id" data-column-name="@column.ColumnName">
 
             <!-- COLUMN HEADER -->
             <div class="kanban-column-header">
@@ -194,55 +188,71 @@
                     <!-- COLUMN TITLE -->
                     <div class="column-title-wrapper flex-grow-1 ms-1" onclick="focusColumn(@column.Id)">
                         <span class="column-title" id="column-title-@column.Id">
-                            @if (isReviewCol) { <i class="bi bi-eye-fill col-icon text-warning"></i> }
-                            else if (isCompletedCol) { <i class="bi bi-check-circle-fill col-icon text-success"></i> }
-                            else { <i class="bi bi-layout-three-columns col-icon"></i> }
+                            @if (isReviewCol)
+                            {
+                                <i class="bi bi-eye-fill col-icon text-warning"></i>
+                            }
+                            else if (isCompletedCol)
+                            {
+                                <i class="bi bi-check-circle-fill col-icon text-success"></i>
+                            }
+                            else
+                            {
+                                <i class="bi bi-layout-three-columns col-icon"></i>
+                            }
                             @column.ColumnName
                         </span>
                         <span class="task-count-badge">@taskCount</span>
 
                         <!-- RENAME MODE -->
-                        <div class="column-rename" id="column-rename-@column.Id" style="display:none;" onclick="event.stopPropagation();">
-                            <input type="text" class="column-title-input" id="column-input-@column.Id" value="@column.ColumnName" />
-                            <button class="icon-btn save-btn" onclick="saveColumnName(@column.Id)"><i class="bi bi-check-lg"></i></button>
-                            <button class="icon-btn cancel-btn" onclick="cancelRename(@column.Id)"><i class="bi bi-x-lg"></i></button>
+                        <div class="column-rename" id="column-rename-@column.Id" style="display:none;"
+                            onclick="event.stopPropagation();">
+                            <input type="text" class="column-title-input" id="column-input-@column.Id"
+                                value="@column.ColumnName" />
+                            <button class="icon-btn save-btn" onclick="saveColumnName(@column.Id)"><i
+                                    class="bi bi-check-lg"></i></button>
+                            <button class="icon-btn cancel-btn" onclick="cancelRename(@column.Id)"><i
+                                    class="bi bi-x-lg"></i></button>
                         </div>
                     </div>
                 </div>
 
                 <div class="d-flex align-items-center gap-1">
                     <!-- ADD TASK -->
-                    @if (!isCompletedCol && (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager") || User.IsInRole("SubManager") || User.IsInRole("User")))
+                    @if (!isCompletedCol && (User.IsInRole("Admin") || User.IsInRole("Manager") ||
+                   User.IsInRole("Sub-Manager") || User.IsInRole("SubManager") || User.IsInRole("User")))
                     {
                         <button class="header-icon-btn" title="Add task"
-                                onclick="openCreateTaskModal(@column.Id); event.stopPropagation();">
+                            onclick="openCreateTaskModal(@column.Id); event.stopPropagation();">
                             <i class="bi bi-plus-circle"></i>
                         </button>
                     }
 
                     <!-- FILTER -->
                     <button class="header-icon-btn" title="Filter / Sort"
-                            onclick="toggleColumnFilter(@column.Id); event.stopPropagation();">
+                        onclick="toggleColumnFilter(@column.Id); event.stopPropagation();">
                         <i class="bi bi-funnel"></i>
                     </button>
 
                     <!-- ADMIN / GRANTED ACTIONS -->
                     @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanRenameColumn == true))
                     {
-                        <button class="header-icon-btn" title="Edit" onclick="startRename(@column.Id); event.stopPropagation();">
+                        <button class="header-icon-btn" title="Edit"
+                            onclick="startRename(@column.Id); event.stopPropagation();">
                             <i class="bi bi-pencil"></i>
                         </button>
                     }
                     @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteTask == true))
                     {
-                        <button class="header-icon-btn text-warning" title="Clear All Tasks" 
-                                onclick="clearColumnTasks(@column.Id); event.stopPropagation();">
+                        <button class="header-icon-btn text-warning" title="Clear All Tasks"
+                            onclick="clearColumnTasks(@column.Id); event.stopPropagation();">
                             <i class="bi bi-eraser"></i>
                         </button>
                     }
                     @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteColumn == true))
                     {
-                        <button class="header-icon-btn text-danger" title="Delete" onclick="confirmDeleteColumn(@column.Id); event.stopPropagation();">
+                        <button class="header-icon-btn text-danger" title="Delete"
+                            onclick="confirmDeleteColumn(@column.Id); event.stopPropagation();">
                             <i class="bi bi-trash3"></i>
                         </button>
                     }
@@ -251,17 +261,15 @@
 
             <!-- 🔽 COLUMN TOOLBAR -->
             <div id="column-toolbar-@column.Id" class="column-toolbar" style="display:none;">
-                <input type="text" id="search-input-@column.Id"
-                       class="form-control form-control-sm mb-2"
-                       placeholder="Search tasks..."
-                       oninput="applyColumnFilter(@column.Id)" />
+                <input type="text" id="search-input-@column.Id" class="form-control form-control-sm mb-2"
+                    placeholder="Search tasks..." oninput="applyColumnFilter(@column.Id)" />
                 <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-outline-secondary flex-fill"
-                            onclick="setColumnSort(@column.Id, 'desc')" id="sort-desc-@column.Id" title="Newest First">
+                    <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort(@column.Id, 'desc')"
+                        id="sort-desc-@column.Id" title="Newest First">
                         <i class="bi bi-sort-down"></i> Newest
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary flex-fill"
-                            onclick="setColumnSort(@column.Id, 'asc')" id="sort-asc-@column.Id" title="Oldest First">
+                    <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort(@column.Id, 'asc')"
+                        id="sort-asc-@column.Id" title="Oldest First">
                         <i class="bi bi-sort-up"></i> Oldest
                     </button>
                 </div>
@@ -273,12 +281,12 @@
                     @foreach (var task in column.Tasks)
                     {
                         @await Html.PartialAsync("_TaskCard", task, new ViewDataDictionary(ViewData) {
-                            { "ColumnName", column.ColumnName },
-                            { "TeamSettings", Model.TeamSettings },
-                            { "UserPermissions", Model.UserPermissions },
-                            { "AssignableUsers", Model.AssignableUsers },
-                            { "UserRolesMap", Model.UserRolesMap }
-                        })
+                { "ColumnName", column.ColumnName },
+                { "TeamSettings", Model.TeamSettings },
+                { "UserPermissions", Model.UserPermissions },
+                { "AssignableUsers", Model.AssignableUsers },
+                { "UserRolesMap", Model.UserRolesMap }
+                })
                     }
                 </div>
             </div>
@@ -295,24 +303,22 @@
             <div class="d-flex align-items-center gap-1">
                 <!-- FILTER -->
                 <button class="header-icon-btn" title="Filter / Sort"
-                        onclick="toggleColumnFilter('history'); event.stopPropagation();">
+                    onclick="toggleColumnFilter('history'); event.stopPropagation();">
                     <i class="bi bi-funnel"></i>
                 </button>
             </div>
         </div>
         <!-- 🔽 COLUMN TOOLBAR -->
         <div id="column-toolbar-history" class="column-toolbar" style="display:none;">
-            <input type="text" id="search-input-history"
-                   class="form-control form-control-sm mb-2"
-                   placeholder="Search history..."
-                   oninput="applyColumnFilter('history')" />
+            <input type="text" id="search-input-history" class="form-control form-control-sm mb-2"
+                placeholder="Search history..." oninput="applyColumnFilter('history')" />
             <div class="d-flex gap-1">
-                <button class="btn btn-sm btn-outline-secondary flex-fill"
-                        onclick="setColumnSort('history', 'desc')" id="sort-desc-history" title="Newest First">
+                <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort('history', 'desc')"
+                    id="sort-desc-history" title="Newest First">
                     <i class="bi bi-sort-down"></i> Newest
                 </button>
-                <button class="btn btn-sm btn-outline-secondary flex-fill"
-                        onclick="setColumnSort('history', 'asc')" id="sort-asc-history" title="Oldest First">
+                <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort('history', 'asc')"
+                    id="sort-asc-history" title="Oldest First">
                     <i class="bi bi-sort-up"></i> Oldest
                 </button>
             </div>
@@ -332,19 +338,16 @@
 
 
 <style>
-
-    <script >
-    function clearFocusedDescription() {
-        const desc = document.getElementById("focusedTaskDescription");
+    <script>function clearFocusedDescription() {
+        const desc=document.getElementById("focusedTaskDescription");
 
         if (desc) {
-            desc .value = "";
+            desc .value="";
             // clears the textarea
         }
     }
 
-    </script >
-
+    </script>
     /* ═══════════════════════════════════════════════════════
        PREMIUM KANBAN BOARD — INDUSTRY STANDARD UI
        ═══════════════════════════════════════════════════════ */
@@ -353,12 +356,14 @@
     .board-top-bar {
         padding: 10px 0;
     }
+
     .board-title {
         font-weight: 700;
         font-size: 20px;
         color: #1a1a2e;
         letter-spacing: -0.3px;
     }
+
     .btn-archive-glow {
         background: linear-gradient(135deg, #00C851, #007E33);
         color: #fff;
@@ -369,11 +374,13 @@
         padding: 6px 14px;
         transition: all 0.3s ease;
     }
+
     .btn-archive-glow:hover {
         box-shadow: 0 4px 15px rgba(0, 200, 81, 0.4);
         transform: translateY(-1px);
         color: #fff;
     }
+
     .btn-add-col {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: #fff;
@@ -384,11 +391,13 @@
         padding: 6px 14px;
         transition: all 0.3s ease;
     }
+
     .btn-add-col:hover {
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         transform: translateY(-1px);
         color: #fff;
     }
+
     .btn-import-excel {
         background: linear-gradient(135deg, #0d9488, #0891b2);
         color: #fff;
@@ -399,6 +408,7 @@
         padding: 6px 14px;
         transition: all 0.3s ease;
     }
+
     .btn-import-excel:hover {
         box-shadow: 0 4px 15px rgba(13, 148, 136, 0.4);
         transform: translateY(-1px);
@@ -413,23 +423,28 @@
         border: 1px solid #e8eaff;
         box-shadow: 0 2px 8px rgba(100, 100, 200, 0.06);
     }
+
     .search-input-group .input-group-text {
         background: transparent;
         border-right: 0;
         color: #667eea;
     }
+
     .search-input-group .form-control {
         border-left: 0;
         border-color: #ddd;
     }
+
     .search-input-group .form-control:focus {
         box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
         border-color: #667eea;
     }
+
     .filter-select {
         border-color: #ddd;
         font-size: 13px;
     }
+
     .filter-select:focus {
         box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
         border-color: #667eea;
@@ -444,13 +459,16 @@
         height: calc(100vh - 220px);
         scrollbar-width: thin;
     }
+
     .kanban-board::-webkit-scrollbar {
         height: 8px;
     }
+
     .kanban-board::-webkit-scrollbar-track {
         background: #f1f1f1;
         border-radius: 4px;
     }
+
     .kanban-board::-webkit-scrollbar-thumb {
         background: linear-gradient(135deg, #667eea, #764ba2);
         border-radius: 4px;
@@ -470,6 +488,7 @@
         transition: all 0.3s ease;
         overflow: visible !important;
     }
+
     .kanban-column:hover {
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
@@ -480,6 +499,7 @@
         border-width: 2px;
         background: #fffdf0;
     }
+
     .col-review .kanban-column-header {
         background: linear-gradient(135deg, #fff8e1, #fffdf5) !important;
         border-bottom-color: #ffe082;
@@ -490,6 +510,7 @@
         border-width: 2px;
         background: #f0fdf4;
     }
+
     .col-completed .kanban-column-header {
         background: linear-gradient(135deg, #e8f5e9, #f0fdf4) !important;
         border-bottom-color: #a5d6a7;
@@ -500,6 +521,7 @@
         border-width: 2px;
         background: #f5f5ff;
     }
+
     .col-history .kanban-column-body {
         background: #fafaff;
     }
@@ -518,10 +540,12 @@
         font-size: 14px;
         min-height: 48px;
     }
+
     .history-header {
         background: linear-gradient(135deg, #1a1a2e, #16213e) !important;
         color: #fff;
     }
+
     .history-header .column-title {
         color: #fff;
     }
@@ -565,8 +589,14 @@
         color: #aaa;
         transition: color 0.2s;
     }
-    .column-drag-handle:hover { color: #667eea; }
-    .column-drag-handle:active { cursor: grabbing; }
+
+    .column-drag-handle:hover {
+        color: #667eea;
+    }
+
+    .column-drag-handle:active {
+        cursor: grabbing;
+    }
 
     .header-icon-btn {
         border: none;
@@ -578,10 +608,12 @@
         color: #888;
         transition: all 0.2s;
     }
+
     .header-icon-btn:hover {
         background: rgba(102, 126, 234, 0.1);
         color: #667eea;
     }
+
     .header-icon-btn.text-danger:hover {
         background: rgba(255, 68, 68, 0.1);
         color: #ff4444;
@@ -609,7 +641,11 @@
         padding-right: 4px;
         scrollbar-width: thin;
     }
-    .kanban-tasks::-webkit-scrollbar { width: 5px; }
+
+    .kanban-tasks::-webkit-scrollbar {
+        width: 5px;
+    }
+
     .kanban-tasks::-webkit-scrollbar-thumb {
         background: #ccc;
         border-radius: 3px;
@@ -631,23 +667,30 @@
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
         overflow-wrap: anywhere;
     }
+
     .task-card:hover {
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
         transform: translateY(-2px);
         border-color: #d0d5dd;
     }
-    .task-card:active { cursor: grabbing; }
+
+    .task-card:active {
+        cursor: grabbing;
+    }
 
     /* ===== PRIORITY-COLORED LEFT BORDER ===== */
     .priority-low {
         border-left: 4px solid #6c757d;
     }
+
     .priority-medium {
         border-left: 4px solid #17a2b8;
     }
+
     .priority-high {
         border-left: 4px solid #ffc107;
     }
+
     .priority-critical {
         border-left: 4px solid #dc3545;
     }
@@ -674,16 +717,20 @@
         white-space: nowrap;
         flex-shrink: 0;
     }
+
     .priority-pill.priority-low {
         background: linear-gradient(135deg, #868e96, #6c757d);
     }
+
     .priority-pill.priority-medium {
         background: linear-gradient(135deg, #33b5e5, #17a2b8);
     }
+
     .priority-pill.priority-high {
         background: linear-gradient(135deg, #ffbb33, #f0ad4e);
         color: #333;
     }
+
     .priority-pill.priority-critical {
         background: linear-gradient(135deg, #ff4444, #dc3545);
     }
@@ -702,16 +749,19 @@
         flex-shrink: 0;
         animation: badgePop 0.4s ease-out;
     }
+
     .review-badge-fail {
         background: linear-gradient(135deg, #ff4444, #cc0000);
         color: #fff;
         box-shadow: 0 2px 8px rgba(255, 68, 68, 0.3);
     }
+
     .review-badge-pass {
         background: linear-gradient(135deg, #00C851, #007E33);
         color: #fff;
         box-shadow: 0 2px 8px rgba(0, 200, 81, 0.3);
     }
+
     .review-badge-pending {
         background: linear-gradient(135deg, #ffbb33, #FF8800);
         color: #fff;
@@ -720,13 +770,31 @@
     }
 
     @@keyframes badgePop {
-        0% { transform: scale(0.8); opacity: 0; }
-        60% { transform: scale(1.08); }
-        100% { transform: scale(1); opacity: 1; }
+        0% {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+
+        60% {
+            transform: scale(1.08);
+        }
+
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
     }
+
     @@keyframes pendingPulse {
-        0%, 100% { box-shadow: 0 2px 8px rgba(255, 187, 51, 0.3); }
-        50% { box-shadow: 0 2px 16px rgba(255, 187, 51, 0.6); }
+
+        0%,
+        100% {
+            box-shadow: 0 2px 8px rgba(255, 187, 51, 0.3);
+        }
+
+        50% {
+            box-shadow: 0 2px 16px rgba(255, 187, 51, 0.6);
+        }
     }
 
     /* ===== TASK ID CHIP ===== */
@@ -746,6 +814,7 @@
         user-select: all;
         transition: background 0.2s;
     }
+
     .task-id-chip:hover {
         background: rgba(102, 126, 234, 0.15);
         border-color: rgba(102, 126, 234, 0.4);
@@ -757,7 +826,7 @@
         font-size: 14px;
         color: #1a1a2e;
         line-height: 1.3;
-        word-break: break-word; 
+        word-break: break-word;
     }
 
     /* ===== TASK DESCRIPTION ===== */
@@ -784,6 +853,7 @@
         background: #fff8f8;
         border-color: #ffcdd2;
     }
+
     .task-passed {
         background: #f8fff8;
         border-color: #c8e6c9;
@@ -795,7 +865,10 @@
         color: #888;
         line-height: 1.6;
     }
-    .task-meta i { color: #aaa; }
+
+    .task-meta i {
+        color: #aaa;
+    }
 
     /* ===== CUSTOM FIELDS ===== */
     .custom-fields-summary {
@@ -804,10 +877,12 @@
         padding: 6px 10px;
         border: 1px solid #e8eaff;
     }
+
     .cf-row {
         font-size: 12px;
         margin-bottom: 2px;
     }
+
     .cf-label {
         font-weight: 600;
         color: #555;
@@ -821,9 +896,11 @@
         font-size: 12px;
         border: 1px solid #d0e4ff;
     }
+
     .assigned-row {
         margin-bottom: 2px;
     }
+
     .assigned-row .label {
         color: #888;
         font-size: 11px;
@@ -835,6 +912,7 @@
         gap: 4px;
         flex-wrap: wrap;
     }
+
     .action-btn {
         font-size: 11px;
         font-weight: 600;
@@ -849,22 +927,77 @@
         background: #f5f5f5;
         color: #555;
     }
+
     .action-btn:hover {
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
-    .action-btn-info { background: #e8f4ff; color: #0d6efd; border-color: #cce5ff; }
-    .action-btn-info:hover { background: #0d6efd; color: #fff; }
-    .action-btn-secondary { background: #f0f0f0; color: #555; border-color: #ddd; }
-    .action-btn-secondary:hover { background: #6c757d; color: #fff; }
-    .action-btn-warning { background: #fff8e1; color: #e65100; border-color: #ffe082; }
-    .action-btn-warning:hover { background: #ff9800; color: #fff; }
-    .action-btn-success { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
-    .action-btn-success:hover { background: #28a745; color: #fff; }
-    .action-btn-edit { background: #fff3e0; color: #f57c00; border-color: #ffe0b2; }
-    .action-btn-edit:hover { background: #ff9800; color: #fff; }
-    .action-btn-danger { background: #ffebee; color: #c62828; border-color: #ffcdd2; }
-    .action-btn-danger:hover { background: #f44336; color: #fff; }
+
+    .action-btn-info {
+        background: #e8f4ff;
+        color: #0d6efd;
+        border-color: #cce5ff;
+    }
+
+    .action-btn-info:hover {
+        background: #0d6efd;
+        color: #fff;
+    }
+
+    .action-btn-secondary {
+        background: #f0f0f0;
+        color: #555;
+        border-color: #ddd;
+    }
+
+    .action-btn-secondary:hover {
+        background: #6c757d;
+        color: #fff;
+    }
+
+    .action-btn-warning {
+        background: #fff8e1;
+        color: #e65100;
+        border-color: #ffe082;
+    }
+
+    .action-btn-warning:hover {
+        background: #ff9800;
+        color: #fff;
+    }
+
+    .action-btn-success {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border-color: #c8e6c9;
+    }
+
+    .action-btn-success:hover {
+        background: #28a745;
+        color: #fff;
+    }
+
+    .action-btn-edit {
+        background: #fff3e0;
+        color: #f57c00;
+        border-color: #ffe0b2;
+    }
+
+    .action-btn-edit:hover {
+        background: #ff9800;
+        color: #fff;
+    }
+
+    .action-btn-danger {
+        background: #ffebee;
+        color: #c62828;
+        border-color: #ffcdd2;
+    }
+
+    .action-btn-danger:hover {
+        background: #f44336;
+        color: #fff;
+    }
 
     /* ===== PREMIUM ASSIGN PANEL ===== */
     .task-assign-panel {
@@ -873,9 +1006,10 @@
         border-radius: 10px;
         padding: 12px;
         margin-top: 10px;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.05);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(0, 0, 0, 0.05);
         animation: panelSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
     .assign-panel-header {
         font-size: 11px;
         font-weight: 700;
@@ -883,15 +1017,18 @@
         color: #667eea;
         letter-spacing: 0.5px;
     }
+
     .task-assign-select {
         border-radius: 8px;
         font-size: 13px;
         border-color: #d1d9e6;
     }
+
     .task-assign-select:focus {
         border-color: #667eea;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
     }
+
     .btn-xs {
         padding: 4px 10px;
         font-size: 11px;
@@ -900,8 +1037,15 @@
     }
 
     @@keyframes panelSlideIn {
-        from { opacity: 0; transform: translateY(-8px); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+            opacity: 0;
+            transform: translateY(-8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     /* ===== HISTORY TASK CARDS ===== */
@@ -918,21 +1062,25 @@
         gap: 6px;
         overflow-wrap: anywhere;
     }
+
     .history-task-card:hover {
         background: linear-gradient(135deg, #e8eaff, #fff);
         box-shadow: 0 4px 12px rgba(100, 100, 255, 0.15);
         transform: translateY(-2px);
     }
+
     .history-task-title {
         font-weight: 700;
         font-size: 13px;
         color: #1a1a2e;
         word-break: break-word;
     }
+
     .history-task-meta {
         font-size: 11px;
         color: #666;
     }
+
     .history-completed-badge {
         display: inline-flex;
         align-items: center;
@@ -960,6 +1108,7 @@
         gap: 6px;
         align-items: center;
     }
+
     .column-title-input {
         width: 100%;
         font-size: 14px;
@@ -968,9 +1117,22 @@
         border: 1px solid #667eea;
         outline: none;
     }
-    .icon-btn { border: none; background: transparent; cursor: pointer; font-size: 14px; padding: 2px; }
-    .save-btn { color: #28a745; }
-    .cancel-btn { color: #dc3545; }
+
+    .icon-btn {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 2px;
+    }
+
+    .save-btn {
+        color: #28a745;
+    }
+
+    .cancel-btn {
+        color: #dc3545;
+    }
 
     /* ===== DRAG OVER STATES ===== */
     .kanban-column.drag-over {
@@ -979,33 +1141,52 @@
         box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2) !important;
         transition: all 0.2s ease;
     }
+
     .kanban-column.drag-blocked {
         background: #ffebee !important;
         border-color: #f44336 !important;
         box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.2) !important;
         cursor: not-allowed !important;
     }
+
     .task-ghost {
         opacity: 0.4;
         background: #e8eaff !important;
     }
+
     .task-chosen {
         box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3) !important;
         transform: rotate(2deg);
     }
+
     .sortable-ghost {
         opacity: 0.4;
         background: #e8eaff !important;
     }
 
     /* ===== SINGLE COLUMN VIEW ===== */
-    .single-column-view { overflow-x: hidden; }
-    .focused-column { min-width: 100% !important; max-width: 100% !important; }
-    .hidden-column { display: none !important; }
+    .single-column-view {
+        overflow-x: hidden;
+    }
+
+    .focused-column {
+        min-width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .hidden-column {
+        display: none !important;
+    }
 
     /* ===== TASK FOCUS MODE ===== */
-    .task-focused-view .kanban-column { display: none; }
-    .task-focused-view .task-card { display: none; }
+    .task-focused-view .kanban-column {
+        display: none;
+    }
+
+    .task-focused-view .task-card {
+        display: none;
+    }
+
     .task-focused-view .task-card.focused-task {
         display: block;
         max-width: 1000px;
@@ -1013,8 +1194,9 @@
         font-size: 16px;
         padding: 24px;
     }
+
     .focused-task {
-        box-shadow: 0 0 0 1px #e0e0e0, 0 10px 40px rgba(0,0,0,0.12);
+        box-shadow: 0 0 0 1px #e0e0e0, 0 10px 40px rgba(0, 0, 0, 0.12);
         border-radius: 14px;
         background: #fff;
         min-height: 60vh;
@@ -1024,11 +1206,30 @@
         flex-direction: column;
         overflow-y: auto;
     }
-    .focused-task strong { font-size: 22px; margin-bottom: 12px; display: block; }
-    .focused-task .small { font-size: 15px; }
-    .focused-task .text-muted { margin-bottom: 16px; }
-    .focused-task-panel { max-width: 700px; margin: 20px auto; }
-    .task-focused-view .kanban-column, .task-focused-view .task-card { display: none; }
+
+    .focused-task strong {
+        font-size: 22px;
+        margin-bottom: 12px;
+        display: block;
+    }
+
+    .focused-task .small {
+        font-size: 15px;
+    }
+
+    .focused-task .text-muted {
+        margin-bottom: 16px;
+    }
+
+    .focused-task-panel {
+        max-width: 700px;
+        margin: 20px auto;
+    }
+
+    .task-focused-view .kanban-column,
+    .task-focused-view .task-card {
+        display: none;
+    }
 
     .task-card.editing {
         border: 2px solid #667eea;
@@ -1036,7 +1237,9 @@
     }
 
     /* ===== DROPDOWN FIX ===== */
-    .dropdown-menu { z-index: 1050; }
+    .dropdown-menu {
+        z-index: 1050;
+    }
 
     /* ===== RESPONSIVE ===== */
     @@media (max-width: 768px) {
@@ -1044,6 +1247,7 @@
             min-width: 280px;
             max-width: 280px;
         }
+
         .board-top-bar {
             flex-wrap: wrap;
         }
@@ -1053,12 +1257,36 @@
             flex-shrink: 0;
             user-select: none;
         }
-        .bg-soft-primary { background-color: rgba(13, 110, 253, 0.1); color: #0d6efd; }
-        .bg-soft-danger { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
-        .bg-soft-info { background-color: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
-        .bg-soft-success { background-color: rgba(25, 135, 84, 0.1); color: #198754; }
-        .bg-soft-warning { background-color: rgba(255, 193, 7, 0.1); color: #ffc107; }
-        .bg-soft-secondary { background-color: rgba(108, 117, 125, 0.1); color: #6c757d; }
+
+        .bg-soft-primary {
+            background-color: rgba(13, 110, 253, 0.1);
+            color: #0d6efd;
+        }
+
+        .bg-soft-danger {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #dc3545;
+        }
+
+        .bg-soft-info {
+            background-color: rgba(13, 202, 240, 0.1);
+            color: #0dcaf0;
+        }
+
+        .bg-soft-success {
+            background-color: rgba(25, 135, 84, 0.1);
+            color: #198754;
+        }
+
+        .bg-soft-warning {
+            background-color: rgba(255, 193, 7, 0.1);
+            color: #ffc107;
+        }
+
+        .bg-soft-secondary {
+            background-color: rgba(108, 117, 125, 0.1);
+            color: #6c757d;
+        }
 
         #permissionTable thead th {
             font-size: 0.75rem;
@@ -1071,6 +1299,7 @@
             height: 1.25em;
             cursor: pointer;
         }
+
         .form-switch .form-check-input:checked {
             background-color: #0dcaf0;
             border-color: #0dcaf0;
@@ -1079,14 +1308,28 @@
 </style>
 
 <script>
-    (function() {
+    (function () {
         // Load history tasks
         if (typeof loadArchivedTasks === 'function') {
             loadArchivedTasks('@Model.TeamName');
         }
-        
+
         // Sync current team name
         window.currentTeamName = '@Model.TeamName';
+
+        // Default Filter for Sub-Managers: show only their tasks by default
+        const myId = window.currentUserId;
+        const rolesMap = window.userRolesMap || {};
+        const myRole = rolesMap[myId];
+
+        if (myRole === "Sub Manager" || myRole === "Sub-Manager") {
+            const assigneeFilter = document.getElementById('assigneeFilter');
+            if (assigneeFilter) {
+                assigneeFilter.value = myId;
+                if (typeof filterBoardTasks === 'function') {
+                    filterBoardTasks();
+                }
+            }
+        }
     })();
 </script>
-
