@@ -2168,7 +2168,7 @@
         }
 
         // Validate custom fields
-        if (typeof validateCustomFields === 'function' && !validateCustomFields()) {
+        if (typeof validateCustomFields === 'function' && !validateCustomFields('editCustomFieldsContainer')) {
             return;
         }
 
@@ -2257,6 +2257,11 @@
             dueDate: dueDateVal || null,
             customFieldValues: (typeof collectCustomFieldValues === 'function') ? collectCustomFieldValues('customFieldsContainer') : {}
         };
+
+        // Validate custom fields
+        if (typeof validateCustomFields === 'function' && !validateCustomFields('customFieldsContainer')) {
+            return;
+        }
 
         fetch('/Tasks/CreateTask', {
             method: 'POST',

@@ -27,6 +27,7 @@ namespace UserRoles.ViewModels
         public int EpicId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public string? AssignedToUserId { get; set; }
     }
 
     public class CreateStoryRequest
@@ -34,6 +35,15 @@ namespace UserRoles.ViewModels
         public int FeatureId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public string? AssignedToUserId { get; set; }
+    }
+
+    public class ProjectMemberViewModel
+    {
+        public string UserId { get; set; } = string.Empty;
+        public string? Name { get; set; }
+        public string? Email { get; set; }
+        public string? Role { get; set; }
     }
 
     public class CreateProjectTaskRequest
@@ -41,6 +51,13 @@ namespace UserRoles.ViewModels
         public int StoryId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
+    }
+
+    public class AddProjectMemberRequest
+    {
+        public int ProjectId { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public string? Role { get; set; }
     }
 
     public class MoveWorkItemRequest

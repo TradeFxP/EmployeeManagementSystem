@@ -15,6 +15,9 @@ namespace UserRoles.Models
         // Navigation - Epics under this project
         public ICollection<Epic> Epics { get; set; } = new List<Epic>();
 
+        // Navigation - Project Members
+        public ICollection<ProjectMember> Members { get; set; } = new List<ProjectMember>();
+
         // Navigation - Direct tasks (for team tasks linked to project)
         public ICollection<TaskItem> Tasks { get; set; } = new List<TaskItem>();
     }

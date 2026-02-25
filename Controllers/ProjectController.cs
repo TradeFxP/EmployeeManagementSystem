@@ -24,10 +24,21 @@ namespace UserRoles.Controllers
         [HttpGet]
         public async Task<IActionResult> Index()
         {
-            var projects = await _context.Projects
-                .Include(p => p.CreatedByUser)
-                .OrderByDescending(p => p.CreatedAt)
-                .ToListAsync();
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Unauthorized();
+
+            var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+
+            IQueryable<Project> query = _context.Projects
+                .Include(p => p.CreatedByUser);
+
+            if (!isAdmin)
+            {
+                // Only show projects where user is a member or creator
+                query = query.Where(p => p.CreatedByUserId == user.Id || p.Members.Any(m => m.UserId == user.Id));
+            }
+
+            var projects = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
 
             return View(projects);
         }
@@ -36,7 +47,13 @@ namespace UserRoles.Controllers
         [HttpGet]
         public async Task<IActionResult> Board(int id)
         {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Unauthorized();
+
+            var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+
             var project = await _context.Projects
+                .Include(p => p.Members).ThenInclude(m => m.User)
                 .Include(p => p.Epics.OrderBy(e => e.Order))
                     .ThenInclude(e => e.Features.OrderBy(f => f.Order))
                         .ThenInclude(f => f.Stories.OrderBy(s => s.Order))
@@ -45,6 +62,12 @@ namespace UserRoles.Controllers
 
             if (project == null)
                 return NotFound();
+
+            // Check access
+            if (!isAdmin && project.CreatedByUserId != user.Id && !project.Members.Any(m => m.UserId == user.Id))
+            {
+                return Forbid();
+            }
 
             var vm = new ProjectBoardViewModel
             {
@@ -159,7 +182,8 @@ namespace UserRoles.Controllers
                 EpicId = model.EpicId,
                 Order = featureCount + 1,
                 CreatedAt = DateTime.UtcNow,
-                CreatedByUserId = user.Id
+                CreatedByUserId = user.Id,
+                AssignedToUserId = model.AssignedToUserId
             };
 
             _context.Features.Add(feature);
@@ -200,7 +224,8 @@ namespace UserRoles.Controllers
                 FeatureId = model.FeatureId,
                 Order = storyCount + 1,
                 CreatedAt = DateTime.UtcNow,
-                CreatedByUserId = user.Id
+                CreatedByUserId = user.Id,
+                AssignedToUserId = model.AssignedToUserId
             };
 
             _context.Stories.Add(story);
@@ -519,6 +544,70 @@ namespace UserRoles.Controllers
             await _context.SaveChangesAsync();
             return Ok();
         }
+        // ==================== MEMBERS = [NEW] ====================
+        [HttpGet]
+        public async Task<IActionResult> GetProjectMembers(int projectId)
+        {
+            var project = await _context.Projects
+                .Include(p => p.Members).ThenInclude(m => m.User)
+                .FirstOrDefaultAsync(p => p.Id == projectId);
+
+            if (project == null) return NotFound();
+
+            var members = project.Members.Select(m => new ProjectMemberViewModel
+            {
+                UserId = m.UserId,
+                Name = m.User?.Name ?? m.User?.UserName,
+                Email = m.User?.Email,
+                Role = m.ProjectRole
+            }).ToList();
+
+            return Json(members);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> AddMemberToProject([FromBody] AddProjectMemberRequest model)
+        {
+            var project = await _context.Projects.FindAsync(model.ProjectId);
+            if (project == null) return NotFound();
+
+            var user = await _userManager.FindByIdAsync(model.UserId);
+            if (user == null) return BadRequest("User not found");
+
+            // Check if already a member
+            if (await _context.ProjectMembers.AnyAsync(m => m.ProjectId == model.ProjectId && m.UserId == model.UserId))
+                return BadRequest("User is already a member of this project");
+
+            var member = new ProjectMember
+            {
+                ProjectId = model.ProjectId,
+                UserId = model.UserId,
+                ProjectRole = model.Role ?? "Contributor",
+                AddedAt = DateTime.UtcNow
+            };
+
+            _context.ProjectMembers.Add(member);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true });
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin,Manager")]
+        public async Task<IActionResult> RemoveMemberFromProject([FromBody] AddProjectMemberRequest model)
+        {
+            var member = await _context.ProjectMembers
+                .FirstOrDefaultAsync(m => m.ProjectId == model.ProjectId && m.UserId == model.UserId);
+
+            if (member == null) return NotFound();
+
+            _context.ProjectMembers.Remove(member);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true });
+        }
+
         // ==================== DELETE PROJECT ====================
         [HttpPost]
         [Authorize(Roles = "Admin")]

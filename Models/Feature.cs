@@ -22,6 +22,10 @@ namespace UserRoles.Models
         public string? CreatedByUserId { get; set; }
         public Users? CreatedByUser { get; set; }
 
+        // Assigned to
+        public string? AssignedToUserId { get; set; }
+        public Users? AssignedToUser { get; set; }
+
         // Navigation - Stories under this Feature
         public ICollection<Story> Stories { get; set; } = new List<Story>();
     }
