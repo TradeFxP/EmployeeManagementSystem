@@ -529,14 +529,36 @@
                                 <option value="">-- Unassigned --</option>
                                 @if (Model != null && Model.AssignableUsers != null)
                                 {
-                                    var managementUsers = Model.AssignableUsers.Where(u => Model.UserRolesMap.ContainsKey(u.Id) && 
-                                        (Model.UserRolesMap[u.Id] == "Admin" || Model.UserRolesMap[u.Id] == "Manager" || Model.UserRolesMap[u.Id] == "Sub-Manager")).ToList();
-                                    var regularMembers = Model.AssignableUsers.Except(managementUsers).ToList();
+                                    var isViewerSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
+                                    var isViewerManager = User.IsInRole("Manager");
+                                    var isViewerAdmin = User.IsInRole("Admin");
 
-                                    @if (managementUsers.Any())
+                                    var filteredManagement = Model.AssignableUsers.Where(u => {
+                                        if (!Model.UserRolesMap.ContainsKey(u.Id)) return false;
+                                        var r = Model.UserRolesMap[u.Id];
+                                        var isTargetAdmin = r == "Admin";
+                                        var isTargetManager = r == "Manager";
+                                        var isTargetSubManager = r == "Sub-Manager" || r == "SubManager";
+
+                                        if (!isTargetAdmin && !isTargetManager && !isTargetSubManager) return false;
+
+                                        if (isViewerSubManager) return isTargetSubManager;
+                                        if (isViewerManager) return isTargetManager || isTargetSubManager;
+                                        return true;
+                                    }).ToList();
+
+                                    var filteredRegular = Model.AssignableUsers.Where(u => {
+                                        if (Model.UserRolesMap.ContainsKey(u.Id)) {
+                                            var r = Model.UserRolesMap[u.Id];
+                                            if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
+                                        }
+                                        return true;
+                                    }).ToList();
+
+                                    @if (filteredManagement.Any())
                                     {
                                         <optgroup label="Management">
-                                            @foreach (var u in managementUsers)
+                                            @foreach (var u in filteredManagement)
                                             {
                                                 var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
                                                 <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
@@ -544,12 +566,13 @@
                                         </optgroup>
                                     }
 
-                                    @if (regularMembers.Any())
+                                    @if (filteredRegular.Any())
                                     {
                                         <optgroup label="Team Members">
-                                            @foreach (var u in regularMembers)
+                                            @foreach (var u in filteredRegular)
                                             {
-                                                <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                                var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
+                                                <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                                             }
                                         </optgroup>
                                     }
@@ -596,14 +619,36 @@
                         <option value="">-- Select User --</option>
                         @if (Model != null && Model.AssignableUsers != null && Model.AssignableUsers.Any())
                         {
-                            var managementUsers = Model.AssignableUsers.Where(u => Model.UserRolesMap.ContainsKey(u.Id) && 
-                                (Model.UserRolesMap[u.Id] == "Admin" || Model.UserRolesMap[u.Id] == "Manager" || Model.UserRolesMap[u.Id] == "Sub-Manager")).ToList();
-                            var regularMembers = Model.AssignableUsers.Except(managementUsers).ToList();
+                            var isViewerSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
+                            var isViewerManager = User.IsInRole("Manager");
+                            var isViewerAdmin = User.IsInRole("Admin");
 
-                            @if (managementUsers.Any())
+                            var filteredManagement = Model.AssignableUsers.Where(u => {
+                                if (!Model.UserRolesMap.ContainsKey(u.Id)) return false;
+                                var r = Model.UserRolesMap[u.Id];
+                                var isTargetAdmin = r == "Admin";
+                                var isTargetManager = r == "Manager";
+                                var isTargetSubManager = r == "Sub-Manager" || r == "SubManager";
+
+                                if (!isTargetAdmin && !isTargetManager && !isTargetSubManager) return false;
+
+                                if (isViewerSubManager) return isTargetSubManager;
+                                if (isViewerManager) return isTargetManager || isTargetSubManager;
+                                return true;
+                            }).ToList();
+
+                            var filteredRegular = Model.AssignableUsers.Where(u => {
+                                if (Model.UserRolesMap.ContainsKey(u.Id)) {
+                                    var r = Model.UserRolesMap[u.Id];
+                                    if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
+                                }
+                                return true;
+                            }).ToList();
+
+                            @if (filteredManagement.Any())
                             {
                                 <optgroup label="Management">
-                                    @foreach (var u in managementUsers)
+                                    @foreach (var u in filteredManagement)
                                     {
                                         var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
                                         <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
@@ -611,12 +656,13 @@
                                 </optgroup>
                             }
 
-                            @if (regularMembers.Any())
+                            @if (filteredRegular.Any())
                             {
                                 <optgroup label="Team Members">
-                                    @foreach (var u in regularMembers)
+                                    @foreach (var u in filteredRegular)
                                     {
-                                        <option value="@u.Id">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                        var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
+                                        <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                                     }
                                 </optgroup>
                             }

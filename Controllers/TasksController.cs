@@ -246,10 +246,17 @@ public class TasksController : Controller
         {
             // Cross-team assignment: move task to target user's team
             var newTeam = targetUserTeam.TeamName;
-            var targetColumn = await _context.TeamColumns
+            var targetColumn = (await _context.TeamColumns
                 .Where(c => c.TeamName == newTeam)
-                .OrderBy(c => c.Order)
-                .FirstOrDefaultAsync();
+                .ToListAsync())
+                .OrderBy(c =>
+                {
+                    var name = c.ColumnName?.Trim().ToLower();
+                    if (name == "review") return 1000;
+                    if (name == "completed") return 1001;
+                    return c.Order;
+                })
+                .FirstOrDefault();
 
             if (targetColumn != null)
             {
@@ -762,11 +769,8 @@ public class TasksController : Controller
             .ToList();
 
         // ✅ 3. Define Assignable Users (Who can be assigned tasks)
-        // Includes team members AND anyone with a management role (Admin, Manager, Sub-Manager)
-        assignableUsers = @allUsers.Where(u =>
-            teamUserIds.Contains(u.Id) ||
-            (allUserRoles.ContainsKey(u.Id) && (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
-        ).ToList();
+        // Pass ALL users to the view; visibility will be handled by the view logic based on role hierarchy
+        assignableUsers = allUsers;
 
         // Get all team names for the assignment dropdown
         var allTeamNames = await _context.TeamColumns
@@ -1439,10 +1443,17 @@ public class TasksController : Controller
         }
 
         // 1. Find the FIRST column for the target team
-        var targetColumn = await _context.TeamColumns
+        var targetColumn = (await _context.TeamColumns
             .Where(c => c.TeamName == model.TeamName)
-            .OrderBy(c => c.Order)
-            .FirstOrDefaultAsync();
+            .ToListAsync())
+            .OrderBy(c =>
+            {
+                var name = c.ColumnName?.Trim().ToLower();
+                if (name == "review") return 1000;
+                if (name == "completed") return 1001;
+                return c.Order;
+            })
+            .FirstOrDefault();
 
         if (targetColumn == null)
             return BadRequest($"No columns found for team '{model.TeamName}'. Create columns first.");
