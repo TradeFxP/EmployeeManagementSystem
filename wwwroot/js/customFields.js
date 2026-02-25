@@ -352,30 +352,47 @@ function collectCustomFieldValues(containerId = 'customFieldsContainer') {
 
 // Validate required custom fields
 function validateCustomFields(containerId = 'customFieldsContainer') {
-    if (!window.customFieldsCache) return true;
-
-    // We can't easily rely on just cache because we need to check if the field exists in the SPECIFIC container
-    // But for now, let's just check the inputs inside the container
-
     const container = document.getElementById(containerId);
     if (!container) return true;
 
-    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
-    const cacheKey = team ? `fields_${team}` : 'fields_default';
-    const fields = window.customFieldsCache ? window.customFieldsCache[cacheKey] : null;
-    if (!fields) return true;
+    // We rely on data-required="true" and data-field-id attributes set during render
+    // Since images might have multiple hidden inputs for same ID, we group by ID
+    const requiredInputs = container.querySelectorAll('[data-required="true"]');
 
-    for (const field of fields) {
-        if (field.isRequired) {
-            // Find input within the container
-            const input = container.querySelector(`[data-field-id="${field.id}"]`);
+    // Track which field IDs have at least one value
+    const fieldValuesMap = {};
+    const fieldNamesMap = {};
 
-            // If input exists in this form and is required
-            if (input && !input.value.trim()) {
-                alert(`${field.fieldName} is required`);
-                input.focus();
-                return false;
+    requiredInputs.forEach(input => {
+        const fieldId = input.dataset.fieldId;
+        const fieldName = input.closest('.mb-3')?.querySelector('label')?.innerText.replace(' *', '') || `Field ${fieldId}`;
+
+        if (!fieldValuesMap[fieldId]) {
+            fieldValuesMap[fieldId] = [];
+            fieldNamesMap[fieldId] = fieldName;
+        }
+
+        if (input.value && input.value.trim() !== "") {
+            fieldValuesMap[fieldId].push(input.value.trim());
+        }
+    });
+
+    // Check if any required field has zero values
+    for (const fieldId in fieldValuesMap) {
+        if (fieldValuesMap[fieldId].length === 0) {
+            const fieldName = fieldNamesMap[fieldId];
+            if (typeof showToast === 'function') {
+                showToast(`${fieldName} is required`, 'warning');
+            } else {
+                alert(`${fieldName} is required`);
             }
+
+            // Try to focus the first input for this field
+            const firstInput = container.querySelector(`[data-field-id="${fieldId}"]`);
+            if (firstInput && typeof firstInput.focus === 'function') {
+                firstInput.focus();
+            }
+            return false;
         }
     }
 

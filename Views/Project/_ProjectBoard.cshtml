@@ -1,5 +1,11 @@
 @using UserRoles.ViewModels
+@using Microsoft.AspNetCore.Identity
+@using UserRoles.Models
 @model ProjectBoardViewModel
+@inject UserManager<Users> UserManager
+@{
+    var currentUser = await UserManager.GetUserAsync(User);
+}
 
 <div class="project-board-header d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex align-items-center gap-3">
@@ -14,12 +20,20 @@
         </h4>
     </div>
 
-    @if (User.IsInRole("Admin"))
-    {
-        <button class="btn btn-sm btn-primary" onclick="openCreateEpicModal()">
-            <i class="bi bi-plus-lg me-1"></i> Add Epic
-        </button>
-    }
+    <div class="d-flex align-items-center gap-2">
+        @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+        {
+            <button class="btn btn-sm btn-outline-info" onclick="openManageMembersModal(@Model.Project?.Id)">
+                <i class="bi bi-people me-1"></i> Members
+            </button>
+        }
+        @if (User.IsInRole("Admin"))
+        {
+            <button class="btn btn-sm btn-primary" onclick="openCreateEpicModal()">
+                <i class="bi bi-plus-lg me-1"></i> Add Epic
+            </button>
+        }
+    </div>
 </div>
 
 <!-- SEARCH BAR -->
@@ -65,6 +79,12 @@
                             <span class="work-item-badge epic-badge">@epic.WorkItemId</span>
                             <span class="expand-arrow" id="epicArrow-@epic.Id">▼</span>
                             <strong class="work-item-title">@epic.Title</strong>
+                            @if (epic.CreatedByUser != null)
+                            {
+                                <span class="badge bg-light text-dark ms-2 border" title="Created by">
+                                    <i class="bi bi-person me-1"></i>@(epic.CreatedByUser.Name ?? epic.CreatedByUser.UserName)
+                                </span>
+                            }
                         </div>
                         <div class="work-item-actions" onclick="event.stopPropagation()">
                             <button class="btn btn-sm btn-outline-primary" 
@@ -113,13 +133,22 @@
                                             <span class="work-item-badge feature-badge">@feature.WorkItemId</span>
                                             <span class="expand-arrow" id="featureArrow-@feature.Id">▼</span>
                                             <strong class="work-item-title">@feature.Title</strong>
+                                            @if (feature.AssignedToUser != null)
+                                            {
+                                                <span class="badge bg-info text-white ms-2" title="Assigned to">
+                                                    <i class="bi bi-person-fill me-1"></i>@(feature.AssignedToUser.Name ?? feature.AssignedToUser.UserName)
+                                                </span>
+                                            }
                                         </div>
                                         <div class="work-item-actions" onclick="event.stopPropagation()">
-                                            <button class="btn btn-sm btn-outline-success" 
-                                                    onclick="openCreateStoryModal(@feature.Id, '@feature.WorkItemId')" 
-                                                    title="Add Story">
-                                                <i class="bi bi-plus-lg"></i>
-                                            </button>
+                                            @if (User.IsInRole("Admin") || feature.AssignedToUserId == currentUser?.Id)
+                                            {
+                                                <button class="btn btn-sm btn-outline-success" 
+                                                        onclick="openCreateStoryModal(@feature.Id, '@feature.WorkItemId')" 
+                                                        title="Add Story">
+                                                    <i class="bi bi-plus-lg"></i>
+                                                </button>
+                                            }
                                             <button class="btn btn-sm btn-outline-secondary" 
                                                     data-id="@feature.Id"
                                                     data-title="@feature.Title"
@@ -161,13 +190,22 @@
                                                             <span class="work-item-badge story-badge">@story.WorkItemId</span>
                                                             <span class="expand-arrow" id="storyArrow-@story.Id">▼</span>
                                                             <strong class="work-item-title">@story.Title</strong>
+                                                            @if (story.AssignedToUser != null)
+                                                            {
+                                                                <span class="badge bg-success text-white ms-2" title="Assigned to">
+                                                                    <i class="bi bi-person-fill me-1"></i>@(story.AssignedToUser.Name ?? story.AssignedToUser.UserName)
+                                                                </span>
+                                                            }
                                                         </div>
                                                         <div class="work-item-actions" onclick="event.stopPropagation()">
-                                                            <button class="btn btn-sm btn-outline-secondary" 
-                                                                    onclick="openCreateProjectTaskModal(@story.Id, '@story.WorkItemId')" 
-                                                                    title="Add Task">
-                                                                <i class="bi bi-plus-lg"></i>
-                                                            </button>
+                                                            @if (User.IsInRole("Admin") || story.AssignedToUserId == currentUser?.Id)
+                                                            {
+                                                                <button class="btn btn-sm btn-outline-secondary" 
+                                                                        onclick="openCreateProjectTaskModal(@story.Id, '@story.WorkItemId')" 
+                                                                        title="Add Task">
+                                                                    <i class="bi bi-plus-lg"></i>
+                                                                </button>
+                                                            }
                                                             <button class="btn btn-sm btn-outline-secondary" 
                                                                     data-id="@story.Id"
                                                                     data-title="@story.Title"
@@ -311,6 +349,16 @@
                     <input type="text" id="featureTitle" class="form-control form-control-lg" placeholder="Enter feature title" maxlength="200" />
                 </div>
                 <div class="mb-3">
+                    <label class="form-label fw-bold">Assign To</label>
+                    <select id="featureAssignee" class="form-select">
+                        <option value="">-- Unassigned --</option>
+                        @foreach (var user in Model.AssignableUsers)
+                        {
+                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
                     <label class="form-label fw-bold">Description</label>
                     <textarea id="featureDescription" class="form-control description-textarea" rows="5" placeholder="Optional description" maxlength="2000"></textarea>
                     <div class="form-text"><span id="featureDescChars">0</span>/2000 characters</div>
@@ -369,6 +417,16 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
                     <input type="text" id="storyTitle" class="form-control form-control-lg" placeholder="Enter story title" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Assign To</label>
+                    <select id="storyAssignee" class="form-select">
+                        <option value="">-- Unassigned --</option>
+                        @foreach (var user in Model.AssignableUsers)
+                        {
+                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                        }
+                    </select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Description</label>
@@ -469,6 +527,63 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button class="btn btn-warning" onclick="submitAssignTaskToTeam()">Assign Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MANAGE MEMBERS MODAL -->
+<div class="modal fade" id="manageMembersModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-people me-2"></i>Manage Project Members</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="memberProjectId" />
+                
+                <div class="row mb-4">
+                    <div class="col-md-7">
+                        <label class="form-label fw-bold">Add New Member</label>
+                        <select id="newMemberUserSelect" class="form-select">
+                            <option value="">Select a user...</option>
+                            @foreach (var user in Model.AssignableUsers)
+                            {
+                                <option value="@user.Id">@(user.Name ?? user.UserName) (@user.Email)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Role</label>
+                        <select id="newMemberRoleSelect" class="form-select">
+                            <option value="Contributor">Contributor</option>
+                            <option value="Viewer">Viewer</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-primary w-100" onclick="addProjectMember()">Add</button>
+                    </div>
+                </div>
+
+                <hr />
+
+                <label class="form-label fw-bold mb-3">Current Members</label>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projectMembersTableBody">
+                            <!-- Members loaded via JS -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -779,6 +894,80 @@
         new bootstrap.Modal(document.getElementById('createProjectTaskModal')).show();
     };
 
+    // ===== MEMBERSHIP JS =====
+    window.openManageMembersModal = function(projectId) {
+        document.getElementById('memberProjectId').value = projectId;
+        loadProjectMembers(projectId);
+        new bootstrap.Modal(document.getElementById('manageMembersModal')).show();
+    };
+
+    window.loadProjectMembers = function(projectId) {
+        fetch(`/Project/GetProjectMembers?projectId=${projectId}`)
+            .then(res => res.json())
+            .then(members => {
+                const tbody = document.getElementById('projectMembersTableBody');
+                tbody.innerHTML = '';
+                members.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${m.name}</td>
+                        <td>${m.email}</td>
+                        <td><span class="badge bg-info">${m.role}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeProjectMember('${m.userId}')">
+                                <i class="bi bi-person-x"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+    };
+
+    window.addProjectMember = function() {
+        const projectId = document.getElementById('memberProjectId').value;
+        const userId = document.getElementById('newMemberUserSelect').value;
+        const role = document.getElementById('newMemberRoleSelect').value;
+
+        if (!userId) {
+            showToast('Please select a user', 'warning');
+            return;
+        }
+
+        fetch('/Project/AddMemberToProject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId: parseInt(projectId), userId, role })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Member added successfully', 'success');
+                loadProjectMembers(projectId);
+            } else {
+                showToast(data.message || 'Error adding member', 'danger');
+            }
+        });
+    };
+
+    window.removeProjectMember = function(userId) {
+        if (!confirm('Are you sure you want to remove this member?')) return;
+        const projectId = document.getElementById('memberProjectId').value;
+
+        fetch('/Project/RemoveMemberFromProject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId: parseInt(projectId), userId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Member removed successfully', 'success');
+                loadProjectMembers(projectId);
+            }
+        });
+    };
+
     // ===== EDIT MODALS =====
     window.openEditEpicModal = function(id, title, description) {
         document.getElementById('editEpicId').value = id;
@@ -859,12 +1048,15 @@
 
     window.createFeature = function() {
         const title = document.getElementById('featureTitle').value.trim();
+        const description = document.getElementById('featureDescription').value.trim();
+        const assignedToUserId = document.getElementById('featureAssignee').value;
         if (!title) { alert('Title is required'); return; }
 
         const data = {
             epicId: parseInt(document.getElementById('featureEpicId').value),
             title: title,
-            description: document.getElementById('featureDescription').value.trim()
+            description: description,
+            assignedToUserId: assignedToUserId
         };
 
         fetch('/Project/CreateFeature', {
@@ -885,12 +1077,15 @@
 
     window.createStory = function() {
         const title = document.getElementById('storyTitle').value.trim();
+        const description = document.getElementById('storyDescription').value.trim();
+        const assignedToUserId = document.getElementById('storyAssignee').value;
         if (!title) { alert('Title is required'); return; }
 
         const data = {
             featureId: parseInt(document.getElementById('storyFeatureId').value),
             title: title,
-            description: document.getElementById('storyDescription').value.trim()
+            description: description,
+            assignedToUserId: assignedToUserId
         };
 
         fetch('/Project/CreateStory', {

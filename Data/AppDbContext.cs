@@ -21,6 +21,7 @@ namespace UserRoles.Data
 
         // Project Management Hierarchy
         public DbSet<Project> Projects { get; set; }
+        public DbSet<ProjectMember> ProjectMembers { get; set; }
         public DbSet<Epic> Epics { get; set; }
         public DbSet<Feature> Features { get; set; }
         public DbSet<Story> Stories { get; set; }
@@ -153,6 +154,33 @@ namespace UserRoles.Data
             builder.Entity<BoardPermission>()
                 .HasIndex(p => new { p.UserId, p.TeamName })
                 .IsUnique();
+
+            // Feature Assignment
+            builder.Entity<Feature>()
+                .HasOne(f => f.AssignedToUser)
+                .WithMany()
+                .HasForeignKey(f => f.AssignedToUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Story Assignment
+            builder.Entity<Story>()
+                .HasOne(s => s.AssignedToUser)
+                .WithMany()
+                .HasForeignKey(s => s.AssignedToUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Project Membership
+            builder.Entity<ProjectMember>()
+                .HasOne(pm => pm.Project)
+                .WithMany(p => p.Members)
+                .HasForeignKey(pm => pm.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<ProjectMember>()
+                .HasOne(pm => pm.User)
+                .WithMany()
+                .HasForeignKey(pm => pm.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }
