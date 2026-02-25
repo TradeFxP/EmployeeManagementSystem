@@ -666,6 +666,79 @@ public class TasksController : Controller
 
 
 
+    [HttpGet]
+    public async Task<IActionResult> AssignedTasksOverview(string team)
+    {
+        if (string.IsNullOrEmpty(team))
+            return BadRequest("Team name is required");
+
+        var tasks = await _context.TaskItems
+            .Include(t => t.AssignedByUser)
+            .Include(t => t.AssignedToUser)
+            .Where(t => t.TeamName == team && !t.IsArchived && t.AssignedToUserId != null)
+            .OrderByDescending(t => t.AssignedAt)
+            .ToListAsync();
+
+        // Fetch members of this team for the filter
+        var teamUserIds = await _context.UserTeams
+            .Where(ut => ut.TeamName == team)
+            .Select(ut => ut.UserId)
+            .ToListAsync();
+
+        // Fetch ALL teams and their members for the grouped filter
+        var allTeams = await _context.Teams.ToListAsync();
+        var groupedMembers = new List<dynamic>();
+
+        foreach (var t in allTeams)
+        {
+            var userIds = await _context.UserTeams
+                .Where(ut => ut.TeamName == t.Name)
+                .Select(ut => ut.UserId)
+                .ToListAsync();
+
+            var teamUsers = await _userManager.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToListAsync();
+
+            foreach (var u in teamUsers)
+            {
+                var roles = await _userManager.GetRolesAsync(u);
+                var primaryRole = roles.FirstOrDefault() ?? "User";
+                bool isManagement = roles.Contains("Admin") || roles.Contains("Manager") || roles.Contains("Sub-Manager") || roles.Contains("SubManager");
+
+                if (roles.Contains("Sub-Manager") || roles.Contains("SubManager") || (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId)))
+                    primaryRole = "Sub-Manager";
+                else if (roles.Contains("Admin"))
+                    primaryRole = "Admin";
+                else if (roles.Contains("Manager"))
+                    primaryRole = "Manager";
+
+                groupedMembers.Add(new
+                {
+                    TeamName = t.Name,
+                    u.Id,
+                    u.UserName,
+                    Name = u.Name ?? u.UserName,
+                    Role = primaryRole,
+                    Category = isManagement ? "Management" : "Team Members"
+                });
+            }
+        }
+
+        // Sort: Team Name, then Category (Management first), then Role Priority, then Name
+        var rolePriority = new Dictionary<string, int> { { "Admin", 1 }, { "Manager", 2 }, { "Sub-Manager", 3 }, { "User", 4 } };
+        var finalMemberList = groupedMembers
+            .OrderBy(m => (string)m.TeamName)
+            .ThenBy(m => (string)m.Category == "Management" ? 1 : 2)
+            .ThenBy(m => rolePriority.ContainsKey((string)m.Role) ? rolePriority[(string)m.Role] : 99)
+            .ThenBy(m => (string)m.Name)
+            .ToList();
+
+        ViewBag.TeamName = team;
+        ViewBag.Members = finalMemberList;
+        return PartialView("_AssignedTasksOverview", tasks);
+    }
+
     [Authorize]
     public async Task<IActionResult> TeamBoard(string team)
     {
