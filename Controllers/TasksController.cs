@@ -142,18 +142,73 @@ public class TasksController : Controller
         // Save custom field values if provided
         if (model.CustomFieldValues != null && model.CustomFieldValues.Any())
         {
-            foreach (var fieldValue in model.CustomFieldValues)
+            int imageCount = model.CustomFieldValues.Values
+                .SelectMany(v => v)
+                .Count(val => !string.IsNullOrEmpty(val) && (val.StartsWith("data:image/") || val.StartsWith("/Tasks/GetFieldImage")));
+            
+            if (imageCount > 2) return BadRequest("Maximum of 2 images allowed per task.");
+
+            foreach (var kvp in model.CustomFieldValues)
             {
-                var customFieldValue = new TaskFieldValue
+                int fieldId = kvp.Key;
+                foreach (var val in kvp.Value)
                 {
-                    TaskId = task.Id,
-                    FieldId = fieldValue.Key,
-                    Value = fieldValue.Value,
-                    CreatedAt = DateTime.UtcNow
-                };
-                _context.TaskFieldValues.Add(customFieldValue);
+                    if (string.IsNullOrEmpty(val)) continue;
+
+                    var customFieldValue = new TaskFieldValue
+                    {
+                        TaskId = task.Id,
+                        FieldId = fieldId,
+                        Value = val,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    // Handle Image Data if it's a Base64 string
+                    if (val.StartsWith("data:image/"))
+                    {
+                        try
+                        {
+                            var parts = val.Split(',');
+                            if (parts.Length > 1)
+                            {
+                                var header = parts[0];
+                                var base64Data = parts[1];
+                                var mimeType = header.Split(':')[1].Split(';')[0];
+                                customFieldValue.ImageData = Convert.FromBase64String(base64Data);
+                                customFieldValue.ImageMimeType = mimeType;
+                                customFieldValue.FileName = $"upload_{fieldId}_{DateTime.UtcNow.Ticks}";
+                                _context.TaskFieldValues.Add(customFieldValue);
+                                await _context.SaveChangesAsync(); // Need ID for URL
+                                customFieldValue.Value = $"/Tasks/GetFieldImageById/{customFieldValue.Id}";
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error processing image for field {fieldId}: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        _context.TaskFieldValues.Add(customFieldValue);
+                    }
+                }
             }
             await _context.SaveChangesAsync();
+        }
+
+        // SignalR: Notify team that a new task was added
+        try
+        {
+            await _hubContext.Clients.Group(column.TeamName).SendAsync("TaskAdded", new
+            {
+                taskId = task.Id,
+                columnId = column.Id,
+                teamName = column.TeamName
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR Error (TaskAdded): {ex.Message}");
         }
 
 
@@ -246,10 +301,17 @@ public class TasksController : Controller
         {
             // Cross-team assignment: move task to target user's team
             var newTeam = targetUserTeam.TeamName;
-            var targetColumn = await _context.TeamColumns
+            var targetColumn = (await _context.TeamColumns
                 .Where(c => c.TeamName == newTeam)
-                .OrderBy(c => c.Order)
-                .FirstOrDefaultAsync();
+                .ToListAsync())
+                .OrderBy(c =>
+                {
+                    var name = c.ColumnName?.Trim().ToLower();
+                    if (name == "review") return 1000;
+                    if (name == "completed") return 1001;
+                    return c.Order;
+                })
+                .FirstOrDefault();
 
             if (targetColumn != null)
             {
@@ -402,56 +464,100 @@ public class TasksController : Controller
 
             var providedFieldIds = model.CustomFieldValues.Keys.ToList();
 
+            // Check total image count limit (2)
+            int totalImages = model.CustomFieldValues.Values
+                .SelectMany(v => v)
+                .Count(val => !string.IsNullOrEmpty(val) && (val.StartsWith("data:image/") || val.Contains("/Tasks/GetFieldImage")));
+            
+            if (totalImages > 2) return BadRequest("Maximum of 2 images allowed per task.");
+
             // 1. Update or Insert
             foreach (var kvp in model.CustomFieldValues)
             {
                 int fieldId = kvp.Key;
-                string newValue = kvp.Value ?? "";
+                var newValues = kvp.Value.Where(v => !string.IsNullOrEmpty(v)).ToList();
 
                 // Check if field exists
                 var fieldDef = await _context.TaskCustomFields.FindAsync(fieldId);
                 if (fieldDef == null) continue;
 
-                var existing = existingFieldValues.FirstOrDefault(v => v.FieldId == fieldId);
+                var existingRecords = await _context.TaskFieldValues
+                    .Where(v => v.TaskId == task.Id && v.FieldId == fieldId)
+                    .ToListAsync();
 
-                if (existing != null)
+                // Identify values to REMOVE
+                var recordsToRemove = existingRecords.Where(r => !newValues.Contains(r.Value)).ToList();
+                if (recordsToRemove.Any())
                 {
-                    // Update if changed
-                    if (existing.Value != newValue)
-                    {
-                        await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, existing.Value ?? "(empty)", newValue, user.Id);
-                        existing.Value = newValue;
-                        existing.UpdatedAt = DateTime.UtcNow;
-                    }
+                    _context.TaskFieldValues.RemoveRange(recordsToRemove);
                 }
-                else
+
+                // Identify values to ADD
+                foreach (var val in newValues)
                 {
-                    // Insert
-                    await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(empty)", newValue, user.Id);
+                    // Check if this value already exists in records
+                    bool alreadyExists = existingRecords.Any(r => r.Value == val);
+                    if (alreadyExists) continue;
+
+                    // It's a NEW value
                     var newVal = new TaskFieldValue
                     {
                         TaskId = task.Id,
                         FieldId = fieldId,
-                        Value = newValue,
+                        Value = val,
                         CreatedAt = DateTime.UtcNow
                     };
-                    _context.TaskFieldValues.Add(newVal);
+
+                    // Handle Image Data if it's a Base64 string
+                    if (val.StartsWith("data:image/"))
+                    {
+                        try
+                        {
+                            var parts = val.Split(',');
+                            if (parts.Length > 1)
+                            {
+                                var header = parts[0];
+                                var base64Data = parts[1];
+                                var mimeType = header.Split(':')[1].Split(';')[0];
+                                newVal.ImageData = Convert.FromBase64String(base64Data);
+                                newVal.ImageMimeType = mimeType;
+                                newVal.FileName = $"upload_{fieldId}_{DateTime.UtcNow.Ticks}";
+                                _context.TaskFieldValues.Add(newVal);
+                                await _context.SaveChangesAsync(); // Need ID for URL
+                                newVal.Value = $"/Tasks/GetFieldImageById/{newVal.Id}";
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error processing image for field {fieldId}: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        _context.TaskFieldValues.Add(newVal);
+                    }
+                    
+                    await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(added)", val, user.Id);
                 }
             }
-
-            // 2. Remove fields that were NOT provided in the payload (optional, usually payload is complete)
-            // If you want to keep data even if not in payload, skip this. 
-            // Most kanban apps send the full state. 
-            /*
-            var toDelete = existingFieldValues.Where(v => !providedFieldIds.Contains(v.FieldId)).ToList();
-            if (toDelete.Any())
-            {
-                _context.TaskFieldValues.RemoveRange(toDelete);
-            }
-            */
         }
 
         await _context.SaveChangesAsync();
+
+        // SignalR: Notify team that the task was updated (refresh card)
+        try
+        {
+            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskAssigned", new
+            {
+                taskId = task.Id,
+                assignedTo = task.AssignedToUser?.Name ?? task.AssignedToUser?.UserName ?? "Unassigned"
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR Error (TaskUpdate): {ex.Message}");
+        }
+
         // ✅ RETURN JSON (IMPORTANT)
         return Json(new { success = true });
     }
@@ -467,12 +573,12 @@ public class TasksController : Controller
 
         if (task == null) return NotFound();
 
-        // Safety: Group by FieldId and take the latest to avoid "duplicate key" 500 error in ToDictionary
-        var latestFieldValues = task.CustomFieldValues
+        // Safety: Group by FieldId to support multiple values (like multiple images)
+        var fieldValuesMap = task.CustomFieldValues
             .GroupBy(v => v.FieldId)
             .ToDictionary(
                 g => g.Key,
-                g => g.OrderByDescending(v => v.CreatedAt).ThenByDescending(v => v.Id).First().Value ?? ""
+                g => g.Select(v => v.Value ?? "").ToList()
             );
 
         // 1. Get basic info
@@ -484,8 +590,8 @@ public class TasksController : Controller
             priority = (int)task.Priority,
             assignedToUserId = task.AssignedToUserId,
             dueDate = task.DueDate?.ToString("yyyy-MM-ddTHH:mm"), // for datetime-local input
-            // 2. Convert custom fields to dictionary for easy JS consumption
-            customFieldValues = latestFieldValues
+            // 2. Convert custom fields to dictionary of LISTS for easy JS consumption
+            customFieldValues = fieldValuesMap
         };
 
         return Ok(result);
@@ -835,11 +941,8 @@ public class TasksController : Controller
             .ToList();
 
         // ✅ 3. Define Assignable Users (Who can be assigned tasks)
-        // Includes team members AND anyone with a management role (Admin, Manager, Sub-Manager)
-        assignableUsers = @allUsers.Where(u =>
-            teamUserIds.Contains(u.Id) ||
-            (allUserRoles.ContainsKey(u.Id) && (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
-        ).ToList();
+        // Pass ALL users to the view; visibility will be handled by the view logic based on role hierarchy
+        assignableUsers = allUsers;
 
         // Get all team names for the assignment dropdown
         var allTeamNames = await _context.TeamColumns
@@ -1512,10 +1615,17 @@ public class TasksController : Controller
         }
 
         // 1. Find the FIRST column for the target team
-        var targetColumn = await _context.TeamColumns
+        var targetColumn = (await _context.TeamColumns
             .Where(c => c.TeamName == model.TeamName)
-            .OrderBy(c => c.Order)
-            .FirstOrDefaultAsync();
+            .ToListAsync())
+            .OrderBy(c =>
+            {
+                var name = c.ColumnName?.Trim().ToLower();
+                if (name == "review") return 1000;
+                if (name == "completed") return 1001;
+                return c.Order;
+            })
+            .FirstOrDefault();
 
         if (targetColumn == null)
             return BadRequest($"No columns found for team '{model.TeamName}'. Create columns first.");
@@ -1951,28 +2061,51 @@ public class TasksController : Controller
         if (file == null || file.Length == 0)
             return BadRequest("No file uploaded");
 
-        if (file.Length > 5 * 1024 * 1024)
-            return BadRequest("File size exceeds 5MB limit");
+        // Enforce 2MB limit (user request)
+        if (file.Length > 2 * 1024 * 1024)
+            return BadRequest("File size exceeds 2MB limit");
 
         var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
         var extension = Path.GetExtension(file.FileName).ToLower();
         if (!allowedExtensions.Contains(extension))
             return BadRequest("Invalid file type");
 
-        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "customfields");
-        if (!Directory.Exists(uploadsDir))
-            Directory.CreateDirectory(uploadsDir);
-
-        var fileName = $"{Guid.NewGuid()}{extension}";
-        var filePath = Path.Combine(uploadsDir, fileName);
-
-        using (var stream = new FileStream(filePath, FileMode.Create))
+        // Instead of saving to disk, convert to Base64 for the frontend to send back during Task creation/update
+        using (var ms = new MemoryStream())
         {
-            await file.CopyToAsync(stream);
+            await file.CopyToAsync(ms);
+            var fileBytes = ms.ToArray();
+            var base64String = Convert.ToBase64String(fileBytes);
+            var contentType = file.ContentType;
+            var dataUrl = $"data:{contentType};base64,{base64String}";
+
+            return Ok(new { success = true, url = dataUrl });
+        }
+    }
+
+    [HttpGet]
+    [Route("Tasks/GetFieldImage/{taskId}/{fieldId}")]
+    [Route("Tasks/GetFieldImageById/{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetFieldImage(int? taskId, int? fieldId, int? id)
+    {
+        TaskFieldValue fieldValue = null;
+
+        if (id.HasValue)
+        {
+            fieldValue = await _context.TaskFieldValues.FindAsync(id.Value);
+        }
+        else if (taskId.HasValue && fieldId.HasValue)
+        {
+            fieldValue = await _context.TaskFieldValues
+                .OrderByDescending(v => v.Id)
+                .FirstOrDefaultAsync(v => v.TaskId == taskId.Value && v.FieldId == fieldId.Value);
         }
 
-        var url = $"/uploads/customfields/{fileName}";
-        return Ok(new { success = true, url = url });
+        if (fieldValue == null || fieldValue.ImageData == null)
+            return NotFound();
+
+        return File(fieldValue.ImageData, fieldValue.ImageMimeType ?? "image/jpeg", fieldValue.FileName ?? "image.jpg");
     }
 
     public class UpdateTeamSettingsRequest

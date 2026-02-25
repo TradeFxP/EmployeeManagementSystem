@@ -127,22 +127,28 @@
     @if (Model.CustomFieldValues != null && Model.CustomFieldValues.Any())
     {
         <div class="custom-fields-summary mt-2">
-            @foreach (var fv in Model.CustomFieldValues.Take(2))
+            @foreach (var fv in Model.CustomFieldValues.Where(f => f.Field != null && f.Field.IsActive).Take(2))
             {
-                @if (fv.Field != null && fv.Field.IsActive)
-                {
-                    <div class="cf-row">
-                        <span class="cf-label">@fv.Field.FieldName:</span>
-                        @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
-                        {
-                            <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
-                        }
-                        else
-                        {
-                            <span>@fv.Value</span>
-                        }
-                    </div>
-                }
+                <div class="cf-row">
+                    <span class="cf-label">@fv.Field.FieldName:</span>
+                    @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
+                    {
+                        <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
+                    }
+                    else if (fv.Field.FieldType == "Image" && !string.IsNullOrEmpty(fv.Value))
+                    {
+                        <div class="mt-1 shadow-sm d-inline-block position-relative" style="cursor: pointer;" onclick="event.stopPropagation(); if(typeof openLightbox === 'function') openLightbox('@fv.Value'); else window.open('@fv.Value', '_blank')">
+                            <img src="@fv.Value" class="rounded" style="max-width: 100%; max-height: 120px; object-fit: contain; border: 1px solid #e2e8f0;" />
+                            <div style="position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 4px; padding: 2px 4px; font-size: 0.65rem;">
+                                <i class="bi bi-arrows-fullscreen"></i>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <span>@fv.Value</span>
+                    }
+                </div>
             }
         </div>
     }
@@ -204,15 +210,38 @@
             <option value="">-- Select Member --</option>
             @{
                 var roleMap = ViewData["UserRolesMap"] as Dictionary<string, string> ?? new Dictionary<string, string>();
-                var managementUsers = assignableUsers.Where(u => roleMap.ContainsKey(u.Id) && 
-                    (roleMap[u.Id] == "Admin" || roleMap[u.Id] == "Manager" || roleMap[u.Id] == "Sub-Manager")).ToList();
-                var regularMembers = assignableUsers.Except(managementUsers).ToList();
+                var isViewerSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
+                var isViewerManager = User.IsInRole("Manager");
+                var isViewerAdmin = User.IsInRole("Admin");
+
+                // Filter users based on viewer role
+                var filteredManagement = assignableUsers.Where(u => {
+                    if (!roleMap.ContainsKey(u.Id)) return false;
+                    var r = roleMap[u.Id];
+                    var isTargetAdmin = r == "Admin";
+                    var isTargetManager = r == "Manager";
+                    var isTargetSubManager = r == "Sub-Manager" || r == "SubManager";
+
+                    if (!isTargetAdmin && !isTargetManager && !isTargetSubManager) return false; // Not management
+
+                    if (isViewerSubManager) return isTargetSubManager; // Sub-Manager sees only Sub-Managers
+                    if (isViewerManager) return isTargetManager || isTargetSubManager; // Manager sees Managers & Sub-Managers
+                    return true; // Admin sees everyone
+                }).ToList();
+
+                var filteredRegular = assignableUsers.Where(u => {
+                    if (roleMap.ContainsKey(u.Id)) {
+                        var r = roleMap[u.Id];
+                        if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
+                    }
+                    return true; // regular members are always visible to management
+                }).ToList();
             }
             
-            @if (managementUsers.Any())
+            @if (filteredManagement.Any())
             {
                 <optgroup label="Management">
-                    @foreach (var u in managementUsers)
+                    @foreach (var u in filteredManagement)
                     {
                         var role = roleMap.ContainsKey(u.Id) ? roleMap[u.Id] : "User";
                         <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
@@ -220,12 +249,13 @@
                 </optgroup>
             }
 
-            @if (regularMembers.Any())
+            @if (filteredRegular.Any())
             {
                 <optgroup label="Team Members">
-                    @foreach (var u in regularMembers)
+                    @foreach (var u in filteredRegular)
                     {
-                        <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">@(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                        var role = roleMap.ContainsKey(u.Id) ? roleMap[u.Id] : "User";
+                        <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                     }
                 </optgroup>
             }

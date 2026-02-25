@@ -13,9 +13,9 @@ namespace UserRoles.ViewModels
 
         // Priority
         public TaskPriority? Priority { get; set; }
-
-        // Custom field values
-        public Dictionary<int, string>? CustomFieldValues { get; set; }
+        
+        // Custom field values: FieldId -> List of strings (to support multiple images per field)
+        public Dictionary<int, List<string>>? CustomFieldValues { get; set; }
 
         public DateTime? DueDate { get; set; }
     }
