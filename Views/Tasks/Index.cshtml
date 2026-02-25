@@ -8,6 +8,9 @@
     ViewData["Title"] = "Tasks";
     var userTeams = ViewBag.UserTeams as List<string> ?? new List<string>();
     var isAdmin = User.IsInRole("Admin");
+    var isManager = User.IsInRole("Manager");
+    var isSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
+    var canAssign = isAdmin || isManager || isSubManager;
 }
 
 <style>
@@ -128,6 +131,7 @@
 
                 <div id="teamTasksDropdown" style="display:block;">
                     <div id="adminTeamList"></div>
+                    <!-- The team list is loaded dynamically, we'll need to handle it in JS or just let it be -->
 
                     <div class="mt-2 pt-2 px-3" style="border-top: 1px solid rgba(255,255,255,0.08);">
                         <div id="addTeamInputContainer" style="display:none;" class="mb-2">
@@ -161,23 +165,34 @@
                 </button>
 
                 <div id="myTasksDropdown" style="display:none;">
-                    @if (userTeams.Any())
-                    {
-                        @foreach (var team in userTeams)
+                        @if (userTeams.Any())
                         {
-                            var icon = team switch
+                            @foreach (var team in userTeams)
                             {
-                                "Development" => "bi-code-slash",
-                                "Testing" => "bi-bug-fill",
-                                "Sales" => "bi-briefcase-fill",
-                                _ => "bi-arrow-right-circle"
-                            };
-                            <button type="button" class="list-group-item list-group-item-action ps-4 team-btn" data-team="@team"
-                                onclick="loadTeamBoard('@team')">
-                                <i class="bi @icon me-2"></i> @team Team
-                            </button>
+                                var icon = "bi-people";
+                                var teamSafeId = "team_" + team.Replace(" ", "_");
+                                
+                                <div class="team-sidebar-item">
+                                    <button type="button" class="list-group-item list-group-item-action ps-4 team-btn d-flex align-items-center" 
+                                            data-team="@team"
+                                            onclick="loadTeamBoard('@team')"
+                                            @(canAssign ? $"ondblclick=toggleTeamItem('{teamSafeId}')" : "")
+                                            title="@(canAssign ? "Single-click: Board | Double-click: Toggle Assign" : "Click to view board")">
+                                        <i class="bi @icon me-2"></i> @team Team
+                                    </button>
+                                    
+                                    @if (canAssign)
+                                    {
+                                        <div id="@teamSafeId" style="display:none;">
+                                            <button type="button" class="list-group-item list-group-item-action ps-5 py-2 border-0 text-info bg-dark" 
+                                                    onclick="loadAssignedTasksOverview('@team')">
+                                                <i class="bi bi-person-check me-2"></i> Assign Task
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         }
-                    }
                     else
                     {
                         <div class="text-muted ps-4 py-2" style="font-size: 0.825rem;">
@@ -1271,25 +1286,50 @@
                     return;
                 }
 
-                container.innerHTML = teams.map(t => `
-               <div class="d-flex align-items-center justify-content-between group-hover-container px-0">
-                    <button type="button"
-                            class="list-group-item list-group-item-action bg-dark text-white team-btn flex-grow-1 text-start border-0 py-2 ps-4"
-                            data-team="${t.name}"
-                            onclick="loadTeamBoard('${t.name}')">
-                        <i class="bi bi-people me-2"></i> ${t.name}
-                    </button>
+                container.innerHTML = teams.map(t => {
+                    let safeName = t.name.replace(/ /g, '_');
+                    let teamId = 'teamAdmin_' + safeName;
+                    
+                    let icon = "bi-people";
+                    
+                    let deleteBtn = `
+                        <button class="btn btn-sm btn-link text-danger p-0 me-2" 
+                                style="opacity:0.5;"
+                                onmouseover="this.style.opacity=1"
+                                onmouseout="this.style.opacity=0.5"
+                                onclick="deleteTeam(${t.id}, '${t.name}')" 
+                                title="Delete Team">
+                            <i class="bi bi-trash"></i>
+                        </button>`;
+                    
+                    let assignBtn = '';
+                    if (@(canAssign ? "true" : "false")) {
+                        assignBtn = `
+                            <button type="button" class="list-group-item list-group-item-action ps-5 py-2 border-0 text-info bg-dark" 
+                                onclick="loadAssignedTasksOverview('${t.name}')">
+                                <i class="bi bi-person-check me-2"></i> Assign Task
+                            </button>`;
+                    }
 
-                    <button class="btn btn-sm btn-link text-danger p-0 me-2" 
-                            style="opacity:0.5;"
-                            onmouseover="this.style.opacity=1"
-                            onmouseout="this.style.opacity=0.5"
-                            onclick="deleteTeam(${t.id}, '${t.name}')" 
-                            title="Delete Team">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-            `).join('');
+                    return `
+                    <div class="team-sidebar-item">
+                        <div class="d-flex align-items-center group-hover-container px-0">
+                            <button type="button"
+                                    class="list-group-item list-group-item-action bg-dark text-white team-btn flex-grow-1 text-start border-0 py-2 ps-4 d-flex align-items-center"
+                                    data-team="${t.name}"
+                                    onclick="loadTeamBoard('${t.name}')"
+                                    ondblclick="toggleTeamItem('${teamId}')"
+                                    title="Single-click: Board | Double-click: Toggle Assign">
+                                <i class="bi ${icon} me-2"></i> ${t.name}
+                            </button>
+                            ${deleteBtn}
+                        </div>
+                        <div id="${teamId}" style="display:none;">
+                            ${assignBtn}
+                        </div>
+                    </div>
+                    `;
+                }).join('');
 
                 // Re-highlight if needed
                 if (typeof currentTeamName !== 'undefined') {
@@ -1297,10 +1337,7 @@
                         .forEach(b => b.classList.add('active'));
                 }
 
-                // Auto-load first team if requested
-                if (autoLoadFirst && teams.length > 0) {
-                    loadTeamBoard(teams[0].name);
-                }
+                // Auto-load first team removed — user must click 'Open Board' explicitly
             });
     }
 
@@ -1322,10 +1359,10 @@
             .catch(err => alert(err.message));
     }
 
-    // Load initially if Admin
+    // Load team list on page load (no auto-board-load)
     document.addEventListener('DOMContentLoaded', function () {
         if (__isTasksAdmin) {
-            loadAdminTeamList(true);
+            loadAdminTeamList(false);
         }
     });
 
@@ -1716,6 +1753,30 @@
             })
             .catch(err => {
                 container.innerHTML = "<div class='text-danger p-4'>Error loading board. Please try again.</div>";
+                console.error(err);
+            });
+    }
+
+    function loadAssignedTasksOverview(team) {
+        const container = document.getElementById('taskBoardContainer');
+        if (!container) return;
+
+        container.innerHTML = "<div class='text-center py-5'><div class='spinner-border text-primary mb-2'></div><br><span class='text-muted'>Loading assigned tasks...</span></div>";
+
+        fetch(`/Tasks/AssignedTasksOverview?team=${encodeURIComponent(team)}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Failed to load overview");
+                return res.text();
+            })
+            .then(html => {
+                container.innerHTML = html;
+                window.currentTeamName = team; // Keep track of the team
+                
+                // Highlight corresponding team button if possible
+                document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+            })
+            .catch(err => {
+                container.innerHTML = "<div class='text-danger p-4'>Error loading assigned tasks overview.</div>";
                 console.error(err);
             });
     }
@@ -3104,7 +3165,16 @@
         }
     }
 
-    // Existing end of script
+    function toggleTeamItem(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        
+        if (el.style.display === 'none') {
+            el.style.display = 'block';
+        } else {
+            el.style.display = 'none';
+        }
+    }
 </script>
 
 <script>

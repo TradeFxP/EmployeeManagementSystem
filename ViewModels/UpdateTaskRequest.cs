@@ -9,11 +9,11 @@ namespace UserRoles.ViewModels
         public string? Description { get; set; }
 
 
-        public string AssignedToUserId { get; set; } // optional
-        
+        public string? AssignedToUserId { get; set; } // optional
+
         // Priority
         public TaskPriority? Priority { get; set; }
-        
+
         // Custom field values
         public Dictionary<int, string>? CustomFieldValues { get; set; }
 

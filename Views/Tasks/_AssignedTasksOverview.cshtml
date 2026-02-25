@@ -1,0 +1,362 @@
+@model IEnumerable<UserRoles.Models.TaskItem>
+
+@{
+    var members = ViewBag.Members as IEnumerable<dynamic>;
+}
+
+<div class="assigned-overview-container p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <h4 class="mb-0 me-3">
+                <i class="bi bi-person-check-fill text-primary me-2"></i>
+                Assigned Tasks: <span class="text-muted">@ViewBag.TeamName</span>
+            </h4>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <!-- MEMBER FILTER DROPDOWN -->
+            <div class="dropdown" id="memberFilterDropdown">
+                <button class="btn btn-sm btn-outline-info dropdown-toggle d-flex align-items-center" type="button" id="memberFilterBtn" data-bs-toggle="dropdown" aria-expanded="false" style="border-radius: 8px; padding: 6px 16px;">
+                    <i class="bi bi-people me-2"></i> <span id="selectedMemberName">Members</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" aria-labelledby="memberFilterBtn" style="min-width: 280px; border-radius: 12px; margin-top: 10px;">
+                    <div class="input-group input-group-sm mb-3">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0 ps-0" id="memberSearchInput" placeholder="Search members..." onkeyup="filterMemberList()">
+                    </div>
+                    <div id="memberListContainer" style="max-height: 450px; overflow-y: auto;">
+                        <button class="dropdown-item rounded-2 py-2 mb-1 member-item active" onclick="selectMember('', 'All Assignees', this)">
+                            <i class="bi bi-grid-fill me-2 opacity-50"></i> All Assignees
+                        </button>
+
+                        @if (members != null)
+                        {
+                            var teamsList = members.GroupBy(m => (string)m.TeamName);
+
+                            foreach (var teamGroup in teamsList)
+                            {
+                                        <div class="dropdown-header fw-bold text-primary mt-3 mb-1 ps-2" style="font-size: 0.9rem; background: #f8fafc; border-radius: 4px; padding: 6px 12px;">
+                                            <i class="bi bi-people-fill me-2"></i> @teamGroup.Key Team
+                                        </div>
+
+                                var mgmt = teamGroup.Where(m => (string)m.Category == "Management");
+                                var teamMates = teamGroup.Where(m => (string)m.Category == "Team Members");
+
+                                @if (mgmt.Any())
+                                {
+                                                <div class="dropdown-header fw-bold text-dark mt-2 ps-3" style="font-size: 0.8rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 2px;">Management</div>
+                                    foreach (var m in mgmt)
+                                    {
+                                                        <button class="dropdown-item rounded-2 py-2 mb-1 member-item d-flex align-items-center justify-content-between ps-4" 
+                                                                onclick="selectMember('@m.Id', '@m.Name', this)" 
+                                                                data-name="@m.Name.ToLower()">
+                                                            <span>
+                                                                <small class="text-muted fw-bold me-1">[@m.Role]</small> @m.Name
+                                                            </span>
+                                                        </button>
+                                    }
+                                }
+
+                                @if (teamMates.Any())
+                                {
+                                                <div class="dropdown-header fw-bold text-dark mt-2 ps-3" style="font-size: 0.8rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 2px;">Team Members</div>
+                                    foreach (var m in teamMates)
+                                    {
+                                                        <button class="dropdown-item rounded-2 py-2 mb-1 member-item d-flex align-items-center justify-content-between ps-4" 
+                                                                onclick="selectMember('@m.Id', '@m.Name', this)" 
+                                                                data-name="@m.Name.ToLower()">
+                                                            <span>@m.Name</span>
+                                                        </button>
+                                    }
+                                }
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadTeamBoard('@ViewBag.TeamName')" style="border-radius: 8px; padding: 6px 16px;">
+                <i class="bi bi-arrow-left me-1"></i> Back to Board
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 overflow-hidden" style="border-radius: 12px; background: #fff;">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 custom-overview-table">
+                <thead style="background: #f8fafc;">
+                    <tr>
+                        <th class="ps-4" style="width: 40%;">Title</th>
+                        <th style="width: 15%;">Status</th>
+                        <th style="width: 20%;">Assigned To</th>
+                        <th style="width: 20%;">Assigned By</th>
+                        <th style="width: 15%;">Due Date</th>
+                    </tr>
+                </thead>
+                <tbody id="assignedTasksTableBody">
+                    @if (!Model.Any())
+                    {
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox-fill d-block mb-2" style="font-size: 2rem; opacity: 0.3;"></i>
+                                    No assigned tasks found for this team.
+                                </td>
+                            </tr>
+                    }
+                    else
+                    {
+                        @foreach (var task in Model)
+                        {
+                            var priorityColor = task.Priority switch
+                            {
+                                UserRoles.Models.Enums.TaskPriority.Critical => "#fb7185",
+                                UserRoles.Models.Enums.TaskPriority.High => "#fbbf24",
+                                UserRoles.Models.Enums.TaskPriority.Medium => "#60a5fa",
+                                _ => "#94a3b8"
+                            };
+
+                                    <tr class="task-row clickable-row" 
+                                        data-task-id="@task.Id" 
+                                        data-assigned-to-id="@task.AssignedToUserId"
+                                        ondblclick="focusTask(@task.Id)"
+                                        onclick="handleRowSingleClick(this)">
+                                        <td class="ps-4">
+                                            <div class="d-flex align-items-center">
+                                                <div style="width: 4px; height: 32px; background: @priorityColor; border-radius: 4px;" class="me-3"></div>
+                                                <div>
+                                                    <div class="fw-bold text-dark mb-0" style="font-size: 0.95rem;">@task.Title</div>
+                                                    <div class="text-muted small">#@task.Id</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge rounded-pill bg-light text-dark border px-3 py-1 fw-semibold">@task.Status</span>
+                                        </td>
+                                        <td>
+                                    @if (task.AssignedToUser != null)
+                                    {
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <div class="avatar-circle-sm" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
+                                                @(task.AssignedToUser.UserName?.Substring(0, 1).ToUpper() ?? "?")
+                                                        </div>
+                                                        <span class="text-truncate" style="max-width: 150px;">@task.AssignedToUser.UserName</span>
+                                                    </div>
+                                    }
+                                    else
+                                    {
+                                                    <span class="text-muted">Unassigned</span>
+                                    }
+                                        </td>
+                                        <td>
+                                    @if (task.AssignedByUser != null)
+                                    {
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <div class="avatar-circle-sm" style="background: linear-gradient(135deg, #64748b, #475569);">
+                                                @(task.AssignedByUser.UserName?.Substring(0, 1).ToUpper() ?? "?")
+                                                        </div>
+                                                        <span class="text-truncate" style="max-width: 150px;">@task.AssignedByUser.UserName</span>
+                                                    </div>
+                                    }
+                                    else
+                                    {
+                                                    <span class="text-muted">Direct</span>
+                                    }
+                                        </td>
+                                        <td>
+                                    @if (task.DueDate.HasValue)
+                                    {
+                                                    <div class="d-flex align-items-center text-danger small fw-bold">
+                                                        <i class="bi bi-calendar-event me-2"></i>
+                                            @task.DueDate.Value.ToString("MMM dd, yyyy")
+                                                    </div>
+                                    }
+                                    else
+                                    {
+                                                    <span class="text-muted">—</span>
+                                    }
+                                        </td>
+                                    </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .assigned-overview-container {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .custom-overview-table thead th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 800;
+        color: #475569;
+        border-bottom: 2px solid #e2e8f0;
+        padding-top: 1.25rem;
+        padding-bottom: 1.25rem;
+    }
+
+    .custom-overview-table tbody td {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.2s;
+    }
+
+    .task-row.clickable-row {
+        cursor: pointer;
+    }
+
+    .task-row.active-row {
+        background-color: #f0f7ff !important;
+    }
+
+    .avatar-circle-sm {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    #memberListContainer::-webkit-scrollbar {
+        width: 6px;
+    }
+    #memberListContainer::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 3px;
+    }
+
+    .member-item {
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+    .member-item:hover {
+        background-color: #f1f5f9;
+    }
+    .member-item.active {
+        background-color: #3b82f6;
+        color: #fff;
+    }
+    .member-item.active small {
+        color: rgba(255,255,255,0.7) !important;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<script>
+    function filterMemberList() {
+        const input = document.getElementById('memberSearchInput');
+        if (!input) return;
+
+        const filter = input.value.toLowerCase().trim();
+        const container = document.getElementById('memberListContainer');
+        if (!container) return;
+
+        const items = container.querySelectorAll('.member-item');
+        const headers = container.querySelectorAll('.dropdown-header');
+        const allAssigneesBtn = items[0];
+
+        // Reset display for everything if search is empty or too short
+        if (filter.length < 2) {
+            if (allAssigneesBtn) allAssigneesBtn.style.setProperty('display', 'flex', 'important');
+            items.forEach(item => item.style.setProperty('display', 'flex', 'important'));
+            headers.forEach(h => h.style.setProperty('display', 'block', 'important'));
+            return;
+        }
+
+        // Filter mode (2+ characters)
+        if (allAssigneesBtn) allAssigneesBtn.style.setProperty('display', 'none', 'important');
+
+        // Filter individual members
+        items.forEach((item, index) => {
+            if (index === 0) return; // Skip "All Assignees"
+            const nameAttr = item.getAttribute('data-name');
+            if (nameAttr && nameAttr.includes(filter)) {
+                item.style.setProperty('display', 'flex', 'important');
+            } else {
+                item.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        // Manage headers (Team and Role sections)
+        const children = Array.from(container.children);
+        headers.forEach(h => h.style.setProperty('display', 'none', 'important'));
+
+        let lastTeamHeader = null;
+        let lastRoleHeader = null;
+
+        children.forEach(child => {
+            if (child.classList.contains('text-primary') && child.classList.contains('dropdown-header')) {
+                lastTeamHeader = child;
+                lastRoleHeader = null; 
+            } else if (child.classList.contains('text-dark') && child.classList.contains('dropdown-header')) {
+                lastRoleHeader = child;
+            } else if (child.classList.contains('member-item') && child.style.display !== 'none') {
+                if (lastTeamHeader) lastTeamHeader.style.setProperty('display', 'block', 'important');
+                if (lastRoleHeader) lastRoleHeader.style.setProperty('display', 'block', 'important');
+            }
+        });
+    }
+
+    function selectMember(userId, userName, element) {
+        // Toggle active states in dropdown
+        document.querySelectorAll('.member-item').forEach(item => item.classList.remove('active'));
+        if (element) {
+            element.classList.add('active');
+        } else {
+            // Find "All Assignees" if no element provided (on reset)
+            const allBtn = document.querySelector('.member-item');
+            if (allBtn) allBtn.classList.add('active');
+        }
+
+        document.getElementById('selectedMemberName').innerText = userName;
+
+        // Clear search box
+        const input = document.getElementById('memberSearchInput');
+        if (input) {
+            input.value = '';
+        }
+        filterMemberList(); // Restore list visibility
+
+        // Table Filtering: "Unhide all things" if userId is empty
+        const rows = document.querySelectorAll('.task-row');
+        rows.forEach(row => {
+            if (!userId || userId === '' || row.dataset.assignedToId === userId) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // Ensure state reset when dropdown closes (Using delegated event)
+    document.addEventListener('hidden.bs.dropdown', (event) => {
+        if (event.target && event.target.id === 'memberFilterDropdown') {
+            const input = document.getElementById('memberSearchInput');
+            if (input && input.value !== '') {
+                input.value = '';
+                filterMemberList();
+            }
+        }
+    });
+
+    function handleRowSingleClick(row) {
+        document.querySelectorAll('.task-row').forEach(r => r.classList.remove('active-row'));
+        row.classList.add('active-row');
+    }
+</script>
