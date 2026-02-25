@@ -158,37 +158,56 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                 break;
             case 'Image':
                 {
+                    const maxImages = 2; // User requested limit
                     const imageFields = fields.filter(f => f.fieldType === 'Image');
-                    const filledImages = imageFields.filter(f => existingValues[f.id]).length;
-                    const fieldIndex = imageFields.indexOf(field) + 1;
+
+                    // Count how many image fields across the WHOLE modal have values
+                    const filledImages = imageFields.filter(f => {
+                        const input = document.getElementById(`field_${f.id}`);
+                        return (input && input.value) || existingValues[f.id];
+                    }).length;
 
                     input = document.createElement('div');
                     input.className = 'image-field-container mb-2';
-                    const currentValue = existingValues[field.id] || '';
 
-                    let previewHtml = '';
-                    if (currentValue) {
-                        previewHtml = `
-                            <div class="mb-2 p-1 border rounded bg-light d-flex align-items-center gap-2">
-                                <img src="${currentValue}" class="rounded" style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;" onclick="window.open('${currentValue}', '_blank')" />
-                                <small class="text-muted flex-grow-1 overflow-hidden text-truncate">${currentValue.split('/').pop()}</small>
-                                <button type="button" class="btn btn-xs btn-outline-danger p-0" style="width:24px; height:24px;" onclick="removeFieldImage(${field.id}, '${containerId}')">
-                                    <i class="bi bi-x"></i>
-                                </button>
-                            </div>
-                        `;
-                    }
+                    // existingValues[field.id] is now an array
+                    const fieldValues = Array.isArray(existingValues[field.id]) ? existingValues[field.id] : (existingValues[field.id] ? [existingValues[field.id]] : []);
 
-                    const countLabel = imageFields.length > 1 ? `<div class="text-end small text-muted mb-1">${filledImages}/${imageFields.length} images added</div>` : '';
+                    let previewsHtml = '';
+                    fieldValues.forEach((val, idx) => {
+                        if (val) {
+                            const isBase64 = val.startsWith('data:');
+                            const displayName = isBase64 ? 'Newly Uploaded Image' : `Image ${idx + 1}`;
+                            previewsHtml += `
+                                <div class="mb-2 p-1 border rounded bg-light d-flex align-items-center gap-2">
+                                    <img src="${val}" class="rounded" style="width: 50px; height: 50px; object-fit: cover; cursor: pointer;" onclick="window.open('${val}', '_blank')" />
+                                    <small class="text-muted flex-grow-1 overflow-hidden text-truncate">${displayName}</small>
+                                    <button type="button" class="btn btn-xs btn-outline-danger p-0" style="width:24px; height:24px;" onclick="removeFieldImage(${field.id}, '${containerId}', ${idx})">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                    <input type="hidden" id="field_${field.id}_${idx}" data-field-id="${field.id}" value="${val}" />
+                                </div>
+                            `;
+                        }
+                    });
+
+                    const isLimitReached = filledImages >= maxImages && fieldValues.length === 0; // Only hide if total is reached AND this specific field is empty?
+                    // Actually, if total reached, hide all upload inputs
+                    const globalLimitReached = filledImages >= maxImages;
+
+                    const countLabel = `<div class="text-end small text-muted mb-1">${filledImages}/${maxImages} images added</div>`;
 
                     input.innerHTML = `
                         ${countLabel}
-                        ${previewHtml}
-                        <div class="input-group input-group-sm">
-                            <input type="file" class="form-control" accept="image/*" onchange="uploadFieldImage(this, ${field.id}, '${containerId}')" />
+                        ${previewsHtml}
+                        <div class="input-group input-group-sm" style="${globalLimitReached ? 'display:none' : ''}">
+                            <input type="file" class="form-control" accept="image/*" onchange="uploadFieldImage(this, ${field.id}, '${containerId}')" ${globalLimitReached ? 'disabled' : ''} />
                             <span class="input-group-text d-none" id="loader_${field.id}"><span class="spinner-border spinner-border-sm"></span></span>
                         </div>
-                        <input type="hidden" id="field_${field.id}" data-field-id="${field.id}" data-required="${field.isRequired}" value="${currentValue}" />
+                        ${globalLimitReached && fieldValues.length === 0 ? '<div class="small text-danger italic">Limit reached (max 2 images)</div>' : ''}
+                        
+                        <!-- For keeping requirements check working if no images added yet -->
+                        ${fieldValues.length === 0 ? `<input type="hidden" id="field_${field.id}" data-field-id="${field.id}" data-required="${field.isRequired}" value="" />` : ''}
                     `;
                 }
                 break;
@@ -199,12 +218,18 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                 break;
         }
 
-        input.id = `field_${field.id}`;
         input.dataset.fieldId = field.id;
         input.dataset.required = field.isRequired;
-        input.value = existingValues[field.id] || '';
 
-        fieldGroup.appendChild(input); // Add this!
+        // For Image fields, we don't want to set id/value on the wrapper div
+        if (field.fieldType !== 'Image') {
+            input.id = `field_${field.id}`;
+            input.value = existingValues[field.id] || '';
+            fieldGroup.appendChild(input);
+        } else {
+            fieldGroup.appendChild(input);
+        }
+
         container.appendChild(fieldGroup);
     });
 
@@ -298,6 +323,7 @@ async function deleteCustomFieldInline(id) {
 
 // Collect custom field values from form
 // Collect custom field values from form
+// Collect custom field values from form as Lists to support multiple values per field ID
 function collectCustomFieldValues(containerId = 'customFieldsContainer') {
     const values = {};
     const container = document.getElementById(containerId);
@@ -307,12 +333,16 @@ function collectCustomFieldValues(containerId = 'customFieldsContainer') {
         return values;
     }
 
-    // Find all inputs with data-field-id
+    // Find all elements with data-field-id (inputs, hiddens, etc)
     const inputs = container.querySelectorAll('[data-field-id]');
 
     inputs.forEach(input => {
+        const fieldId = input.dataset.fieldId;
+        if (!values[fieldId]) values[fieldId] = [];
+
         if (input.value && input.value.trim() !== "") {
-            values[input.dataset.fieldId] = input.value.trim();
+            // For select-multiple or just multiple inputs with same ID
+            values[fieldId].push(input.value.trim());
         }
     });
 
@@ -605,15 +635,40 @@ async function uploadFieldImage(input, fieldId, containerId) {
     if (!input.files || !input.files[0]) return;
 
     const file = input.files[0];
+    const loader = document.getElementById(`loader_${fieldId}`);
 
-    // 5MB Limit
-    if (file.size > 5 * 1024 * 1024) {
-        alert("Image size exceeds 5MB limit.");
+    // 2MB Limit (user request)
+    if (file.size > 2 * 1024 * 1024) {
+        alert("Image size exceeds 2MB limit. Please upload images 2MB or smaller.");
         input.value = "";
         return;
     }
 
-    const loader = document.getElementById(`loader_${fieldId}`);
+    // Check total image count across the current modal
+    // We collect current values first to be accurate
+    const currentValues = collectCustomFieldValues(containerId);
+
+    // TEMPORARY: Put the current file's value as something non-empty to check limit correctly
+    // or just check against the collected values plus the fact we are adding one.
+    const imageFields = Array.from(document.querySelectorAll(`#${containerId} .image-field-container`));
+    let filledCount = 0;
+
+    // Count existing values in hidden inputs
+    const hiddenInputs = document.querySelectorAll(`#${containerId} input[type="hidden"][id^="field_"]`);
+    hiddenInputs.forEach(hi => {
+        if (hi.value && hi.value.trim() !== "") filledCount++;
+    });
+
+    // If this specific field is empty, adding a file will increase count
+    const thisField = document.getElementById(`field_${fieldId}`);
+    const willIncreaseCount = !thisField || !thisField.value;
+
+    if (willIncreaseCount && filledCount >= 2) {
+        alert("Maximum of 2 images allowed across all fields.");
+        input.value = "";
+        return;
+    }
+
     if (loader) loader.classList.remove('d-none');
 
     const formData = new FormData();
@@ -625,34 +680,42 @@ async function uploadFieldImage(input, fieldId, containerId) {
             body: formData
         });
 
-        if (!response.ok) throw new Error('Upload failed');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Upload failed');
+        }
+
         const data = await response.json();
 
         if (data.success) {
-            // Update hidden input
-            const hiddenInput = document.getElementById(`field_${fieldId}`);
-            if (hiddenInput) {
-                hiddenInput.value = data.url;
-                // Re-render to show preview
-                const container = document.getElementById(containerId);
-                const values = collectCustomFieldValues(containerId);
-                const team = document.getElementById('kanbanBoard')?.dataset.teamName;
-                await renderCustomFieldInputs(containerId, values, team);
-            }
+            // Collect ALL current values from the form to preserve them during re-render
+            const updatedValues = collectCustomFieldValues(containerId);
+
+            // Append the new URL to this field's list
+            if (!updatedValues[fieldId]) updatedValues[fieldId] = [];
+            updatedValues[fieldId].push(data.url);
+
+            const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+            await renderCustomFieldInputs(containerId, updatedValues, team);
         }
     } catch (error) {
+        console.error('Upload error:', error);
         alert("Error uploading image: " + error.message);
+        input.value = ""; // Clear file input on error
     } finally {
         if (loader) loader.classList.add('d-none');
     }
 }
 
-async function removeFieldImage(fieldId, containerId) {
-    const hiddenInput = document.getElementById(`field_${fieldId}`);
-    if (hiddenInput) {
-        hiddenInput.value = "";
-        // Re-render
-        const values = collectCustomFieldValues(containerId);
+async function removeFieldImage(fieldId, containerId, index) {
+    // 1. Collect current values
+    const values = collectCustomFieldValues(containerId);
+
+    // 2. Remove the specific value at the given index
+    if (values[fieldId] && values[fieldId][index] !== undefined) {
+        values[fieldId].splice(index, 1);
+
+        // 3. Re-render the UI with the updated array
         const team = document.getElementById('kanbanBoard')?.dataset.teamName;
         await renderCustomFieldInputs(containerId, values, team);
     }

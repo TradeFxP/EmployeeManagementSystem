@@ -127,22 +127,28 @@
     @if (Model.CustomFieldValues != null && Model.CustomFieldValues.Any())
     {
         <div class="custom-fields-summary mt-2">
-            @foreach (var fv in Model.CustomFieldValues.Take(2))
+            @foreach (var fv in Model.CustomFieldValues.Where(f => f.Field != null && f.Field.IsActive).Take(2))
             {
-                @if (fv.Field != null && fv.Field.IsActive)
-                {
-                    <div class="cf-row">
-                        <span class="cf-label">@fv.Field.FieldName:</span>
-                        @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
-                        {
-                            <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
-                        }
-                        else
-                        {
-                            <span>@fv.Value</span>
-                        }
-                    </div>
-                }
+                <div class="cf-row">
+                    <span class="cf-label">@fv.Field.FieldName:</span>
+                    @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
+                    {
+                        <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
+                    }
+                    else if (fv.Field.FieldType == "Image" && !string.IsNullOrEmpty(fv.Value))
+                    {
+                        <div class="mt-1 shadow-sm d-inline-block position-relative" style="cursor: pointer;" onclick="event.stopPropagation(); if(typeof openLightbox === 'function') openLightbox('@fv.Value'); else window.open('@fv.Value', '_blank')">
+                            <img src="@fv.Value" class="rounded" style="max-width: 100%; max-height: 120px; object-fit: contain; border: 1px solid #e2e8f0;" />
+                            <div style="position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 4px; padding: 2px 4px; font-size: 0.65rem;">
+                                <i class="bi bi-arrows-fullscreen"></i>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <span>@fv.Value</span>
+                    }
+                </div>
             }
         </div>
     }
