@@ -14,6 +14,11 @@ namespace UserRoles.Models
         
         // Value stored as string (converted based on FieldType)
         public string? Value { get; set; }
+
+        // Large binary data for Image fields (Database storage)
+        public byte[]? ImageData { get; set; }
+        public string? ImageMimeType { get; set; }
+        public string? FileName { get; set; }
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }

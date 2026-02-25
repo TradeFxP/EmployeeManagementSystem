@@ -142,18 +142,73 @@ public class TasksController : Controller
         // Save custom field values if provided
         if (model.CustomFieldValues != null && model.CustomFieldValues.Any())
         {
-            foreach (var fieldValue in model.CustomFieldValues)
+            int imageCount = model.CustomFieldValues.Values
+                .SelectMany(v => v)
+                .Count(val => !string.IsNullOrEmpty(val) && (val.StartsWith("data:image/") || val.StartsWith("/Tasks/GetFieldImage")));
+            
+            if (imageCount > 2) return BadRequest("Maximum of 2 images allowed per task.");
+
+            foreach (var kvp in model.CustomFieldValues)
             {
-                var customFieldValue = new TaskFieldValue
+                int fieldId = kvp.Key;
+                foreach (var val in kvp.Value)
                 {
-                    TaskId = task.Id,
-                    FieldId = fieldValue.Key,
-                    Value = fieldValue.Value,
-                    CreatedAt = DateTime.UtcNow
-                };
-                _context.TaskFieldValues.Add(customFieldValue);
+                    if (string.IsNullOrEmpty(val)) continue;
+
+                    var customFieldValue = new TaskFieldValue
+                    {
+                        TaskId = task.Id,
+                        FieldId = fieldId,
+                        Value = val,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    // Handle Image Data if it's a Base64 string
+                    if (val.StartsWith("data:image/"))
+                    {
+                        try
+                        {
+                            var parts = val.Split(',');
+                            if (parts.Length > 1)
+                            {
+                                var header = parts[0];
+                                var base64Data = parts[1];
+                                var mimeType = header.Split(':')[1].Split(';')[0];
+                                customFieldValue.ImageData = Convert.FromBase64String(base64Data);
+                                customFieldValue.ImageMimeType = mimeType;
+                                customFieldValue.FileName = $"upload_{fieldId}_{DateTime.UtcNow.Ticks}";
+                                _context.TaskFieldValues.Add(customFieldValue);
+                                await _context.SaveChangesAsync(); // Need ID for URL
+                                customFieldValue.Value = $"/Tasks/GetFieldImageById/{customFieldValue.Id}";
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error processing image for field {fieldId}: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        _context.TaskFieldValues.Add(customFieldValue);
+                    }
+                }
             }
             await _context.SaveChangesAsync();
+        }
+
+        // SignalR: Notify team that a new task was added
+        try
+        {
+            await _hubContext.Clients.Group(column.TeamName).SendAsync("TaskAdded", new
+            {
+                taskId = task.Id,
+                columnId = column.Id,
+                teamName = column.TeamName
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR Error (TaskAdded): {ex.Message}");
         }
 
 
@@ -189,7 +244,7 @@ public class TasksController : Controller
         ViewData["TeamSettings"] = team;
         ViewData["ColumnName"] = (await _context.TeamColumns.FindAsync(task.ColumnId))?.ColumnName;
         ViewData["AssignableUsers"] = users;
-        
+
         // Load permissions for this user on this team
         var currentUser = await _userManager.GetUserAsync(User);
         BoardPermission? permissions = null;
@@ -246,10 +301,17 @@ public class TasksController : Controller
         {
             // Cross-team assignment: move task to target user's team
             var newTeam = targetUserTeam.TeamName;
-            var targetColumn = await _context.TeamColumns
+            var targetColumn = (await _context.TeamColumns
                 .Where(c => c.TeamName == newTeam)
-                .OrderBy(c => c.Order)
-                .FirstOrDefaultAsync();
+                .ToListAsync())
+                .OrderBy(c =>
+                {
+                    var name = c.ColumnName?.Trim().ToLower();
+                    if (name == "review") return 1000;
+                    if (name == "completed") return 1001;
+                    return c.Order;
+                })
+                .FirstOrDefault();
 
             if (targetColumn != null)
             {
@@ -361,12 +423,12 @@ public class TasksController : Controller
 
         if (task.DueDate != model.DueDate)
         {
-            await _historyService.LogTaskUpdated(task.Id, user.Id, "Due Date", 
-                task.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None", 
+            await _historyService.LogTaskUpdated(task.Id, user.Id, "Due Date",
+                task.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None",
                 model.DueDate?.ToString("dd MMM yyyy, hh:mm tt") ?? "None");
-            
-            task.DueDate = model.DueDate.HasValue 
-                ? DateTime.SpecifyKind(model.DueDate.Value, DateTimeKind.Utc) 
+
+            task.DueDate = model.DueDate.HasValue
+                ? DateTime.SpecifyKind(model.DueDate.Value, DateTimeKind.Utc)
                 : null;
         }
 
@@ -402,56 +464,100 @@ public class TasksController : Controller
 
             var providedFieldIds = model.CustomFieldValues.Keys.ToList();
 
+            // Check total image count limit (2)
+            int totalImages = model.CustomFieldValues.Values
+                .SelectMany(v => v)
+                .Count(val => !string.IsNullOrEmpty(val) && (val.StartsWith("data:image/") || val.Contains("/Tasks/GetFieldImage")));
+            
+            if (totalImages > 2) return BadRequest("Maximum of 2 images allowed per task.");
+
             // 1. Update or Insert
             foreach (var kvp in model.CustomFieldValues)
             {
                 int fieldId = kvp.Key;
-                string newValue = kvp.Value ?? "";
+                var newValues = kvp.Value.Where(v => !string.IsNullOrEmpty(v)).ToList();
 
                 // Check if field exists
                 var fieldDef = await _context.TaskCustomFields.FindAsync(fieldId);
                 if (fieldDef == null) continue;
 
-                var existing = existingFieldValues.FirstOrDefault(v => v.FieldId == fieldId);
+                var existingRecords = await _context.TaskFieldValues
+                    .Where(v => v.TaskId == task.Id && v.FieldId == fieldId)
+                    .ToListAsync();
 
-                if (existing != null)
+                // Identify values to REMOVE
+                var recordsToRemove = existingRecords.Where(r => !newValues.Contains(r.Value)).ToList();
+                if (recordsToRemove.Any())
                 {
-                    // Update if changed
-                    if (existing.Value != newValue)
-                    {
-                        await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, existing.Value ?? "(empty)", newValue, user.Id);
-                        existing.Value = newValue;
-                        existing.UpdatedAt = DateTime.UtcNow;
-                    }
+                    _context.TaskFieldValues.RemoveRange(recordsToRemove);
                 }
-                else
+
+                // Identify values to ADD
+                foreach (var val in newValues)
                 {
-                    // Insert
-                    await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(empty)", newValue, user.Id);
+                    // Check if this value already exists in records
+                    bool alreadyExists = existingRecords.Any(r => r.Value == val);
+                    if (alreadyExists) continue;
+
+                    // It's a NEW value
                     var newVal = new TaskFieldValue
                     {
                         TaskId = task.Id,
                         FieldId = fieldId,
-                        Value = newValue,
+                        Value = val,
                         CreatedAt = DateTime.UtcNow
                     };
-                    _context.TaskFieldValues.Add(newVal);
+
+                    // Handle Image Data if it's a Base64 string
+                    if (val.StartsWith("data:image/"))
+                    {
+                        try
+                        {
+                            var parts = val.Split(',');
+                            if (parts.Length > 1)
+                            {
+                                var header = parts[0];
+                                var base64Data = parts[1];
+                                var mimeType = header.Split(':')[1].Split(';')[0];
+                                newVal.ImageData = Convert.FromBase64String(base64Data);
+                                newVal.ImageMimeType = mimeType;
+                                newVal.FileName = $"upload_{fieldId}_{DateTime.UtcNow.Ticks}";
+                                _context.TaskFieldValues.Add(newVal);
+                                await _context.SaveChangesAsync(); // Need ID for URL
+                                newVal.Value = $"/Tasks/GetFieldImageById/{newVal.Id}";
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error processing image for field {fieldId}: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        _context.TaskFieldValues.Add(newVal);
+                    }
+                    
+                    await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(added)", val, user.Id);
                 }
             }
-
-            // 2. Remove fields that were NOT provided in the payload (optional, usually payload is complete)
-            // If you want to keep data even if not in payload, skip this. 
-            // Most kanban apps send the full state. 
-            /*
-            var toDelete = existingFieldValues.Where(v => !providedFieldIds.Contains(v.FieldId)).ToList();
-            if (toDelete.Any())
-            {
-                _context.TaskFieldValues.RemoveRange(toDelete);
-            }
-            */
         }
 
         await _context.SaveChangesAsync();
+
+        // SignalR: Notify team that the task was updated (refresh card)
+        try
+        {
+            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskAssigned", new
+            {
+                taskId = task.Id,
+                assignedTo = task.AssignedToUser?.Name ?? task.AssignedToUser?.UserName ?? "Unassigned"
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR Error (TaskUpdate): {ex.Message}");
+        }
+
         // ✅ RETURN JSON (IMPORTANT)
         return Json(new { success = true });
     }
@@ -467,12 +573,12 @@ public class TasksController : Controller
 
         if (task == null) return NotFound();
 
-        // Safety: Group by FieldId and take the latest to avoid "duplicate key" 500 error in ToDictionary
-        var latestFieldValues = task.CustomFieldValues
+        // Safety: Group by FieldId to support multiple values (like multiple images)
+        var fieldValuesMap = task.CustomFieldValues
             .GroupBy(v => v.FieldId)
             .ToDictionary(
                 g => g.Key,
-                g => g.OrderByDescending(v => v.CreatedAt).ThenByDescending(v => v.Id).First().Value ?? ""
+                g => g.Select(v => v.Value ?? "").ToList()
             );
 
         // 1. Get basic info
@@ -484,8 +590,8 @@ public class TasksController : Controller
             priority = (int)task.Priority,
             assignedToUserId = task.AssignedToUserId,
             dueDate = task.DueDate?.ToString("yyyy-MM-ddTHH:mm"), // for datetime-local input
-            // 2. Convert custom fields to dictionary for easy JS consumption
-            customFieldValues = latestFieldValues
+            // 2. Convert custom fields to dictionary of LISTS for easy JS consumption
+            customFieldValues = fieldValuesMap
         };
 
         return Ok(result);
@@ -600,17 +706,21 @@ public class TasksController : Controller
             })
             .ToList();
 
-        // Load all tasks for team (with users and custom field values) — exclude archived
+        // Load all tasks:
+        // 1. Tasks in this team
+        // 2. Tasks assigned BY this user (cross-team tracking)
+        // 3. Tasks assigned TO this user (cross-team tracking)
         var allTasks = await _context.TaskItems
-     .Where(t => t.TeamName == team && !t.IsArchived)
-     .Include(t => t.CreatedByUser)
-     .Include(t => t.AssignedToUser)
-     .Include(t => t.AssignedByUser)
-     .Include(t => t.ReviewedByUser)
-     .Include(t => t.CompletedByUser)
-     .Include(t => t.CustomFieldValues)
-        .ThenInclude(v => v.Field)
-     .ToListAsync();
+            .Where(t => (t.TeamName == team || t.AssignedByUserId == user.Id || t.AssignedToUserId == user.Id) && !t.IsArchived)
+            .Include(t => t.CreatedByUser)
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.AssignedByUser)
+            .Include(t => t.ReviewedByUser)
+            .Include(t => t.CompletedByUser)
+            .Include(t => t.Column) // Included for cross-team mapping if needed
+            .Include(t => t.CustomFieldValues)
+                .ThenInclude(v => v.Field)
+            .ToListAsync();
 
 
         // 🔥 PERFORMANCE OPTIMIZATION: Pre-fetch roles for all users involved to avoid N+1 queries in CanUserSeeTask
@@ -619,8 +729,8 @@ public class TasksController : Controller
             .Where(id => !string.IsNullOrEmpty(id))
             .Distinct()
             .ToList();
-        
-        if (user != null && !usersToFetchRolesFor.Contains(user.Id)) 
+
+        if (user != null && !usersToFetchRolesFor.Contains(user.Id))
             usersToFetchRolesFor.Add(user.Id);
 
         var userRolesMap = new Dictionary<string, IList<string>>();
@@ -634,67 +744,132 @@ public class TasksController : Controller
         }
 
         // 🔥 FILTER TASKS BASED ON ROLE RULES
-    // Pre-fetch hierarchy for visibility check
-    var userHierarchy = await _userManager.Users
-        .Where(u => u.Id != null)
-        .Select(u => new { u.Id, u.ManagerId })
-        .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+        // Pre-fetch hierarchy for visibility check
+        var userHierarchy = await _userManager.Users
+            .Where(u => u.Id != null)
+            .Select(u => new { u.Id, u.ManagerId })
+            .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
 
-    var visibleTasks = new List<TaskItem>();
-    var viewerRoles = userRolesMap.ContainsKey(user.Id) ? userRolesMap[user.Id] : new List<string>();
+        var visibleTasks = new List<TaskItem>();
+        var viewerRoles = userRolesMap.ContainsKey(user.Id) ? userRolesMap[user.Id] : new List<string>();
 
-    foreach (var task in allTasks)
-    {
-        if (CanUserSeeTaskOptimized(task, user.Id, viewerRoles, userRolesMap, userHierarchy))
-            visibleTasks.Add(task);
-    }
+        foreach (var task in allTasks)
+        {
+            if (CanUserSeeTaskOptimized(task, user.Id, viewerRoles, userRolesMap, userHierarchy))
+                visibleTasks.Add(task);
+        }
 
         // Attach filtered tasks to columns
         foreach (var col in columns)
         {
+            var targetColName = col.ColumnName?.Trim().ToLower();
+
+            // Task belongs here if:
+            // 1. It is explicitly in this column
+            // 2. Cross-team tracking: It matches the column name (History/Review/Completed mapping)
             col.Tasks = visibleTasks
-                .Where(t => t.ColumnId == col.Id)
+                .Where(t => t.ColumnId == col.Id || (t.TeamName != team && t.Column?.ColumnName?.Trim().ToLower() == targetColName))
                 .ToList();
         }
 
         // ✅ 1. Load assignable users and assignors based on role/hierarchy
         var allUsers = await _userManager.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync();
+
+        // Fetch UserIds belonging to the current team
+        var teamUserIds = await _context.UserTeams
+            .Where(ut => ut.TeamName == team)
+            .Select(ut => ut.UserId)
+            .ToListAsync();
+
         var assignableUsers = new List<Users>();
         var assignors = new List<Users>();
 
         // We need hierarchy map for visibility check
         var fullHierarchy = allUsers.Where(u => !string.IsNullOrEmpty(u.Id)).ToDictionary(u => u.Id, u => u.ParentUserId);
-        
+
         // Roles for everyone for filtering
         var allUserRoles = new Dictionary<string, string>();
-        foreach(var u in allUsers)
+        foreach (var u in allUsers)
         {
             var r = await _userManager.GetRolesAsync(u);
-            allUserRoles[u.Id] = r.FirstOrDefault() ?? "User";
+            var primaryRole = r.FirstOrDefault() ?? "User";
+
+            // Prioritize Sub-Manager for display. 
+            // In this system, a Sub-Manager often has the Identity role "Manager" but has a ParentUserId.
+            if (r.Contains("Sub-Manager") || r.Contains("SubManager") || (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId)))
+                allUserRoles[u.Id] = "Sub-Manager";
+            else if (primaryRole == "Manager")
+                allUserRoles[u.Id] = "Manager";
+            else
+                allUserRoles[u.Id] = primaryRole;
         }
 
-        // Show all users for assignment regardless of role
-        assignableUsers = allUsers;
-
+        // Populate FilteredAssignees for the top-level board filter (Hierarchical + Team restricted)
+        var filteredAssignees = new List<Users>();
         if (viewerRoles.Contains("Admin"))
         {
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+            filteredAssignees = allUsers;
         }
         else if (viewerRoles.Contains("Manager"))
         {
-            // Managers see assignors: Admins
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin").ToList();
+            filteredAssignees.Add(user);
+            var directSubordinates = allUsers.Where(u => u.ParentUserId == user.Id).ToList();
+            filteredAssignees.AddRange(directSubordinates);
+            foreach (var sub in directSubordinates)
+            {
+                filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == sub.Id));
+            }
         }
         else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
         {
-            // Sub-Managers see assignors: Admins + Managers
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+            filteredAssignees.Add(user);
+            filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == user.Id));
         }
-        else // User
+        else
         {
-            // Users see assignors: Everyone (Admins, Managers, Sub-Managers)
-            assignors = allUsers.Where(u => allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager").ToList();
+            filteredAssignees.Add(user);
         }
+
+        // Role priority for sorting: Admin (1), Manager (2), Sub-Manager (3), User (4)
+        var rolePriority = new Dictionary<string, int>
+        {
+            { "Admin", 1 },
+            { "Manager", 2 },
+            { "Sub-Manager", 3 },
+            { "User", 4 }
+        };
+
+        // ✅ Apply Team Filter: "show only fronted team" (the selected team members only)
+        filteredAssignees = filteredAssignees
+            .DistinctBy(u => u.Id)
+            .Where(u => teamUserIds.Contains(u.Id))
+            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles.ContainsKey(u.Id) ? allUserRoles[u.Id] : "User", 99))
+            .ThenBy(u => u.Name ?? u.UserName)
+            .ToList();
+
+        // Also restrict assignableUsers (Quick Assign) to the team members
+        assignableUsers = allUsers.Where(u => teamUserIds.Contains(u.Id)).ToList();
+
+        // Role mapping for FE logic
+        var feUserRolesMap = new Dictionary<string, string>();
+        foreach (var u in allUsers)
+        {
+            if (allUserRoles.ContainsKey(u.Id))
+                feUserRolesMap[u.Id] = allUserRoles[u.Id];
+        }
+
+        // ✅ 2. Define Assignors (Who can assign tasks)
+        // Includes anyone with Admin, Manager, or Sub-Manager role, sorted by priority
+        assignors = allUsers
+            .Where(u => allUserRoles.ContainsKey(u.Id) &&
+                (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
+            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles[u.Id], 99))
+            .ThenBy(u => u.Name ?? u.UserName)
+            .ToList();
+
+        // ✅ 3. Define Assignable Users (Who can be assigned tasks)
+        // Pass ALL users to the view; visibility will be handled by the view logic based on role hierarchy
+        assignableUsers = allUsers;
 
         // Get all team names for the assignment dropdown
         var allTeamNames = await _context.TeamColumns
@@ -721,11 +896,13 @@ public class TasksController : Controller
             TeamName = team,
             Columns = columns,
             AssignableUsers = assignableUsers,
+            FilteredAssignees = filteredAssignees,
             Assignors = assignors,
             AllTeamNames = allTeamNames,
             CustomFields = customFields,
             UserPermissions = userPerms,
-            TeamSettings = teamSettings
+            TeamSettings = teamSettings,
+            UserRolesMap = feUserRolesMap
         };
 
         // ✅ 3. Return partial view
@@ -879,8 +1056,8 @@ public class TasksController : Controller
         if (viewerRoles.Contains("Admin"))
             return true;
 
-        // Creator and Assignee always see their tasks
-        if (task.CreatedByUserId == currentUserId || task.AssignedToUserId == currentUserId)
+        // Creator, Assignee, and Assignor always see their tasks
+        if (task.CreatedByUserId == currentUserId || task.AssignedToUserId == currentUserId || task.AssignedByUserId == currentUserId)
             return true;
 
         // Managerial Role Check (Hierarchy based)
@@ -888,7 +1065,7 @@ public class TasksController : Controller
         if (isManagerOrSub)
         {
             // Does the creator or assignee report to the current manager?
-            if (IsUnderManager(task.CreatedByUserId, currentUserId, hierarchyMap) || 
+            if (IsUnderManager(task.CreatedByUserId, currentUserId, hierarchyMap) ||
                 IsUnderManager(task.AssignedToUserId, currentUserId, hierarchyMap))
             {
                 return true;
@@ -901,11 +1078,11 @@ public class TasksController : Controller
     private bool IsUnderManager(string? userId, string managerId, Dictionary<string, string?> hierarchyMap)
     {
         if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(managerId)) return false;
-        
+
         string? currentUserIdToCheck = userId;
         int maxDepth = 20; // Safety against cycles
         int depth = 0;
-        
+
         while (hierarchyMap.TryGetValue(currentUserIdToCheck, out var parentId) && !string.IsNullOrEmpty(parentId) && depth < maxDepth)
         {
             if (parentId == managerId) return true;
@@ -931,7 +1108,7 @@ public class TasksController : Controller
         var map = new Dictionary<string, IList<string>> { { currentUser.Id, roles } };
         // We don't really need the userRolesMap for the new hierarchical logic unless we want to keep the old role logic
         // but the requirement is "only to user and admin and their manager".
-        
+
         return CanUserSeeTaskOptimized(task, currentUser.Id, roles, map, userHierarchy);
     }
 
@@ -964,7 +1141,7 @@ public class TasksController : Controller
         var sourceColName = task.Column?.ColumnName?.Trim().ToLower();
 
         // ═══════ ROLE-BASED RESTRICTIONS ═══════
-        
+
         // 1. COMPLETED column: ONLY Admin OR users with ReviewTask permission can move tasks here
         if (targetColName == "completed")
         {
@@ -1135,7 +1312,7 @@ public class TasksController : Controller
                 task.CompletedByUserId = task.AssignedToUserId;
                 task.CompletedAt = DateTime.UtcNow;
                 task.CurrentColumnEntryAt = DateTime.UtcNow;
-                
+
                 await _context.SaveChangesAsync();
 
                 // 🚀 BROADCAST UPDATE (Review Result)
@@ -1365,10 +1542,17 @@ public class TasksController : Controller
         }
 
         // 1. Find the FIRST column for the target team
-        var targetColumn = await _context.TeamColumns
+        var targetColumn = (await _context.TeamColumns
             .Where(c => c.TeamName == model.TeamName)
-            .OrderBy(c => c.Order)
-            .FirstOrDefaultAsync();
+            .ToListAsync())
+            .OrderBy(c =>
+            {
+                var name = c.ColumnName?.Trim().ToLower();
+                if (name == "review") return 1000;
+                if (name == "completed") return 1001;
+                return c.Order;
+            })
+            .FirstOrDefault();
 
         if (targetColumn == null)
             return BadRequest($"No columns found for team '{model.TeamName}'. Create columns first.");
@@ -1600,20 +1784,40 @@ public class TasksController : Controller
             .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .ToListAsync();
 
+        // Get the set of user IDs that belong to this specific team
+        var teamUserIds = await _context.UserTeams
+            .Where(ut => ut.TeamName == team)
+            .Select(ut => ut.UserId)
+            .ToHashSetAsync();
+
         var result = new List<BoardPermissionDto>();
 
         foreach (var u in users)
         {
-            var roles = await _userManager.GetRolesAsync(u);
-            if (roles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
-            
+            var rawRoles = await _userManager.GetRolesAsync(u);
+            if (rawRoles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
+
+            string primaryRole = rawRoles.FirstOrDefault() ?? "User";
+            // Distinguish Sub Manager: role is "Manager" + has ParentUserId
+            if (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId))
+            {
+                primaryRole = "Sub Manager";
+            }
+
+            // 🔒 Scoping rule:
+            // - Manager (no ParentUserId): always show — they oversee all teams
+            // - Sub Manager / User: only show if they belong to this team
+            bool isTopLevelManager = primaryRole == "Manager";
+            if (!isTopLevelManager && !teamUserIds.Contains(u.Id))
+                continue;
+
             var p = perms.FirstOrDefault(x => x.UserId == u.Id);
-            
+
             result.Add(new BoardPermissionDto
             {
                 UserId = u.Id,
                 UserName = u.UserName ?? "Unknown",
-                Role = roles.FirstOrDefault() ?? "No Role",
+                Role = primaryRole,
                 TeamName = team,
                 CanAddColumn = p?.CanAddColumn ?? false,
                 CanRenameColumn = p?.CanRenameColumn ?? false,
@@ -1627,7 +1831,20 @@ public class TasksController : Controller
             });
         }
 
-        return Ok(result);
+        // Sort: Manager (1) -> Sub Manager (2) -> User (3)
+        var rolePriority = new Dictionary<string, int>
+        {
+            { "Manager", 1 },
+            { "Sub Manager", 2 },
+            { "User", 3 }
+        };
+
+        var sortedResult = result
+            .OrderBy(r => rolePriority.GetValueOrDefault(r.Role, 99))
+            .ThenBy(r => r.UserName)
+            .ToList();
+
+        return Ok(sortedResult);
     }
 
     [Authorize(Roles = "Admin")]
@@ -1661,7 +1878,7 @@ public class TasksController : Controller
                 var duplicates = allExisting.Where(p => p.Id != existing.Id).ToList();
                 _context.BoardPermissions.RemoveRange(duplicates);
             }
-            
+
             // Ensure team name is sanitized/standardized on the one we keep
             existing.TeamName = dto.TeamName.Trim();
         }
@@ -1720,10 +1937,10 @@ public class TasksController : Controller
 
         var oldTasks = await _context.TaskItems
             .Include(t => t.Column)
-            .Where(t => t.TeamName == teamName 
-                     && !t.IsArchived 
-                     && t.Column.ColumnName.ToLower().Trim() == "completed" 
-                     && t.CompletedAt.HasValue 
+            .Where(t => t.TeamName == teamName
+                     && !t.IsArchived
+                     && t.Column.ColumnName.ToLower().Trim() == "completed"
+                     && t.CompletedAt.HasValue
                      && t.CompletedAt.Value < today)
             .ToListAsync();
 
@@ -1771,28 +1988,51 @@ public class TasksController : Controller
         if (file == null || file.Length == 0)
             return BadRequest("No file uploaded");
 
-        if (file.Length > 5 * 1024 * 1024)
-            return BadRequest("File size exceeds 5MB limit");
+        // Enforce 2MB limit (user request)
+        if (file.Length > 2 * 1024 * 1024)
+            return BadRequest("File size exceeds 2MB limit");
 
         var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
         var extension = Path.GetExtension(file.FileName).ToLower();
         if (!allowedExtensions.Contains(extension))
             return BadRequest("Invalid file type");
 
-        var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "customfields");
-        if (!Directory.Exists(uploadsDir))
-            Directory.CreateDirectory(uploadsDir);
-
-        var fileName = $"{Guid.NewGuid()}{extension}";
-        var filePath = Path.Combine(uploadsDir, fileName);
-
-        using (var stream = new FileStream(filePath, FileMode.Create))
+        // Instead of saving to disk, convert to Base64 for the frontend to send back during Task creation/update
+        using (var ms = new MemoryStream())
         {
-            await file.CopyToAsync(stream);
+            await file.CopyToAsync(ms);
+            var fileBytes = ms.ToArray();
+            var base64String = Convert.ToBase64String(fileBytes);
+            var contentType = file.ContentType;
+            var dataUrl = $"data:{contentType};base64,{base64String}";
+
+            return Ok(new { success = true, url = dataUrl });
+        }
+    }
+
+    [HttpGet]
+    [Route("Tasks/GetFieldImage/{taskId}/{fieldId}")]
+    [Route("Tasks/GetFieldImageById/{id}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetFieldImage(int? taskId, int? fieldId, int? id)
+    {
+        TaskFieldValue fieldValue = null;
+
+        if (id.HasValue)
+        {
+            fieldValue = await _context.TaskFieldValues.FindAsync(id.Value);
+        }
+        else if (taskId.HasValue && fieldId.HasValue)
+        {
+            fieldValue = await _context.TaskFieldValues
+                .OrderByDescending(v => v.Id)
+                .FirstOrDefaultAsync(v => v.TaskId == taskId.Value && v.FieldId == fieldId.Value);
         }
 
-        var url = $"/uploads/customfields/{fileName}";
-        return Ok(new { success = true, url = url });
+        if (fieldValue == null || fieldValue.ImageData == null)
+            return NotFound();
+
+        return File(fieldValue.ImageData, fieldValue.ImageMimeType ?? "image/jpeg", fieldValue.FileName ?? "image.jpg");
     }
 
     public class UpdateTeamSettingsRequest

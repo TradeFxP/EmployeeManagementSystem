@@ -601,7 +601,13 @@ function openArchivedTaskDetail(taskId) {
                 ${t.customFields && t.customFields.length > 0 ? `
                     <div class="border-top pt-3 mt-3">
                         <h6 class="text-muted mb-2">Custom Fields</h6>
-                        ${t.customFields.map(f => `<div class="small mb-1"><strong>${escapeHtml(f.fieldName || '')}:</strong> ${escapeHtml(f.value || '')}</div>`).join('')}
+                        ${t.customFields.map(f => `
+                            <div class="small mb-1">
+                                <strong>${escapeHtml(f.fieldName || '')}:</strong> 
+                                ${(f.value && f.value.startsWith('/Tasks/GetFieldImage'))
+                    ? `<div class="mt-1"><img src="${f.value}" class="rounded border" style="max-height:100px; cursor:pointer;" onclick="window.open('${f.value}', '_blank')" /></div>`
+                    : escapeHtml(f.value || '')}
+                            </div>`).join('')}
                     </div>
                 ` : ''}
 

@@ -32,6 +32,12 @@ namespace UserRoles.ViewModels
         // Users who can appear in the "Filter By Assignor" dropdown
         public List<Users> Assignors { get; set; } = new();
 
+        // Users filtered by hierarchy for the top-level board filter
+        public List<Users> FilteredAssignees { get; set; } = new();
+
         public Team? TeamSettings { get; set; }
+        
+        // Map of UserId to their primary role (used for frontend filtering)
+        public Dictionary<string, string> UserRolesMap { get; set; } = new();
     }
 }
