@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using UserRoles.Hubs;
 using UserRoles.Data;
 using UserRoles.Models;
 using UserRoles.ViewModels;
@@ -13,11 +15,13 @@ namespace UserRoles.Controllers
     {
         private readonly AppDbContext _context;
         private readonly UserManager<Users> _userManager;
+        private readonly IHubContext<TaskHub> _hubContext;
 
-        public ProjectController(AppDbContext context, UserManager<Users> userManager)
+        public ProjectController(AppDbContext context, UserManager<Users> userManager, IHubContext<TaskHub> hubContext)
         {
             _context = context;
             _userManager = userManager;
+            _hubContext = hubContext;
         }
 
         // ==================== INDEX ====================
@@ -55,9 +59,21 @@ namespace UserRoles.Controllers
             var project = await _context.Projects
                 .Include(p => p.Members).ThenInclude(m => m.User)
                 .Include(p => p.Epics.OrderBy(e => e.Order))
+                    .ThenInclude(e => e.AssignedToUser)
+                .Include(p => p.Epics.OrderBy(e => e.Order))
+                    .ThenInclude(e => e.CreatedByUser)
+                .Include(p => p.Epics.OrderBy(e => e.Order))
+                    .ThenInclude(e => e.Features.OrderBy(f => f.Order))
+                        .ThenInclude(f => f.AssignedToUser)
+                .Include(p => p.Epics.OrderBy(e => e.Order))
+                    .ThenInclude(e => e.Features.OrderBy(f => f.Order))
+                        .ThenInclude(f => f.Stories.OrderBy(s => s.Order))
+                            .ThenInclude(s => s.AssignedToUser)
+                .Include(p => p.Epics.OrderBy(e => e.Order))
                     .ThenInclude(e => e.Features.OrderBy(f => f.Order))
                         .ThenInclude(f => f.Stories.OrderBy(s => s.Order))
                             .ThenInclude(s => s.Tasks)
+                                .ThenInclude(t => t.AssignedToUser)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             if (project == null)
@@ -83,7 +99,20 @@ namespace UserRoles.Controllers
         [HttpGet]
         public async Task<IActionResult> GetProjects()
         {
-            var projects = await _context.Projects
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Unauthorized();
+
+            var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+
+            IQueryable<Project> query = _context.Projects;
+
+            if (!isAdmin)
+            {
+                query = query.Where(p => p.CreatedByUserId == user.Id || p.Members.Any(m => m.UserId == user.Id));
+            }
+
+            var projects = await query
+                .OrderByDescending(p => p.CreatedAt)
                 .Select(p => new { p.Id, p.Name })
                 .ToListAsync();
 
@@ -144,7 +173,8 @@ namespace UserRoles.Controllers
                 ProjectId = model.ProjectId,
                 Order = epicCount + 1,
                 CreatedAt = DateTime.UtcNow,
-                CreatedByUserId = user.Id
+                CreatedByUserId = user.Id,
+                AssignedToUserId = model.AssignedToUserId
             };
 
             _context.Epics.Add(epic);
@@ -289,7 +319,7 @@ namespace UserRoles.Controllers
                 Status = Models.Enums.TaskStatus.ToDo,
                 CreatedAt = DateTime.UtcNow,
                 CreatedByUserId = user.Id,
-                AssignedToUserId = user.Id,
+                AssignedToUserId = model.AssignedToUserId ?? user.Id,
                 AssignedByUserId = user.Id,
                 AssignedAt = DateTime.UtcNow
             };
@@ -509,6 +539,7 @@ namespace UserRoles.Controllers
 
             epic.Title = model.Title.Trim();
             epic.Description = model.Description?.Trim();
+            epic.AssignedToUserId = model.AssignedToUserId;
             epic.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -524,6 +555,7 @@ namespace UserRoles.Controllers
 
             feature.Title = model.Title.Trim();
             feature.Description = model.Description?.Trim();
+            feature.AssignedToUserId = model.AssignedToUserId;
             feature.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -539,6 +571,7 @@ namespace UserRoles.Controllers
 
             story.Title = model.Title.Trim();
             story.Description = model.Description?.Trim();
+            story.AssignedToUserId = model.AssignedToUserId;
             story.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -590,6 +623,9 @@ namespace UserRoles.Controllers
             _context.ProjectMembers.Add(member);
             await _context.SaveChangesAsync();
 
+            // Notify the user in real-time
+            await _hubContext.Clients.User(model.UserId).SendAsync("ProjectAccessUpdated");
+
             return Ok(new { success = true });
         }
 
@@ -605,6 +641,53 @@ namespace UserRoles.Controllers
             _context.ProjectMembers.Remove(member);
             await _context.SaveChangesAsync();
 
+            return Ok(new { success = true });
+        }
+
+        // ==================== QUICK ASSIGN ====================
+        [HttpPost]
+        public async Task<IActionResult> QuickAssignWorkItem([FromBody] QuickAssignRequest model)
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Unauthorized();
+
+            bool isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+
+            switch (model.ItemType.ToLower())
+            {
+                case "epic":
+                    var epic = await _context.Epics.FindAsync(model.ItemId);
+                    if (epic == null) return NotFound();
+                    epic.AssignedToUserId = model.UserId;
+                    epic.UpdatedAt = DateTime.UtcNow;
+                    break;
+
+                case "feature":
+                    var feature = await _context.Features.FindAsync(model.ItemId);
+                    if (feature == null) return NotFound();
+                    feature.AssignedToUserId = model.UserId;
+                    feature.UpdatedAt = DateTime.UtcNow;
+                    break;
+
+                case "story":
+                    var story = await _context.Stories.FindAsync(model.ItemId);
+                    if (story == null) return NotFound();
+                    story.AssignedToUserId = model.UserId;
+                    story.UpdatedAt = DateTime.UtcNow;
+                    break;
+
+                case "task":
+                    var task = await _context.TaskItems.FindAsync(model.ItemId);
+                    if (task == null) return NotFound();
+                    task.AssignedToUserId = model.UserId;
+                    task.UpdatedAt = DateTime.UtcNow;
+                    break;
+
+                default:
+                    return BadRequest("Invalid item type");
+            }
+
+            await _context.SaveChangesAsync();
             return Ok(new { success = true });
         }
 

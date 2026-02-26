@@ -20,6 +20,7 @@ namespace UserRoles.ViewModels
         public int ProjectId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public string? AssignedToUserId { get; set; }
     }
 
     public class CreateFeatureRequest
@@ -51,6 +52,7 @@ namespace UserRoles.ViewModels
         public int StoryId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public string? AssignedToUserId { get; set; }
     }
 
     public class AddProjectMemberRequest
@@ -75,5 +77,12 @@ namespace UserRoles.ViewModels
         public string Title { get; set; } = string.Empty;
         public string Breadcrumb { get; set; } = string.Empty;
         public int Id { get; set; }
+    }
+
+    public class QuickAssignRequest
+    {
+        public string ItemType { get; set; } = string.Empty; // epic, feature, story, task
+        public int ItemId { get; set; }
+        public string UserId { get; set; } = string.Empty;
     }
 }

@@ -779,18 +779,15 @@ public class TasksController : Controller
             })
             .ToList();
 
-        // Load all tasks:
-        // 1. Tasks in this team
-        // 2. Tasks assigned BY this user (cross-team tracking)
-        // 3. Tasks assigned TO this user (cross-team tracking)
+        // Load all tasks for this team:
         var allTasks = await _context.TaskItems
-            .Where(t => (t.TeamName == team || t.AssignedByUserId == user.Id || t.AssignedToUserId == user.Id) && !t.IsArchived)
+            .Where(t => t.TeamName == team && !t.IsArchived)
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
             .Include(t => t.ReviewedByUser)
             .Include(t => t.CompletedByUser)
-            .Include(t => t.Column) // Included for cross-team mapping if needed
+            .Include(t => t.Column)
             .Include(t => t.CustomFieldValues)
                 .ThenInclude(v => v.Field)
             .ToListAsync();
@@ -835,13 +832,9 @@ public class TasksController : Controller
         // Attach filtered tasks to columns
         foreach (var col in columns)
         {
-            var targetColName = col.ColumnName?.Trim().ToLower();
-
-            // Task belongs here if:
-            // 1. It is explicitly in this column
-            // 2. Cross-team tracking: It matches the column name (History/Review/Completed mapping)
+            // Task belongs here if it is explicitly in this column
             col.Tasks = visibleTasks
-                .Where(t => t.ColumnId == col.Id || (t.TeamName != team && t.Column?.ColumnName?.Trim().ToLower() == targetColName))
+                .Where(t => t.ColumnId == col.Id)
                 .ToList();
         }
 

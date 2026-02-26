@@ -162,6 +162,13 @@ namespace UserRoles.Data
                 .HasForeignKey(f => f.AssignedToUserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // Epic Assignment
+            builder.Entity<Epic>()
+                .HasOne(e => e.AssignedToUser)
+                .WithMany()
+                .HasForeignKey(e => e.AssignedToUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Story Assignment
             builder.Entity<Story>()
                 .HasOne(s => s.AssignedToUser)

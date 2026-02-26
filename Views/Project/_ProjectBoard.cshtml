@@ -7,6 +7,36 @@
     var currentUser = await UserManager.GetUserAsync(User);
 }
 
+<style>
+    /* Hierarchy Specific Colors */
+    .epic-badge { background-color: #6f42c1 !important; } /* Purple */
+    .feature-badge { background-color: #0d6efd !important; } /* Blue */
+    .story-badge { background-color: #198754 !important; } /* Green */
+    .task-badge { background-color: #6c757d !important; } /* Gray */
+
+    .work-item-card {
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .work-item-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* Breakdown Restriction Styles */
+    .btn.disabled.opacity-50 {
+        cursor: not-allowed;
+        pointer-events: auto; /* Allow tooltip to show */
+    }
+
+    .badge-assignee {
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 0.35em 0.65em;
+        border-radius: 50rem;
+    }
+</style>
+
 <div class="project-board-header d-flex justify-content-between align-items-center mb-4">
     <div class="d-flex align-items-center gap-3">
         <button id="backToProjectsBtn" 
@@ -85,13 +115,32 @@
                                     <i class="bi bi-person me-1"></i>@(epic.CreatedByUser.Name ?? epic.CreatedByUser.UserName)
                                 </span>
                             }
+                            @if (epic.AssignedToUser != null)
+                            {
+                                <span class="badge bg-info text-white ms-2" title="Assigned to">
+                                    <i class="bi bi-person-fill me-1"></i>@(epic.AssignedToUser.Name ?? epic.AssignedToUser.UserName)
+                                </span>
+                            }
                         </div>
                         <div class="work-item-actions" onclick="event.stopPropagation()">
-                            <button class="btn btn-sm btn-outline-primary" 
-                                    onclick="openCreateFeatureModal(@epic.Id, '@epic.WorkItemId')" 
-                                    title="Add Feature">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
+                            @if (User.IsInRole("Admin") || Model.Project?.CreatedByUserId == currentUser?.Id)
+                            {
+                                <button class="btn btn-sm btn-outline-info me-1" 
+                                        onclick="openQuickAssignModal('epic', @epic.Id, '@epic.AssignedToUserId')" 
+                                        title="Assign Epic">
+                                    <i class="bi bi-person-plus"></i>
+                                </button>
+                            }
+
+                            @if (User.IsInRole("Admin") || epic.AssignedToUserId == currentUser?.Id)
+                            {
+                                bool canAdd = User.IsInRole("Admin") || !string.IsNullOrEmpty(epic.AssignedToUserId);
+                                <button class="btn btn-sm @(canAdd ? "btn-outline-primary" : "btn-outline-secondary opacity-50")" 
+                                        onclick="@(canAdd ? $"openCreateFeatureModal({epic.Id}, '{epic.WorkItemId}')" : "showToast('Assign Epic first to add features', 'warning')")" 
+                                        title="@(canAdd ? "Add Feature" : "Assign Epic first to add features")">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            }
                             <button class="btn btn-sm btn-outline-secondary" 
                                     data-id="@epic.Id"
                                     data-title="@epic.Title"
@@ -141,11 +190,21 @@
                                             }
                                         </div>
                                         <div class="work-item-actions" onclick="event.stopPropagation()">
+                                            @if (User.IsInRole("Admin") || Model.Project?.CreatedByUserId == currentUser?.Id || epic.AssignedToUserId == currentUser?.Id)
+                                            {
+                                                <button class="btn btn-sm btn-outline-info me-1" 
+                                                        onclick="openQuickAssignModal('feature', @feature.Id, '@feature.AssignedToUserId')" 
+                                                        title="Assign Feature">
+                                                    <i class="bi bi-person-plus"></i>
+                                                </button>
+                                            }
+
                                             @if (User.IsInRole("Admin") || feature.AssignedToUserId == currentUser?.Id)
                                             {
-                                                <button class="btn btn-sm btn-outline-success" 
-                                                        onclick="openCreateStoryModal(@feature.Id, '@feature.WorkItemId')" 
-                                                        title="Add Story">
+                                                bool canAdd = User.IsInRole("Admin") || !string.IsNullOrEmpty(feature.AssignedToUserId);
+                                                <button class="btn btn-sm @(canAdd ? "btn-outline-success" : "btn-outline-secondary opacity-50")" 
+                                                        onclick="@(canAdd ? $"openCreateStoryModal({feature.Id}, '{feature.WorkItemId}')" : "showToast('Assign Feature first to add stories', 'warning')")" 
+                                                        title="@(canAdd ? "Add Story" : "Assign Feature first to add stories")">
                                                     <i class="bi bi-plus-lg"></i>
                                                 </button>
                                             }
@@ -198,11 +257,21 @@
                                                             }
                                                         </div>
                                                         <div class="work-item-actions" onclick="event.stopPropagation()">
+                                                            @if (User.IsInRole("Admin") || Model.Project?.CreatedByUserId == currentUser?.Id || feature.AssignedToUserId == currentUser?.Id)
+                                                            {
+                                                                <button class="btn btn-sm btn-outline-info me-1" 
+                                                                        onclick="openQuickAssignModal('story', @story.Id, '@story.AssignedToUserId')" 
+                                                                        title="Assign Story">
+                                                                    <i class="bi bi-person-plus"></i>
+                                                                </button>
+                                                            }
+
                                                             @if (User.IsInRole("Admin") || story.AssignedToUserId == currentUser?.Id)
                                                             {
-                                                                <button class="btn btn-sm btn-outline-secondary" 
-                                                                        onclick="openCreateProjectTaskModal(@story.Id, '@story.WorkItemId')" 
-                                                                        title="Add Task">
+                                                                bool canAdd = User.IsInRole("Admin") || !string.IsNullOrEmpty(story.AssignedToUserId);
+                                                                <button class="btn btn-sm @(canAdd ? "btn-outline-secondary" : "btn-outline-secondary opacity-50")" 
+                                                                        onclick="@(canAdd ? $"openCreateProjectTaskModal({story.Id}, '{story.WorkItemId}')" : "showToast('Assign Story first to add tasks', 'warning')")" 
+                                                                        title="@(canAdd ? "Add Task" : "Assign Story first to add tasks")">
                                                                     <i class="bi bi-plus-lg"></i>
                                                                 </button>
                                                             }
@@ -246,6 +315,15 @@
                                                                             <span class="work-item-title">@task.Title</span>
                                                                         </div>
                                                                         <div class="work-item-actions">
+                                                                            @if (User.IsInRole("Admin") || Model.Project?.CreatedByUserId == currentUser?.Id || story.AssignedToUserId == currentUser?.Id)
+                                                                            {
+                                                                                <button class="btn btn-sm btn-outline-info me-2" 
+                                                                                        onclick="openQuickAssignModal('task', @task.Id, '@task.AssignedToUserId')" 
+                                                                                        title="Assign Task">
+                                                                                    <i class="bi bi-person-plus"></i>
+                                                                                </button>
+                                                                            }
+
                                                                             <button class="btn btn-sm btn-outline-warning me-2" 
                                                                                     onclick="openAssignTaskToTeamModal(@task.Id, '@task.Title')" 
                                                                                     title="Assign to Team">
@@ -292,6 +370,16 @@
                     <label class="form-label fw-bold">Description</label>
                     <textarea id="epicDescription" class="form-control description-textarea" rows="5" placeholder="Optional description (supports long text)" maxlength="2000"></textarea>
                     <div class="form-text"><span id="epicDescChars">0</span>/2000 characters</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Assign To</label>
+                    <select id="epicAssignee" class="form-select">
+                        <option value="">-- Unassigned --</option>
+                        @foreach (var user in Model.AssignableUsers)
+                        {
+                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                        }
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
@@ -492,6 +580,16 @@
                     <label class="form-label fw-bold">Description</label>
                     <textarea id="projectTaskDescription" class="form-control description-textarea" rows="5" placeholder="Optional description" maxlength="2000"></textarea>
                     <div class="form-text"><span id="taskDescChars">0</span>/2000 characters</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Assign To</label>
+                    <select id="projectTaskAssignee" class="form-select">
+                        <option value="">-- Unassigned --</option>
+                        @foreach (var user in Model.AssignableUsers)
+                        {
+                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                        }
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
@@ -818,10 +916,84 @@
     50% { box-shadow: 0 0 0 15px rgba(111, 66, 193, 0); }
     100% { box-shadow: 0 0 0 0 rgba(111, 66, 193, 0); }
 }
+    <!-- QUICK ASSIGN WORK ITEM MODAL -->
+    <div class="modal fade" id="quickAssignModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Quick Assign</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <input type="hidden" id="quickAssignType" />
+                    <input type="hidden" id="quickAssignId" />
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Assignee</label>
+                        <select id="quickAssignUserSelect" class="form-select form-select-lg">
+                            <option value="">-- Unassigned --</option>
+                            @foreach (var m in Model.Project?.Members ?? new List<ProjectMember>())
+                            {
+                                <option value="@m.UserId">@(m.User?.Name ?? m.User?.UserName)</option>
+                            }
+                        </select>
+                        <div class="form-text mt-2 text-info">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Assigning this item will unlock its breakdown capabilities.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-link text-decoration-none text-muted" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info px-4 text-white fw-bold" onclick="submitQuickAssign()">
+                        Confirm Assignment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </style>
 
 <script>
 (function() {
+    window.submitQuickAssign = function() {
+        const type = document.getElementById('quickAssignType').value;
+        const id = document.getElementById('quickAssignId').value;
+        const userId = document.getElementById('quickAssignUserSelect').value;
+
+        const btn = document.querySelector('#quickAssignModal .btn-info');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Updating...';
+
+        fetch('/Project/QuickAssignWorkItem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemType: type, itemId: parseInt(id), userId: userId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('quickAssignModal'))?.hide();
+                loadProjectBoard(document.getElementById('currentProjectId').value);
+                showToast('Assignment updated successfully', 'success');
+            } else {
+                throw new Error(data.message || 'Failed to update assignment');
+            }
+        })
+        .catch(err => {
+            showToast(err.message, 'danger');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        });
+    };
+
+    window.openQuickAssignModal = function(type, id, currentUserId) {
+        document.getElementById('quickAssignType').value = type;
+        document.getElementById('quickAssignId').value = id;
+        document.getElementById('quickAssignUserSelect').value = currentUserId || "";
+        new bootstrap.Modal(document.getElementById('quickAssignModal')).show();
+    };
+
     // ===== EXPAND/COLLAPSE =====
     window.toggleEpicExpand = function(epicId) {
         const body = document.getElementById(`epicBody-${epicId}`);
@@ -1027,7 +1199,8 @@
         const data = {
             projectId: parseInt(projectId),
             title: title,
-            description: document.getElementById('epicDescription').value.trim()
+            description: document.getElementById('epicDescription').value.trim(),
+            assignedToUserId: document.getElementById('epicAssignee').value
         };
 
         fetch('/Project/CreateEpic', {
@@ -1111,7 +1284,8 @@
         const data = {
             storyId: parseInt(document.getElementById('taskStoryId').value),
             title: title,
-            description: document.getElementById('projectTaskDescription').value.trim()
+            description: document.getElementById('projectTaskDescription').value.trim(),
+            assignedToUserId: document.getElementById('projectTaskAssignee').value
         };
 
         fetch('/Project/CreateProjectTask', {
@@ -1327,6 +1501,45 @@
             element.classList.add('highlight-pulse');
             setTimeout(() => element.classList.remove('highlight-pulse'), 2000);
         }
+    };
+
+    window.submitQuickAssign = function() {
+        const type = document.getElementById('quickAssignType').value;
+        const id = document.getElementById('quickAssignId').value;
+        const userId = document.getElementById('quickAssignUserSelect').value;
+
+        const btn = document.querySelector('#quickAssignModal .btn-info');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Updating...';
+
+        fetch('/Project/QuickAssignWorkItem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ itemType: type, itemId: parseInt(id), userId: userId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('quickAssignModal'))?.hide();
+                loadProjectBoard(document.getElementById('currentProjectId').value);
+                showToast('Assignment updated successfully', 'success');
+            } else {
+                throw new Error(data.message || 'Failed to update assignment');
+            }
+        })
+        .catch(err => {
+            showToast(err.message, 'danger');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        });
+    };
+
+    window.openQuickAssignModal = function(type, id, currentUserId) {
+        document.getElementById('quickAssignType').value = type;
+        document.getElementById('quickAssignId').value = id;
+        document.getElementById('quickAssignUserSelect').value = currentUserId || "";
+        new bootstrap.Modal(document.getElementById('quickAssignModal')).show();
     };
 
     // ===== ASSIGN TO TEAM =====
