@@ -329,6 +329,32 @@
                                                                                     title="Assign to Team">
                                                                                 <i class="bi bi-arrow-right-circle"></i>
                                                                             </button>
+
+                                                                            <button class="btn btn-sm btn-outline-secondary me-2" 
+                                                                                    data-id="@task.Id"
+                                                                                    data-title="@task.Title"
+                                                                                    data-description="@task.Description"
+                                                                                    onclick="openEditProjectTaskModal(this)" 
+                                                                                    title="Edit">
+                                                                                <i class="bi bi-pencil"></i>
+                                                                            </button>
+
+                                                                            @if (User.IsInRole("Admin"))
+                                                                            {
+                                                                                <button class="btn btn-sm btn-outline-danger me-2" 
+                                                                                        onclick="deleteProjectTask(@task.Id)" 
+                                                                                        title="Delete">
+                                                                                    <i class="bi bi-trash"></i>
+                                                                                </button>
+                                                                            }
+
+                                                                            @if (task.AssignedToUser != null)
+                                                                            {
+                                                                                <span class="badge bg-info text-white me-2" title="Assigned to">
+                                                                                    <i class="bi bi-person-fill me-1"></i>@(task.AssignedToUser.Name ?? task.AssignedToUser.UserName)
+                                                                                </span>
+                                                                            }
+
                                                                             <span class="badge bg-@(task.Status.ToString().ToLower() == "complete" ? "success" : task.Status.ToString().ToLower() == "doing" ? "warning" : "secondary")">
                                                                                 @task.Status
                                                                             </span>
@@ -373,11 +399,16 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Assign To</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control user-search-input" placeholder="Search members..." onkeyup="filterUserList(this, 'epicAssignee')" />
+                    </div>
                     <select id="epicAssignee" class="form-select">
                         <option value="">-- Unassigned --</option>
                         @foreach (var user in Model.AssignableUsers)
                         {
-                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                            var role = Model.UserRolesMap.ContainsKey(user.Id) ? Model.UserRolesMap[user.Id] : "Member";
+                            <option value="@user.Id">[@role] @(user.Name ?? user.UserName)</option>
                         }
                     </select>
                 </div>
@@ -438,11 +469,16 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Assign To</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control user-search-input" placeholder="Search members..." onkeyup="filterUserList(this, 'featureAssignee')" />
+                    </div>
                     <select id="featureAssignee" class="form-select">
                         <option value="">-- Unassigned --</option>
                         @foreach (var user in Model.AssignableUsers)
                         {
-                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                            var role = Model.UserRolesMap.ContainsKey(user.Id) ? Model.UserRolesMap[user.Id] : "Member";
+                            <option value="@user.Id">[@role] @(user.Name ?? user.UserName)</option>
                         }
                     </select>
                 </div>
@@ -508,11 +544,16 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Assign To</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control user-search-input" placeholder="Search members..." onkeyup="filterUserList(this, 'storyAssignee')" />
+                    </div>
                     <select id="storyAssignee" class="form-select">
                         <option value="">-- Unassigned --</option>
                         @foreach (var user in Model.AssignableUsers)
                         {
-                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                            var role = Model.UserRolesMap.ContainsKey(user.Id) ? Model.UserRolesMap[user.Id] : "Member";
+                            <option value="@user.Id">[@role] @(user.Name ?? user.UserName)</option>
                         }
                     </select>
                 </div>
@@ -583,11 +624,16 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Assign To</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control user-search-input" placeholder="Search members..." onkeyup="filterUserList(this, 'projectTaskAssignee')" />
+                    </div>
                     <select id="projectTaskAssignee" class="form-select">
                         <option value="">-- Unassigned --</option>
                         @foreach (var user in Model.AssignableUsers)
                         {
-                            <option value="@user.Id">@(user.Name ?? user.UserName)</option>
+                            var role = Model.UserRolesMap.ContainsKey(user.Id) ? Model.UserRolesMap[user.Id] : "Member";
+                            <option value="@user.Id">[@role] @(user.Name ?? user.UserName)</option>
                         }
                     </select>
                 </div>
@@ -595,6 +641,48 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button class="btn btn-dark" onclick="createProjectTask()">Create Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT PROJECT TASK MODAL -->
+<div class="modal fade" id="editProjectTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-purple text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Task</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editProjectTaskId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Title</label>
+                    <input type="text" id="editProjectTaskTitle" class="form-control form-control-lg" placeholder="Task title..." />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <textarea id="editProjectTaskDescription" class="form-control description-textarea" placeholder="Detailed description..."></textarea>
+                </div>
+                 <div class="mb-3">
+                    <label class="form-label fw-bold">Assign To</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control user-search-input" placeholder="Search members..." onkeyup="filterUserList(this, 'editProjectTaskAssignee')" />
+                    </div>
+                    <select id="editProjectTaskAssignee" class="form-select">
+                        <option value="">-- Unassigned --</option>
+                        @foreach (var user in Model.AssignableUsers)
+                        {
+                            var role = Model.UserRolesMap.ContainsKey(user.Id) ? Model.UserRolesMap[user.Id] : "Member";
+                            <option value="@user.Id">[@role] @(user.Name ?? user.UserName)</option>
+                        }
+                    </select>
+                </div> 
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-purple" onclick="submitUpdateProjectTask()">Save Changes</button>
             </div>
         </div>
     </div>
@@ -915,43 +1003,48 @@
     0% { box-shadow: 0 0 0 0 rgba(111, 66, 193, 0.7); }
     50% { box-shadow: 0 0 0 15px rgba(111, 66, 193, 0); }
     100% { box-shadow: 0 0 0 0 rgba(111, 66, 193, 0); }
-}
-    <!-- QUICK ASSIGN WORK ITEM MODAL -->
-    <div class="modal fade" id="quickAssignModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content shadow-lg border-0">
-                <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Quick Assign</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <input type="hidden" id="quickAssignType" />
-                    <input type="hidden" id="quickAssignId" />
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Select Assignee</label>
-                        <select id="quickAssignUserSelect" class="form-select form-select-lg">
-                            <option value="">-- Unassigned --</option>
-                            @foreach (var m in Model.Project?.Members ?? new List<ProjectMember>())
-                            {
-                                <option value="@m.UserId">@(m.User?.Name ?? m.User?.UserName)</option>
-                            }
-                        </select>
-                        <div class="form-text mt-2 text-info">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Assigning this item will unlock its breakdown capabilities.
-                        </div>
+</style>
+
+<!-- QUICK ASSIGN WORK ITEM MODAL -->
+<div class="modal fade" id="quickAssignModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Quick Assign</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <input type="hidden" id="quickAssignType" />
+                <input type="hidden" id="quickAssignId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Assignee</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control user-search-input" placeholder="Search members..." onkeyup="filterUserList(this, 'quickAssignUserSelect')" />
+                    </div>
+                    <select id="quickAssignUserSelect" class="form-select form-select-lg">
+                        <option value="">-- Unassigned --</option>
+                        @foreach (var user in Model.AssignableUsers)
+                        {
+                            var role = Model.UserRolesMap.ContainsKey(user.Id) ? Model.UserRolesMap[user.Id] : "Member";
+                            <option value="@user.Id">[@role] @(user.Name ?? user.UserName)</option>
+                        }
+                    </select>
+                    <div class="form-text mt-2 text-info">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Assigning this item will unlock its breakdown capabilities.
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-link text-decoration-none text-muted" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-info px-4 text-white fw-bold" onclick="submitQuickAssign()">
-                        Confirm Assignment
-                    </button>
-                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-link text-decoration-none text-muted" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info px-4 text-white fw-bold" onclick="submitQuickAssign()">
+                    Confirm Assignment
+                </button>
             </div>
         </div>
     </div>
-</style>
+</div>
 
 <script>
 (function() {
@@ -991,6 +1084,14 @@
         document.getElementById('quickAssignType').value = type;
         document.getElementById('quickAssignId').value = id;
         document.getElementById('quickAssignUserSelect').value = currentUserId || "";
+        
+        // Reset search input and filter when opening
+        const searchInput = document.querySelector('#quickAssignModal .user-search-input');
+        if (searchInput) {
+            searchInput.value = '';
+            filterUserList(searchInput, 'quickAssignUserSelect');
+        }
+
         new bootstrap.Modal(document.getElementById('quickAssignModal')).show();
     };
 
@@ -1457,6 +1558,20 @@
         .catch(err => alert(err.message));
     };
 
+    window.deleteProjectTask = function(taskId) {
+        if (!confirm('Delete this task?')) return;
+        fetch('/Project/DeleteProjectTask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(taskId)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t); });
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
+
     // ===== SEARCH =====
     let searchTimeoutVar = null;
     window.searchWorkItems = function(query) {
@@ -1503,44 +1618,7 @@
         }
     };
 
-    window.submitQuickAssign = function() {
-        const type = document.getElementById('quickAssignType').value;
-        const id = document.getElementById('quickAssignId').value;
-        const userId = document.getElementById('quickAssignUserSelect').value;
-
-        const btn = document.querySelector('#quickAssignModal .btn-info');
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Updating...';
-
-        fetch('/Project/QuickAssignWorkItem', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ itemType: type, itemId: parseInt(id), userId: userId })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                bootstrap.Modal.getInstance(document.getElementById('quickAssignModal'))?.hide();
-                loadProjectBoard(document.getElementById('currentProjectId').value);
-                showToast('Assignment updated successfully', 'success');
-            } else {
-                throw new Error(data.message || 'Failed to update assignment');
-            }
-        })
-        .catch(err => {
-            showToast(err.message, 'danger');
-            btn.disabled = false;
-            btn.textContent = originalText;
-        });
-    };
-
-    window.openQuickAssignModal = function(type, id, currentUserId) {
-        document.getElementById('quickAssignType').value = type;
-        document.getElementById('quickAssignId').value = id;
-        document.getElementById('quickAssignUserSelect').value = currentUserId || "";
-        new bootstrap.Modal(document.getElementById('quickAssignModal')).show();
-    };
+    // Unified quick assign handling
 
     // ===== ASSIGN TO TEAM =====
     window.openAssignTaskToTeamModal = function(taskId, taskTitle) {
@@ -1657,7 +1735,54 @@
         });
     }
 
-    // Initialize drag & drop
-    enableProjectDragDrop();
+    window.filterUserList = function(input, selectId) {
+        const filter = input.value.toLowerCase();
+        const select = document.getElementById(selectId);
+        const options = select.options;
+        
+        for (let i = 0; i < options.length; i++) {
+            const text = options[i].text.toLowerCase();
+            if (i === 0 || text.includes(filter)) {
+                options[i].style.display = "";
+            } else {
+                options[i].style.display = "none";
+            }
+        }
+    };
+
+    window.openEditProjectTaskModal = function(btn) {
+        document.getElementById('editProjectTaskId').value = btn.dataset.id;
+        document.getElementById('editProjectTaskTitle').value = btn.dataset.title;
+        document.getElementById('editProjectTaskDescription').value = btn.dataset.description;
+        // Search for the assignee mapping if possible or just reset
+        document.getElementById('editProjectTaskAssignee').value = ""; 
+        
+        new bootstrap.Modal(document.getElementById('editProjectTaskModal')).show();
+    };
+
+    window.submitUpdateProjectTask = function() {
+        const id = document.getElementById('editProjectTaskId').value;
+        const title = document.getElementById('editProjectTaskTitle').value.trim();
+        if (!title) { alert('Title is required'); return; }
+
+        const data = {
+            id: parseInt(id),
+            title: title,
+            description: document.getElementById('editProjectTaskDescription').value.trim(),
+            assignedToUserId: document.getElementById('editProjectTaskAssignee').value
+        };
+
+        fetch('/Project/UpdateProjectTask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(res => {
+            if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to update task'); });
+            bootstrap.Modal.getInstance(document.getElementById('editProjectTaskModal'))?.hide();
+            loadProjectBoard(document.getElementById('currentProjectId').value);
+        })
+        .catch(err => alert(err.message));
+    };
 })();
 </script>

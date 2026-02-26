@@ -4,7 +4,7 @@
 @inject UserManager<Users> UserManager
 @model TeamBoardViewModel
 
-<div class="board-top-bar d-flex justify-content-between align-items-center mb-1">
+<div class="board-top-bar d-flex justify-content-between align-items-center mb-3">
     <div class="d-flex align-items-center gap-3">
         <!-- 🔙 BACK TO BOARD -->
         <button id="backToBoardBtn" class="btn btn-sm btn-outline-primary" style="display:none;"
@@ -91,10 +91,6 @@
 
 <!-- KANBAN BOARD -->
 <div class="kanban-board" id="kanbanBoard" data-team-name="@Model.TeamName"
-    data-priority-visible="@((Model.TeamSettings?.IsPriorityVisible ?? true) ? "true" : "false")"
-    data-due-date-visible="@((Model.TeamSettings?.IsDueDateVisible ?? true) ? "true" : "false")"
-    data-title-visible="@((Model.TeamSettings?.IsTitleVisible ?? true) ? "true" : "false")"
-    data-description-visible="@((Model.TeamSettings?.IsDescriptionVisible ?? true) ? "true" : "false")"
     data-perm-add-col="@((Model.UserPermissions?.CanAddColumn ?? false) ? "true" : "false")"
     data-perm-rename-col="@((Model.UserPermissions?.CanRenameColumn ?? false) ? "true" : "false")"
     data-perm-reorder-cols="@((Model.UserPermissions?.CanReorderColumns ?? false) ? "true" : "false")"
@@ -459,7 +455,7 @@
         display: flex;
         gap: 16px;
         overflow-x: auto;
-        padding-bottom: 1px;
+        padding-bottom: 12px;
         height: calc(100vh - 220px);
         scrollbar-width: thin;
     }

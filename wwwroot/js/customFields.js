@@ -61,6 +61,12 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
 
     container.innerHTML = '';
 
+    // Apply grid layout
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(2, 1fr)';
+    container.style.gap = '16px';
+    container.style.alignItems = 'start';
+
     if (!fields || fields.length === 0) {
         console.log('No custom fields to render');
         return;
@@ -70,7 +76,12 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
 
     fields.forEach(field => {
         const fieldGroup = document.createElement('div');
-        fieldGroup.className = 'mb-3 position-relative field-group'; // Added position-relative
+        fieldGroup.className = 'mb-1 position-relative field-group';
+
+        // Ensure some fields take full width if needed (optional)
+        if (field.fieldType === 'Image' || field.fieldName.toLowerCase().includes('description')) {
+            fieldGroup.style.gridColumn = 'span 2';
+        }
 
         // Header container for Label + Actions
         const header = document.createElement('div');
@@ -82,31 +93,6 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         label.htmlFor = `field_${field.id}`;
         header.appendChild(label);
 
-        // Inline Actions (All Roles for local customization/UI preference)
-        if (true) {
-            const actions = document.createElement('div');
-            actions.className = 'btn-group btn-group-sm';
-
-            // Rename Button
-            const renameBtn = document.createElement('button');
-            renameBtn.type = 'button';
-            renameBtn.className = 'btn btn-link text-secondary p-0 me-2';
-            renameBtn.innerHTML = '<i class="bi bi-pencil"></i>';
-            renameBtn.title = 'Rename Field';
-            renameBtn.onclick = (e) => { e.preventDefault(); renameCustomField(field.id, field.fieldName); };
-            actions.appendChild(renameBtn);
-
-            // Delete Button
-            const deleteBtn = document.createElement('button');
-            deleteBtn.type = 'button';
-            deleteBtn.className = 'btn btn-link text-danger p-0';
-            deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-            deleteBtn.title = 'Delete Field';
-            deleteBtn.onclick = (e) => { e.preventDefault(); deleteCustomFieldInline(field.id); };
-            actions.appendChild(deleteBtn);
-
-            header.appendChild(actions);
-        }
         fieldGroup.appendChild(header);
 
         let input;
@@ -141,7 +127,18 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                 const optionsArray = optionsStr ? optionsStr.split(',') : [];
 
                 if (optionsArray.length > 0) {
-                    input.innerHTML = optionsArray.map(opt => `<option value="${opt}">${opt}</option>`).join('');
+                    const isTaskType = field.fieldName.toLowerCase().includes('task type');
+                    input.innerHTML = optionsArray.map(opt => {
+                        let prefix = "";
+                        if (isTaskType) {
+                            const lowOpt = opt.toLowerCase().trim();
+                            if (lowOpt === 'story') prefix = "📔 ";
+                            else if (lowOpt === 'bug') prefix = "🐞 ";
+                            else if (lowOpt === 'feature') prefix = "⭐ ";
+                            else if (lowOpt === 'enhancement') prefix = "🚀 ";
+                        }
+                        return `<option value="${opt}">${prefix}${opt}</option>`;
+                    }).join('');
                 } else {
                     // Fallback for older fields
                     if (field.fieldName.toLowerCase().includes('priority')) {
@@ -248,6 +245,12 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         // Remove duplicate manageBtn from here as it's in the modal footer
 
         container.appendChild(addBtnContainer);
+    }
+
+    // Reset grid for the button container to center it
+    const lastChild = container.lastElementChild;
+    if (lastChild) {
+        lastChild.style.gridColumn = 'span 2';
     }
 }
 
@@ -408,6 +411,39 @@ function openManageFieldsModal() {
     modal.show();
 }
 
+// --- Dropdown Options Management ---
+function addDropdownOptionRow(value = "") {
+    const list = document.getElementById('newFieldOptionsList');
+    if (!list) return;
+
+    const row = document.createElement('div');
+    row.className = 'input-group input-group-sm mb-2 dropdown-option-row animate__animated animate__fadeInUp';
+    row.style.animationDuration = '0.3s';
+    row.innerHTML = `
+        <input type="text" class="form-control dropdown-option-input border-end-0" value="${value}" placeholder="Option name" />
+        <button class="btn btn-outline-danger border-start-0 bg-white" type="button" onclick="this.parentElement.remove()" style="border-color: #dee2e6;">
+            <i class="bi bi-trash"></i>
+        </button>
+    `;
+    list.appendChild(row);
+}
+
+// Toggle options section based on field type in Create form
+$(document).on('change', '#newFieldType', function () {
+    const section = document.getElementById('newFieldOptionsSection');
+    if (section) {
+        if (this.value === 'Dropdown') {
+            section.classList.remove('d-none');
+            const list = document.getElementById('newFieldOptionsList');
+            if (list && list.children.length === 0) {
+                addDropdownOptionRow();
+            }
+        } else {
+            section.classList.add('d-none');
+        }
+    }
+});
+
 async function loadFieldsList(team) {
     const container = document.getElementById('fieldsList');
     if (!container) return;
@@ -426,70 +462,82 @@ async function loadFieldsList(team) {
         }
 
 
-        container.innerHTML = fields.map(f => `
-            <div class="field-item mb-3 border rounded shadow-sm bg-white overflow-hidden" id="field_item_${f.id}">
-                <div class="bg-light p-2 border-bottom d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong class="text-primary">${f.fieldName}</strong>
-                        <span class="badge bg-secondary ms-2">${f.fieldType === 'DateTime' ? 'Date & Time' : f.fieldType}</span>
-                        ${f.isRequired ? '<span class="badge bg-warning text-dark ms-1">Required</span>' : ''}
-                    </div>
-                    <div class="d-flex gap-1">
-                        <button class="btn btn-xs btn-outline-primary" onclick="toggleFieldEditor(${f.id})" title="Edit Field">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn btn-xs btn-outline-danger" onclick="deleteField(${f.id})" title="Delete Field">
-                            <i class="bi bi-trash"></i>
-                        </button>
+        container.innerHTML = `<div class="row g-3">
+            ${fields.map(f => `
+                <div class="col-md-6 animate__animated animate__fadeIn" style="animation-duration: 0.4s">
+                    <div class="field-item border rounded-3 shadow-sm bg-white h-100 d-flex flex-column" id="field_item_${f.id}" style="transition: transform 0.2s ease, box-shadow 0.2s ease;">
+                        <div class="p-3 d-flex justify-content-between align-items-start">
+                            <div class="overflow-hidden">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <h6 class="mb-0 text-dark fw-bold text-truncate">${f.fieldName}</h6>
+                                    ${f.isRequired ? '<span class="badge bg-soft-warning text-warning-emphasis rounded-pill" style="font-size: 10px; background: #fff3cd; border: 1px solid #ffeeba;">Required</span>' : ''}
+                                </div>
+                                <div class="badge bg-soft-primary text-primary-emphasis rounded-pill" style="font-size: 11px; background: #e7f1ff; border: 1px solid #cfe2ff;">
+                                    ${f.fieldType === 'DateTime' ? '📅 Date & Time' :
+                f.fieldType === 'Date' ? '📅 Date' :
+                    f.fieldType === 'Image' ? '🖼️ Image' :
+                        f.fieldType === 'Dropdown' ? '▼ Dropdown' :
+                            f.fieldType === 'Number' ? '🔢 Number' : '🔤 Text'}
+                                </div>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-icon btn-sm btn-light rounded-circle" onclick="toggleFieldEditor(${f.id})" title="Edit Field">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <button class="btn btn-icon btn-sm btn-light rounded-circle text-danger" onclick="deleteField(${f.id})" title="Delete Field">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        ${f.fieldType === 'Dropdown' ? `
+                            <div class="px-3 pb-2 flex-grow-1">
+                                <div class="d-flex flex-wrap gap-1">
+                                    ${(f.dropdownOptions || "").split(',').filter(o => o).slice(0, 4).map(o => `<span class="badge bg-light text-muted border py-1 px-2" style="font-size: 10px;">${o}</span>`).join('')}
+                                    ${(f.dropdownOptions || "").split(',').filter(o => o).length > 4 ? `<span class="badge bg-light text-muted border py-1 px-2" style="font-size: 10px;">+${(f.dropdownOptions || "").split(',').filter(o => o).length - 4} more</span>` : ''}
+                                    ${!(f.dropdownOptions || "").split(',').filter(o => o).length ? '<span class="text-danger x-small italic">No options</span>' : ''}
+                                </div>
+                            </div>
+                        ` : '<div class="flex-grow-1"></div>'}
+                        
+                        <!-- Inline Editor (Hidden by default) -->
+                        <div id="editor_${f.id}" class="p-3 border-top bg-light d-none animate__animated animate__fadeInDown animate__faster" style="border-radius: 0 0 12px 12px;">
+                            <div class="mb-3">
+                                <label class="form-label x-small fw-bold text-uppercase text-muted">Field Name</label>
+                                <input type="text" id="edit_name_${f.id}" class="form-control form-control-sm shadow-sm" value="${f.fieldName}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label x-small fw-bold text-uppercase text-muted">Field Type</label>
+                                <select id="edit_type_${f.id}" class="form-select form-select-sm shadow-sm" onchange="toggleEditOptionsSection(${f.id})">
+                                    <option value="Text" ${f.fieldType === 'Text' ? 'selected' : ''}>🔤 Text</option>
+                                    <option value="Number" ${f.fieldType === 'Number' ? 'selected' : ''}>🔢 Number</option>
+                                    <option value="Date" ${f.fieldType === 'Date' ? 'selected' : ''}>📅 Date</option>
+                                    <option value="Time" ${f.fieldType === 'Time' ? 'selected' : ''}>🕐 Time</option>
+                                    <option value="DateTime" ${f.fieldType === 'DateTime' ? 'selected' : ''}>🗓️ Date & Time</option>
+                                    <option value="Dropdown" ${f.fieldType === 'Dropdown' ? 'selected' : ''}>▼ Dropdown</option>
+                                    <option value="Image" ${f.fieldType === 'Image' ? 'selected' : ''}>🖼️ Image (Max 2, 2MB)</option>
+                                </select>
+                            </div>
+                            
+                            <div id="edit_options_section_${f.id}" class="${f.fieldType === 'Dropdown' ? '' : 'd-none'} mb-3">
+                                <label class="form-label x-small fw-bold text-uppercase text-muted">Dropdown Choices (comma-separated)</label>
+                                <textarea id="edit_options_${f.id}" class="form-control form-control-sm shadow-sm" rows="2">${f.dropdownOptions || ''}</textarea>
+                            </div>
+
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="edit_required_${f.id}" ${f.isRequired ? 'checked' : ''}>
+                                <label class="form-check-label x-small" for="edit_required_${f.id}">Mandatory field</label>
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button class="btn btn-sm btn-white border shadow-sm" onclick="toggleFieldEditor(${f.id})">Cancel</button>
+                                <button class="btn btn-sm btn-primary shadow-sm" onclick="saveFieldChanges(${f.id})">Update Field</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Inline Editor (Hidden by default) -->
-                <div id="editor_${f.id}" class="p-3 border-top bg-light d-none">
-                    <div class="row g-2 mb-2">
-                        <div class="col-md-6">
-                            <label class="small text-muted mb-1">Field Name</label>
-                            <input type="text" id="edit_name_${f.id}" class="form-control form-control-sm" value="${f.fieldName}">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="small text-muted mb-1">Field Type</label>
-                            <select id="edit_type_${f.id}" class="form-select form-select-sm" onchange="toggleEditOptionsSection(${f.id})">
-                                <option value="Text" ${f.fieldType === 'Text' ? 'selected' : ''}>Text</option>
-                                <option value="Number" ${f.fieldType === 'Number' ? 'selected' : ''}>Number</option>
-                                <option value="Date" ${f.fieldType === 'Date' ? 'selected' : ''}>Date</option>
-                                <option value="Time" ${f.fieldType === 'Time' ? 'selected' : ''}>Time</option>
-                                <option value="DateTime" ${f.fieldType === 'DateTime' ? 'selected' : ''}>Date & Time</option>
-                                <option value="Dropdown" ${f.fieldType === 'Dropdown' ? 'selected' : ''}>Dropdown</option>
-                                <option value="Image" ${f.fieldType === 'Image' ? 'selected' : ''}>Image (Max 3, 5MB)</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div id="edit_options_section_${f.id}" class="${f.fieldType === 'Dropdown' ? '' : 'd-none'} mb-2">
-                        <label class="small text-muted mb-1">Dropdown Choices (comma-separated)</label>
-                        <textarea id="edit_options_${f.id}" class="form-control form-control-sm" rows="2">${f.dropdownOptions || ''}</textarea>
-                    </div>
-
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="edit_required_${f.id}" ${f.isRequired ? 'checked' : ''}>
-                        <label class="form-check-label small" for="edit_required_${f.id}">Mark as Required</label>
-                    </div>
-
-                    <div class="d-flex justify-content-end gap-2">
-                        <button class="btn btn-sm btn-secondary" onclick="toggleFieldEditor(${f.id})">Cancel</button>
-                        <button class="btn btn-sm btn-primary" onclick="saveFieldChanges(${f.id})">Save Changes</button>
-                    </div>
-                </div>
-
-                ${f.fieldType === 'Dropdown' ? `
-                    <div class="p-2 small bg-white">
-                        <div class="d-flex flex-wrap gap-1">
-                            ${(f.dropdownOptions || "").split(',').filter(o => o).map(o => `<span class="badge bg-light text-dark border">${o}</span>`).join('') || '<span class="text-danger italic">No options defined</span>'}
-                        </div>
-                    </div>
-                ` : ''}
-            </div>
-        `).join('');
+            `).join('')}
+        </div>`;
 
     } catch (error) {
         console.error('Error in loadFieldsList:', error);
@@ -750,6 +798,8 @@ async function updateTeamSettings() {
     const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
     const isPriorityVisible = document.getElementById('showPriorityCheckbox').checked;
     const isDueDateVisible = document.getElementById('showDueDateCheckbox').checked;
+    const isTitleVisible = document.getElementById('showTitleCheckbox').checked;
+    const isDescriptionVisible = document.getElementById('showDescriptionCheckbox').checked;
 
     if (!teamName) return;
 
@@ -760,7 +810,9 @@ async function updateTeamSettings() {
             body: JSON.stringify({
                 teamName: teamName,
                 isPriorityVisible: isPriorityVisible,
-                isDueDateVisible: isDueDateVisible
+                isDueDateVisible: isDueDateVisible,
+                isTitleVisible: isTitleVisible,
+                isDescriptionVisible: isDescriptionVisible
             })
         });
 

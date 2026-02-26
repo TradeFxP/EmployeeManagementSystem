@@ -3,6 +3,8 @@
 
 $(document).ready(function () {
 
+    let currentBoardXhr = null;
+
     $(".task-link").on("click", function (e) {
         e.preventDefault();
 
@@ -11,47 +13,43 @@ $(document).ready(function () {
         $(this).addClass("active");
 
         var url = $(this).data("url");
+        window.currentTeamName = $(this).data("team"); // Set global team name
 
-        // Show loading
-        $("#taskBoardContainer").html(
-            "<div class='text-muted'>Loading...</div>"
-        );
-
-        // Load partial view
-        $("#taskBoardContainer").load(url);
-    });
-
-});
-
-
-$(document).on("submit", "#addTaskForm", function (e) {
-    e.preventDefault();
-
-    $.ajax({
-        url: "/Tasks/CreateTask",
-        type: "POST",
-        data: $(this).serialize(),
-        success: function () {
-
-            // Properly close Bootstrap 5 modal
-            const modalEl = document.getElementById("addTaskModal");
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-
-            // 🔥 IMPORTANT: cleanup backdrop + body state
-            document.body.classList.remove("modal-open");
-
-            const backdrops = document.getElementsByClassName("modal-backdrop");
-            while (backdrops.length > 0) {
-                backdrops[0].parentNode.removeChild(backdrops[0]);
-            }
-
-            // Reload current board
-            $(".task-link.active").click();
+        // Abort previous request if still pending
+        if (currentBoardXhr) {
+            currentBoardXhr.abort();
         }
 
+        // Show loading spinner
+        $("#taskBoardContainer").html(`
+            <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 400px;">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+                <div class="text-muted fw-bold">Loading board...</div>
+            </div>
+        `);
+
+        // Load partial view with explicit AJAX for abort control
+        currentBoardXhr = $.ajax({
+            url: url,
+            type: 'GET',
+            success: function (html) {
+                $("#taskBoardContainer").html(html);
+                currentBoardXhr = null;
+            },
+            error: function (xhr, status, error) {
+                if (status === 'abort') return;
+                $("#taskBoardContainer").html(
+                    "<div class='alert alert-danger m-3'>Failed to load board. Please try again.</div>"
+                );
+                currentBoardXhr = null;
+            }
+        });
     });
+
 });
+
+
+// Task creation is handled by submitCreateTask function in this file.
 
 $(document).on("input", "#taskTitle", function () {
     $("#titleCount").text(50 - $(this).val().length);
@@ -62,34 +60,42 @@ $(document).on("input", "#taskDescription", function () {
 });
 
 
-$(document).on("click", ".delete-task", function () {
+// Use a centralized deleteTask function
+function deleteTask(taskId) {
+    if (!confirm('Are you sure you want to delete this task?')) return;
 
-    if (!confirm("Are you sure you want to delete this task?")) return;
+    fetch('/Tasks/DeleteTask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskId)
+    })
+        .then(res => {
+            if (!res.ok) throw new Error('Failed to delete task');
 
-    const id = $(this).data("id");
+            // Remove card from DOM immediately
+            const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (card) {
+                card.remove();
+                if (typeof updateColumnCounts === 'function') updateColumnCounts();
+            }
+            if (typeof showToast === 'function') showToast("🗑️ Task deleted successfully!", "info");
+        })
+        .catch(err => {
+            console.error(err);
+            if (typeof showToast === 'function') showToast('Failed to delete task.', 'danger');
+        });
+}
 
-    $.post("/Tasks/DeleteTask", { id: id })
-        .done(() => location.reload())
-        .fail(() => showToast('Failed to delete task. Please try again.', 'danger'));
-});
-
-
-
-$(document).on("submit", "#addTaskForm", function (e) {
+$(document).on("click", ".delete-task", function (e) {
     e.preventDefault();
-
-    $.ajax({
-        url: "/Tasks/CreateTask",
-        type: "POST",
-        data: $(this).serialize(),
-        success: function () {
-            $("#addTaskModal").modal("hide");
-
-            // reload current board
-            $(".task-link.active").click();
-        }
-    });
+    e.stopPropagation();
+    const id = $(this).data("id");
+    deleteTask(id);
 });
+
+
+
+// Removed duplicate handler
 
 
 
@@ -170,14 +176,19 @@ async function openCreateTaskModal(columnId) {
 
 // Submit create task form
 function submitCreateTask() {
-    const title = document.getElementById("taskTitle")?.value.trim();
+    const titleEl = document.getElementById("taskTitle");
+    const title = titleEl?.value.trim() || "New Task";
     const description = document.getElementById("taskDescription")?.value.trim();
     const columnId = document.getElementById("taskColumnId").value;
     const projectId = document.getElementById("taskProjectId")?.value || null;
     const priority = parseInt(document.getElementById("taskPriority").value);
     const dueDate = document.getElementById("taskDueDate")?.value || null;
 
-    if (!title) {
+    // Check if title is visible
+    const titleGroup = document.getElementById('groupCreateTaskTitle');
+    const isTitleVisible = titleGroup && titleGroup.style.display !== 'none';
+
+    if (isTitleVisible && (!title || title === "New Task")) {
         showToast('Please enter a task title to continue.', 'warning');
         return;
     }
@@ -188,12 +199,12 @@ function submitCreateTask() {
     }
 
     // Ensure custom fields are rendered and validated before collecting values
-    if (typeof validateCustomFields === 'function' && !validateCustomFields()) {
+    if (typeof validateCustomFields === 'function' && !validateCustomFields('customFieldsContainer')) {
         return;
     }
 
     const customFieldValues = (typeof collectCustomFieldValues === 'function')
-        ? collectCustomFieldValues()
+        ? collectCustomFieldValues('customFieldsContainer')
         : {};
 
     $.ajax({
@@ -211,20 +222,14 @@ function submitCreateTask() {
         }),
         success: function (response) {
             if (response && response.success) {
-                bootstrap.Modal.getInstance(document.getElementById("createTaskModal"))?.hide();
-                // reload board
-                if (window.currentTeamName) {
-                    // prefer partial reload
-                    if (window.loadTeamBoard) window.loadTeamBoard(window.currentTeamName);
-                    else location.reload();
-                } else {
-                    location.reload();
-                }
+                // Properly close modal
+                const modalEl = document.getElementById("createTaskModal");
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                showToast("✅ Task created successfully!", "success");
             } else {
-                bootstrap.Modal.getInstance(document.getElementById("createTaskModal"))?.hide();
-                // still reload to pick up new task
-                if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) loadTeamBoard(currentTeamName);
-                else location.reload();
+                showToast(response.message || 'Failed to create task.', 'danger');
             }
         },
         error: function (xhr) {
@@ -233,6 +238,70 @@ function submitCreateTask() {
         }
     });
 }
+
+function submitEditTask() {
+    const taskId = parseInt(document.getElementById('editTaskId').value);
+    const titleEl = document.getElementById('editTaskTitle');
+    const title = titleEl ? titleEl.value.trim() || "Task" : "Task";
+
+    const descEl = document.getElementById('editTaskDescription');
+    const description = descEl ? descEl.value.trim() : "";
+
+    const priority = parseInt(document.getElementById('editTaskPriority').value);
+    const assignedToUserId = document.getElementById('editTaskAssignedTo').value;
+
+    const titleGroup = document.getElementById('groupEditTaskTitle');
+    const isTitleVisible = titleGroup && titleGroup.style.display !== 'none';
+
+    if (isTitleVisible && (!title || title === "Task")) {
+        showToast("Title is required", "warning");
+        return;
+    }
+
+    // Validate custom fields
+    if (typeof validateCustomFields === 'function' && !validateCustomFields('editCustomFieldsContainer')) {
+        return;
+    }
+
+    const editDueDateVal = document.getElementById('editTaskDueDate') ? document.getElementById('editTaskDueDate').value : null;
+
+    const data = {
+        taskId: taskId,
+        title: title,
+        description: description,
+        priority: priority,
+        dueDate: editDueDateVal || null,
+        assignedToUserId: assignedToUserId,
+        customFieldValues: (typeof collectCustomFieldValues === 'function') ?
+            collectCustomFieldValues('editCustomFieldsContainer') : {}
+    };
+
+    fetch('/Tasks/UpdateTask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+        .then(res => {
+            if (!res.ok) throw new Error("Failed to update task");
+            return res.json();
+        })
+        .then(() => {
+            showToast("✅ Task updated successfully!", "success");
+            // Close modal
+            const modalEl = document.getElementById('editTaskModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            // Reload board if necessary, though SignalR should handle it
+            if (window.currentTeamName && window.loadTeamBoard) loadTeamBoard(window.currentTeamName);
+        })
+        .catch(err => {
+            console.error(err);
+            showToast("Failed to update task", "danger");
+        });
+}
+
+// Redundant function removed as it exists in customFields.js
 
 // Get priority badge HTML
 function getPriorityBadge(priority) {

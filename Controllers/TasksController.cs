@@ -227,6 +227,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetTaskCardPartial(int taskId)
     {
         var task = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
@@ -568,6 +569,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetTask(int id)
     {
         var task = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.CustomFieldValues)
             .FirstOrDefaultAsync(t => t.Id == id);
 
@@ -602,6 +604,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetTaskDetail(int id)
     {
         var task = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
@@ -672,37 +675,41 @@ public class TasksController : Controller
         if (string.IsNullOrEmpty(team))
             return BadRequest("Team name is required");
 
+        // Fetch tasks
         var tasks = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.AssignedByUser)
             .Include(t => t.AssignedToUser)
             .Where(t => t.TeamName == team && !t.IsArchived && t.AssignedToUserId != null)
             .OrderByDescending(t => t.AssignedAt)
             .ToListAsync();
 
-        // Fetch members of this team for the filter
-        var teamUserIds = await _context.UserTeams
-            .Where(ut => ut.TeamName == team)
-            .Select(ut => ut.UserId)
-            .ToListAsync();
+        // 🔥 PERFORMANCE: Bulk-fetch ALL users, teams, and roles once
+        var allUsers = await _userManager.Users.AsNoTracking().ToListAsync();
+        var allTeams = await _context.Teams.AsNoTracking().ToListAsync();
+        var allUserTeams = await _context.UserTeams.AsNoTracking().ToListAsync();
+        
+        var userRolesData = await (from ur in _context.UserRoles
+                                   join r in _context.Roles on ur.RoleId equals r.Id
+                                   select new { ur.UserId, RoleName = r.Name })
+                                  .AsNoTracking()
+                                  .ToListAsync();
 
-        // Fetch ALL teams and their members for the grouped filter
-        var allTeams = await _context.Teams.ToListAsync();
+        var userRolesMap = userRolesData
+            .GroupBy(ur => ur.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(ur => ur.RoleName).ToList());
+
         var groupedMembers = new List<dynamic>();
+        var userTeamsLookup = allUserTeams.ToLookup(ut => ut.TeamName);
 
         foreach (var t in allTeams)
         {
-            var userIds = await _context.UserTeams
-                .Where(ut => ut.TeamName == t.Name)
-                .Select(ut => ut.UserId)
-                .ToListAsync();
-
-            var teamUsers = await _userManager.Users
-                .Where(u => userIds.Contains(u.Id))
-                .ToListAsync();
+            var userIdsInTeam = userTeamsLookup[t.Name].Select(ut => ut.UserId).ToList();
+            var teamUsers = allUsers.Where(u => userIdsInTeam.Contains(u.Id)).ToList();
 
             foreach (var u in teamUsers)
             {
-                var roles = await _userManager.GetRolesAsync(u);
+                var roles = userRolesMap.GetValueOrDefault(u.Id, new List<string>());
                 var primaryRole = roles.FirstOrDefault() ?? "User";
                 bool isManagement = roles.Contains("Admin") || roles.Contains("Manager") || roles.Contains("Sub-Manager") || roles.Contains("SubManager");
 
@@ -779,8 +786,9 @@ public class TasksController : Controller
             })
             .ToList();
 
-        // Load all tasks for this team:
+        // Load all tasks for this team strictly (AsNoTracking for performance)
         var allTasks = await _context.TaskItems
+            .AsNoTracking()
             .Where(t => t.TeamName == team && !t.IsArchived)
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
@@ -792,36 +800,25 @@ public class TasksController : Controller
                 .ThenInclude(v => v.Field)
             .ToListAsync();
 
+        // 🔥 PERFORMANCE: Bulk-fetch roles for ALL users in one query
+        var userRolesData = await (from ur in _context.UserRoles
+                                   join r in _context.Roles on ur.RoleId equals r.Id
+                                   select new { ur.UserId, RoleName = r.Name })
+                                  .AsNoTracking()
+                                  .ToListAsync();
 
-        // 🔥 PERFORMANCE OPTIMIZATION: Pre-fetch roles for all users involved to avoid N+1 queries in CanUserSeeTask
-        var usersToFetchRolesFor = allTasks
-            .Select(t => t.CreatedByUserId)
-            .Where(id => !string.IsNullOrEmpty(id))
-            .Distinct()
-            .ToList();
+        var userRolesMap = userRolesData
+            .GroupBy(ur => ur.UserId)
+            .ToDictionary(g => g.Key, g => (IList<string>)g.Select(ur => ur.RoleName).ToList());
 
-        if (user != null && !usersToFetchRolesFor.Contains(user.Id))
-            usersToFetchRolesFor.Add(user.Id);
-
-        var userRolesMap = new Dictionary<string, IList<string>>();
-        foreach (var uid in usersToFetchRolesFor)
-        {
-            var u = await _userManager.FindByIdAsync(uid);
-            if (u != null)
-            {
-                userRolesMap[uid] = await _userManager.GetRolesAsync(u);
-            }
-        }
-
-        // 🔥 FILTER TASKS BASED ON ROLE RULES
-        // Pre-fetch hierarchy for visibility check
+        // Pre-fetch hierarchy for visibility check (AsNoTracking)
         var userHierarchy = await _userManager.Users
-            .Where(u => u.Id != null)
+            .AsNoTracking()
             .Select(u => new { u.Id, u.ManagerId })
             .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
 
         var visibleTasks = new List<TaskItem>();
-        var viewerRoles = userRolesMap.ContainsKey(user.Id) ? userRolesMap[user.Id] : new List<string>();
+        var viewerRoles = userRolesMap.GetValueOrDefault(user.Id, new List<string>());
 
         foreach (var task in allTasks)
         {
@@ -832,127 +829,94 @@ public class TasksController : Controller
         // Attach filtered tasks to columns
         foreach (var col in columns)
         {
-            // Task belongs here if it is explicitly in this column
             col.Tasks = visibleTasks
                 .Where(t => t.ColumnId == col.Id)
                 .ToList();
         }
 
-        // ✅ 1. Load assignable users and assignors based on role/hierarchy
+        // ✅ 1. Load assignable users (AsNoTracking)
         var allUsers = await _userManager.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync();
 
         // Fetch UserIds belonging to the current team
         var teamUserIds = await _context.UserTeams
+            .AsNoTracking()
             .Where(ut => ut.TeamName == team)
             .Select(ut => ut.UserId)
             .ToListAsync();
 
-        var assignableUsers = new List<Users>();
-        var assignors = new List<Users>();
-
-        // We need hierarchy map for visibility check
-        var fullHierarchy = allUsers.Where(u => !string.IsNullOrEmpty(u.Id)).ToDictionary(u => u.Id, u => u.ParentUserId);
-
-        // Roles for everyone for filtering
-        var allUserRoles = new Dictionary<string, string>();
-        foreach (var u in allUsers)
-        {
-            var r = await _userManager.GetRolesAsync(u);
-            var primaryRole = r.FirstOrDefault() ?? "User";
-
-            // Prioritize Sub-Manager for display. 
-            // In this system, a Sub-Manager often has the Identity role "Manager" but has a ParentUserId.
-            if (r.Contains("Sub-Manager") || r.Contains("SubManager") || (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId)))
-                allUserRoles[u.Id] = "Sub-Manager";
-            else if (primaryRole == "Manager")
-                allUserRoles[u.Id] = "Manager";
-            else
-                allUserRoles[u.Id] = primaryRole;
-        }
-
-        // Populate FilteredAssignees for the top-level board filter (Hierarchical + Team restricted)
-        var filteredAssignees = new List<Users>();
-        if (viewerRoles.Contains("Admin"))
-        {
-            filteredAssignees = allUsers;
-        }
-        else if (viewerRoles.Contains("Manager"))
-        {
-            filteredAssignees.Add(user);
-            var directSubordinates = allUsers.Where(u => u.ParentUserId == user.Id).ToList();
-            filteredAssignees.AddRange(directSubordinates);
-            foreach (var sub in directSubordinates)
-            {
-                filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == sub.Id));
-            }
-        }
-        else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
-        {
-            filteredAssignees.Add(user);
-            filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == user.Id));
-        }
-        else
-        {
-            filteredAssignees.Add(user);
-        }
-
-        // Role priority for sorting: Admin (1), Manager (2), Sub-Manager (3), User (4)
-        var rolePriority = new Dictionary<string, int>
-        {
-            { "Admin", 1 },
-            { "Manager", 2 },
-            { "Sub-Manager", 3 },
-            { "User", 4 }
-        };
-
-        // ✅ Apply Team Filter: "show only fronted team" (the selected team members only)
-        filteredAssignees = filteredAssignees
-            .DistinctBy(u => u.Id)
-            .Where(u => teamUserIds.Contains(u.Id))
-            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles.ContainsKey(u.Id) ? allUserRoles[u.Id] : "User", 99))
-            .ThenBy(u => u.Name ?? u.UserName)
-            .ToList();
-
-        // Also restrict assignableUsers (Quick Assign) to the team members
-        assignableUsers = allUsers.Where(u => teamUserIds.Contains(u.Id)).ToList();
-
-        // Role mapping for FE logic
+        // Pre-calculate primary roles for all users for filtering/FE
         var feUserRolesMap = new Dictionary<string, string>();
         foreach (var u in allUsers)
         {
-            if (allUserRoles.ContainsKey(u.Id))
-                feUserRolesMap[u.Id] = allUserRoles[u.Id];
+            var r = userRolesMap.GetValueOrDefault(u.Id, new List<string>());
+            var primaryRole = r.FirstOrDefault() ?? "User";
+
+            if (r.Contains("Sub-Manager") || r.Contains("SubManager") || (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId)))
+                feUserRolesMap[u.Id] = "Sub-Manager";
+            else if (r.Contains("Admin"))
+                feUserRolesMap[u.Id] = "Admin";
+            else if (primaryRole == "Manager")
+                feUserRolesMap[u.Id] = "Manager";
+            else
+                feUserRolesMap[u.Id] = primaryRole;
         }
 
-        // ✅ 2. Define Assignors (Who can assign tasks)
-        // Includes anyone with Admin, Manager, or Sub-Manager role, sorted by priority
-        assignors = allUsers
-            .Where(u => allUserRoles.ContainsKey(u.Id) &&
-                (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
-            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles[u.Id], 99))
+        // Populate FilteredAssignees (Hierarchical + Team restricted)
+        var filteredAssignees = new List<Users>();
+        if (viewerRoles.Contains("Admin"))
+        {
+            filteredAssignees = allUsers.Where(u => teamUserIds.Contains(u.Id)).ToList();
+        }
+        else if (viewerRoles.Contains("Manager"))
+        {
+            var accessibleIds = new HashSet<string> { user.Id };
+            var directSubordinates = allUsers.Where(u => u.ParentUserId == user.Id).Select(u => u.Id).ToList();
+            foreach(var id in directSubordinates) accessibleIds.Add(id);
+            var indirect = allUsers.Where(u => directSubordinates.Contains(u.ParentUserId ?? "")).Select(u => u.Id);
+            foreach(var id in indirect) accessibleIds.Add(id);
+
+            filteredAssignees = allUsers.Where(u => accessibleIds.Contains(u.Id) && teamUserIds.Contains(u.Id)).ToList();
+        }
+        else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
+        {
+            var accessibleIds = new HashSet<string> { user.Id };
+            var subs = allUsers.Where(u => u.ParentUserId == user.Id).Select(u => u.Id);
+            foreach(var id in subs) accessibleIds.Add(id);
+
+            filteredAssignees = allUsers.Where(u => accessibleIds.Contains(u.Id) && teamUserIds.Contains(u.Id)).ToList();
+        }
+        else
+        {
+            filteredAssignees = allUsers.Where(u => u.Id == user.Id && teamUserIds.Contains(u.Id)).ToList();
+        }
+
+        // Role priority for sorting
+        var rolePriority = new Dictionary<string, int> { { "Admin", 1 }, { "Manager", 2 }, { "Sub-Manager", 3 }, { "User", 4 } };
+
+        filteredAssignees = filteredAssignees
+            .OrderBy(u => rolePriority.GetValueOrDefault(feUserRolesMap.GetValueOrDefault(u.Id, "User"), 99))
             .ThenBy(u => u.Name ?? u.UserName)
             .ToList();
 
-        // ✅ 3. Define Assignable Users (Who can be assigned tasks)
-        // Pass ALL users to the view; visibility will be handled by the view logic based on role hierarchy
-        assignableUsers = allUsers;
-
-        // Get all team names for the assignment dropdown
-        var allTeamNames = await _context.TeamColumns
-            .Select(c => c.TeamName)
-            .Distinct()
-            .ToListAsync();
+        // Assignors: Anyone with Management role
+        var assignors = allUsers
+            .Where(u => feUserRolesMap.ContainsKey(u.Id) &&
+                (feUserRolesMap[u.Id] == "Admin" || feUserRolesMap[u.Id] == "Manager" || feUserRolesMap[u.Id] == "Sub-Manager"))
+            .OrderBy(u => rolePriority.GetValueOrDefault(feUserRolesMap[u.Id], 99))
+            .ThenBy(u => u.Name ?? u.UserName)
+            .ToList();
 
         // Load active custom fields
         var customFields = await _context.TaskCustomFields
-            .Where(f => f.IsActive && (string.IsNullOrEmpty(f.TeamName) || f.TeamName == team))
+            .AsNoTracking()
+            .Where(f => f.IsActive && f.TeamName == team)
             .OrderBy(f => f.Order)
             .ToListAsync();
 
-        var teamSettings = await _context.Teams.FirstOrDefaultAsync(t => t.Name == team);
+        var teamSettings = await _context.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Name == team);
 
-        // ✅ 2. Build ViewModel AFTER data exists
-        var userPerms = user == null ? null : await _context.BoardPermissions
+        var userPerms = await _context.BoardPermissions
+            .AsNoTracking()
             .Where(p => p.UserId == user.Id && p.TeamName != null && p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .OrderByDescending(p => p.Id)
             .FirstOrDefaultAsync();
@@ -961,17 +925,16 @@ public class TasksController : Controller
         {
             TeamName = team,
             Columns = columns,
-            AssignableUsers = assignableUsers,
+            AssignableUsers = allUsers, // Industry standard: can assign to anyone (cross-team)
             FilteredAssignees = filteredAssignees,
             Assignors = assignors,
-            AllTeamNames = allTeamNames,
+            AllTeamNames = await _context.TeamColumns.AsNoTracking().Select(c => c.TeamName).Distinct().ToListAsync(),
             CustomFields = customFields,
             UserPermissions = userPerms,
             TeamSettings = teamSettings,
             UserRolesMap = feUserRolesMap
         };
 
-        // ✅ 3. Return partial view
         return PartialView("_TeamBoard", vm);
 
 
@@ -1675,7 +1638,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetCustomFields(string? team)
     {
         var fields = await _context.TaskCustomFields
-            .Where(f => f.IsActive && (string.IsNullOrEmpty(f.TeamName) || f.TeamName == team))
+            .Where(f => f.IsActive && f.TeamName == team)
             .OrderBy(f => f.Order)
             .Select(f => new
             {
@@ -1845,13 +1808,26 @@ public class TasksController : Controller
     {
         if (string.IsNullOrWhiteSpace(team)) return BadRequest();
 
-        var users = await _userManager.Users.OrderBy(u => u.UserName).ToListAsync();
+        var users = await _userManager.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
         var perms = await _context.BoardPermissions
+            .AsNoTracking()
             .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .ToListAsync();
 
+        // 🔥 PERFORMANCE: Bulk-fetch roles
+        var userRolesData = await (from ur in _context.UserRoles
+                                   join r in _context.Roles on ur.RoleId equals r.Id
+                                   select new { ur.UserId, RoleName = r.Name })
+                                  .AsNoTracking()
+                                  .ToListAsync();
+
+        var userRolesMap = userRolesData
+            .GroupBy(ur => ur.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(ur => ur.RoleName).ToList());
+
         // Get the set of user IDs that belong to this specific team
         var teamUserIds = await _context.UserTeams
+            .AsNoTracking()
             .Where(ut => ut.TeamName == team)
             .Select(ut => ut.UserId)
             .ToHashSetAsync();
@@ -1860,7 +1836,7 @@ public class TasksController : Controller
 
         foreach (var u in users)
         {
-            var rawRoles = await _userManager.GetRolesAsync(u);
+            var rawRoles = userRolesMap.GetValueOrDefault(u.Id, new List<string>());
             if (rawRoles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
 
             string primaryRole = rawRoles.FirstOrDefault() ?? "User";

@@ -22,9 +22,13 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddSignalR();
 
 // ================= DATABASE =================
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddDbContextPool<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorCodesToAdd: null)));
 
 // ================= IDENTITY =================
 builder.Services.AddIdentity<Users, IdentityRole>(options =>

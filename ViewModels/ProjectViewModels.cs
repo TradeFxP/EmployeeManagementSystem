@@ -7,6 +7,7 @@ namespace UserRoles.ViewModels
         public Project? Project { get; set; }
         public List<Epic> Epics { get; set; } = new();
         public List<Users> AssignableUsers { get; set; } = new();
+        public Dictionary<string, string> UserRolesMap { get; set; } = new();
     }
 
     public class CreateProjectRequest
@@ -17,6 +18,7 @@ namespace UserRoles.ViewModels
 
     public class CreateEpicRequest
     {
+        public int? Id { get; set; }
         public int ProjectId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
@@ -25,6 +27,7 @@ namespace UserRoles.ViewModels
 
     public class CreateFeatureRequest
     {
+        public int? Id { get; set; }
         public int EpicId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
@@ -33,6 +36,7 @@ namespace UserRoles.ViewModels
 
     public class CreateStoryRequest
     {
+        public int? Id { get; set; }
         public int FeatureId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }
@@ -49,6 +53,7 @@ namespace UserRoles.ViewModels
 
     public class CreateProjectTaskRequest
     {
+        public int? Id { get; set; }
         public int StoryId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string? Description { get; set; }

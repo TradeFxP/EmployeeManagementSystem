@@ -222,7 +222,7 @@ namespace UserRoles.Controllers
         /* ================= USERS LIST ================= */
 
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Managers(string editId = null)
+        public async Task<IActionResult> Managers(string? editId = null)
         {
             ViewBag.EditId = editId;
 
