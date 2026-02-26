@@ -22,6 +22,10 @@ namespace UserRoles.Models
         public string? CreatedByUserId { get; set; }
         public Users? CreatedByUser { get; set; }
 
+        // Assigned to
+        public string? AssignedToUserId { get; set; }
+        public Users? AssignedToUser { get; set; }
+
         // Navigation - Features under this Epic
         public ICollection<Feature> Features { get; set; } = new List<Feature>();
     }

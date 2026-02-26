@@ -21,6 +21,14 @@ namespace UserRoles.Services
                 logger.LogInformation("Ensuring the database is created.");
                 await context.Database.EnsureCreatedAsync();
 
+                // Manual Migration: Add AssignedToUserId to Hierarchy Tables if missing
+                logger.LogInformation("Applying manual schema updates for assignments.");
+                await context.Database.ExecuteSqlRawAsync(@"
+                    ALTER TABLE ""Epics"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
+                    ALTER TABLE ""Features"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
+                    ALTER TABLE ""Stories"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
+                ");
+
                 // Add roles
                 logger.LogInformation("Seeding roles.");
                 await AddRoleAsync(roleManager, "Admin");
