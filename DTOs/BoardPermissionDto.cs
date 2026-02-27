@@ -15,5 +15,7 @@ namespace UserRoles.DTOs
         public bool CanReviewTask { get; set; }
         public bool CanImportExcel { get; set; }
         public bool CanAssignTask { get; set; }
+
+        public Dictionary<int, List<int>> AllowedTransitions { get; set; } = new();
     }
 }

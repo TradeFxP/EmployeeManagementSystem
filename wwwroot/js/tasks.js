@@ -709,10 +709,21 @@ function escapeHtml(str) {
 function formatDate(dateStr) {
     if (!dateStr) return '';
     try {
-        return new Date(dateStr).toLocaleDateString('en-GB', {
-            day: '2-digit', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+
+        const day = d.getDate().toString().padStart(2, '0');
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+
+        let hours = d.getHours();
+        const minutes = d.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12 || 12;
+        const hStr = hours.toString().padStart(2, '0');
+
+        return `${day} ${month} ${year}, ${hStr}:${minutes} ${ampm}`;
     } catch {
         return dateStr;
     }
@@ -837,4 +848,69 @@ function deleteArchivedTask(event, taskId) {
             showToast('Failed to delete task', 'danger');
         }
     });
+}
+
+// ═══════════════════════════════════════════════
+// DYNAMIC MOVE-TO LOGIC
+// ═══════════════════════════════════════════════
+
+function populateMoveToDropdown() {
+    const dropdown = document.getElementById('editTaskMoveTo');
+    if (!dropdown) return;
+
+    dropdown.innerHTML = '<option value="">-- Change Column --</option>';
+
+    // Select current column ID if we are editing
+    const currentColId = document.getElementById('taskColumnId')?.value ||
+        document.querySelector(`.task-card[data-task-id="${document.getElementById('editTaskId')?.value}"]`)?.dataset.columnId;
+
+    document.querySelectorAll('.kanban-column').forEach(col => {
+        const id = col.dataset.columnId;
+        const name = col.dataset.columnName;
+        if (id && name && name.toLowerCase() !== 'history') {
+            const isSelected = id == currentColId ? 'selected' : '';
+            dropdown.innerHTML += `<option value="${id}" ${isSelected}>${name}</option>`;
+        }
+    });
+}
+
+function moveTaskFromEditModal() {
+    const taskId = parseInt(document.getElementById('editTaskId').value);
+    const targetColumnId = parseInt(document.getElementById('editTaskMoveTo').value);
+
+    if (!taskId || !targetColumnId) return;
+
+    // Check if it's the same column
+    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+    if (card && card.dataset.columnId == targetColumnId) return;
+
+    fetch('/Tasks/MoveTask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            taskId: taskId,
+            columnId: targetColumnId
+        })
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // The SignalR "TaskMoved" handler will take care of moving the card in the DOM.
+                // But we should update the local data-column-id just in case
+                if (card) card.dataset.columnId = targetColumnId;
+                if (typeof showToast === 'function') showToast("🚀 Task moved successfully!", "success");
+
+                // Optionally close modal or refresh? User said "when select in move to drop the task will move to that column"
+                // We'll keep modal open so they can keep editing, but signal move.
+            } else {
+                alert("Error moving task: " + (data.message || "Unknown error"));
+                // Reset dropdown to previous value
+                populateMoveToDropdown();
+            }
+        })
+        .catch(err => {
+            console.error("Move error:", err);
+            alert("Failed to move task.");
+            populateMoveToDropdown();
+        });
 }

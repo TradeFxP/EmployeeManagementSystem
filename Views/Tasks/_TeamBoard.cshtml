@@ -17,6 +17,15 @@
     </div>
 
     <div class="d-flex gap-2">
+        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager") || User.IsInRole("SubManager"))
+        {
+            <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="openMoveRequestsModal('@Model.TeamName')"
+                title="View Column Move Requests">
+                <i class="bi bi-mailbox me-1"></i> Move Requests
+                <span id="moveRequestBadge" class="badge bg-danger rounded-pill d-none" style="font-size: 0.6rem;">0</span>
+            </button>
+        }
+
         @if (User.IsInRole("Admin"))
         {
             <button class="btn btn-sm btn-outline-info" onclick="openBoardPermissionModal('@Model.TeamName')"
@@ -341,17 +350,16 @@
 </div>
 
 
-<style>
-    <script>function clearFocusedDescription() {
-        const desc=document.getElementById("focusedTaskDescription");
-
+<script>
+    function clearFocusedDescription() {
+        const desc = document.getElementById("focusedTaskDescription");
         if (desc) {
-            desc .value="";
-            // clears the textarea
+            desc.value = "";
         }
     }
+</script>
 
-    </script>
+<style>
     /* ═══════════════════════════════════════════════════════
        PREMIUM KANBAN BOARD — INDUSTRY STANDARD UI
        ═══════════════════════════════════════════════════════ */
@@ -640,6 +648,8 @@
 
     /* ===== TASK LIST (SCROLLS) ===== */
     .kanban-tasks {
+        display: flex;
+        flex-direction: column;
         height: 100%;
         overflow-y: auto;
         padding-right: 4px;
@@ -670,6 +680,7 @@
         cursor: grab;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
         overflow-wrap: anywhere;
+        flex-shrink: 0;
     }
 
     .task-card:hover {
@@ -697,6 +708,18 @@
 
     .priority-critical {
         border-left: 4px solid #dc3545;
+    }
+
+    /* ===== FOLLOW-UP TODAY HIGHLIGHT ===== */
+    .follow-up-today {
+        border: 2px solid #ffc107 !important;
+        box-shadow: 0 0 15px rgba(255, 193, 7, 0.3) !important;
+        order: -10 !important; /* Force to top of column */
+        background: #fffef2 !important;
+    }
+
+    .follow-up-today:hover {
+        box-shadow: 0 0 20px rgba(255, 193, 7, 0.5) !important;
     }
 
     /* ===== CARD TOP ROW — BADGES ===== */

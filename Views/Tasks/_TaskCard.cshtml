@@ -35,9 +35,26 @@
     };
 
     var reviewCardClass = isFailed ? "task-failed" : isPassed ? "task-passed" : "";
+
+    // Follow-up Date Logic
+    bool isFollowUpToday = false;
+    DateTime? followUpDate = null;
+    if (Model.CustomFieldValues != null)
+    {
+        var fv = Model.CustomFieldValues.FirstOrDefault(f => f.Field?.FieldName?.Trim().ToLower().Contains("follow-up") == true || f.Field?.FieldName?.Trim().ToLower().Contains("followup") == true);
+        if (fv != null && DateTime.TryParse(fv.Value, out var dt))
+        {
+            followUpDate = dt;
+            if (dt.Date == DateTime.Today)
+            {
+                isFollowUpToday = true;
+            }
+        }
+    }
+    var followUpClass = isFollowUpToday ? "follow-up-today" : "";
 }
 
-<div class="task-card @priorityBorderClass @reviewCardClass"
+<div class="task-card @priorityBorderClass @reviewCardClass @followUpClass"
      draggable="true"
      data-task-id="@Model.Id"
      data-column-id="@Model.ColumnId"
@@ -116,6 +133,15 @@
                         <i class="bi @typeIcon"></i>
                     </span>
                 }
+            }
+
+            @if (isFollowUpToday)
+            {
+                <span class="badge bg-warning text-dark border-warning animate__animated animate__pulse animate__infinite d-flex align-items-center gap-1" 
+                      title="Follow-up Required Today"
+                      style="font-size: 0.7rem; font-weight: 800; box-shadow: 0 0 8px rgba(255,193,7,0.5);">
+                    <i class="bi bi-alarm-fill"></i> TODAY
+                </span>
             }
         </div>
 
@@ -308,6 +334,15 @@
                 onclick="openEditTaskModal(@Model.Id); event.stopPropagation();">
             <i class="bi bi-pencil-square"></i>
         </button>
+
+        @if (!User.IsInRole("Admin"))
+        {
+            <button class="action-btn action-btn-primary action-btn-request-move" title="Request Task Move"
+                    style="display: @(!isCompletedCol ? "inline-flex" : "none")"
+                    onclick="openMoveRequestModal(@Model.Id, '@(Model.Title?.Replace("'", "\\'"))', @Model.ColumnId, '@(colName?.Replace("'", "\\'"))'); event.stopPropagation();">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        }
 
         @if (User.IsInRole("Admin") || (userPermissions?.CanAssignTask == true))
         {
