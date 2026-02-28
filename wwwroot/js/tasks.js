@@ -1,4 +1,4 @@
-﻿// tasks.js
+// tasks.js
 // Single responsibility: load boards into right panel
 
 $(document).ready(function () {
@@ -46,8 +46,10 @@ $(document).on("submit", "#addTaskForm", function (e) {
                 backdrops[0].parentNode.removeChild(backdrops[0]);
             }
 
-            // Reload current board
-            $(".task-link.active").click();
+            // Reload current board (quiet)
+            if (window.loadTeamBoard && window.currentTeamName) {
+                window.loadTeamBoard(window.currentTeamName, true);
+            }
         }
 
     });
@@ -69,7 +71,11 @@ $(document).on("click", ".delete-task", function () {
     const id = $(this).data("id");
 
     $.post("/Tasks/DeleteTask", { id: id })
-        .done(() => location.reload())
+        .done(() => {
+            if (window.loadTeamBoard && window.currentTeamName) {
+                window.loadTeamBoard(window.currentTeamName, true);
+            }
+        })
         .fail(() => showToast('Failed to delete task. Please try again.', 'danger'));
 });
 
@@ -85,8 +91,10 @@ $(document).on("submit", "#addTaskForm", function (e) {
         success: function () {
             $("#addTaskModal").modal("hide");
 
-            // reload current board
-            $(".task-link.active").click();
+            // reload current board (quiet)
+            if (window.loadTeamBoard && window.currentTeamName) {
+                window.loadTeamBoard(window.currentTeamName, true);
+            }
         }
     });
 });
@@ -139,7 +147,11 @@ $(document).on("click", ".edit-task", function () {
         id: id,
         title: title,
         description: desc
-    }).done(() => location.reload());
+    }).done(() => {
+        if (window.loadTeamBoard && window.currentTeamName) {
+            window.loadTeamBoard(window.currentTeamName, true);
+        }
+    });
 });
 
 
@@ -211,20 +223,16 @@ function submitCreateTask() {
         }),
         success: function (response) {
             if (response && response.success) {
-                bootstrap.Modal.getInstance(document.getElementById("createTaskModal"))?.hide();
-                // reload board
-                if (window.currentTeamName) {
-                    // prefer partial reload
-                    if (window.loadTeamBoard) window.loadTeamBoard(window.currentTeamName);
-                    else location.reload();
-                } else {
-                    location.reload();
+                // reload board (quiet)
+                if (window.loadTeamBoard && window.currentTeamName) {
+                    window.loadTeamBoard(window.currentTeamName, true);
                 }
             } else {
                 bootstrap.Modal.getInstance(document.getElementById("createTaskModal"))?.hide();
-                // still reload to pick up new task
-                if (typeof currentTeamName !== 'undefined' && window.loadTeamBoard) loadTeamBoard(currentTeamName);
-                else location.reload();
+                // still reload (quiet)
+                if (window.loadTeamBoard && window.currentTeamName) {
+                    window.loadTeamBoard(window.currentTeamName, true);
+                }
             }
         },
         error: function (xhr) {
@@ -379,9 +387,7 @@ function submitReview() {
                 console.log("SignalR will handle the UI update.");
             } else {
                 if (window.currentTeamName && window.loadTeamBoard) {
-                    window.loadTeamBoard(window.currentTeamName);
-                } else {
-                    location.reload();
+                    window.loadTeamBoard(window.currentTeamName, true);
                 }
             }
         },
@@ -410,9 +416,7 @@ function archiveCompletedTasks(teamName) {
         success: function (response) {
             showToast(`Archived ${response.archivedCount} task(s) to history`, 'success');
             if (window.currentTeamName && window.loadTeamBoard) {
-                window.loadTeamBoard(window.currentTeamName);
-            } else {
-                location.reload();
+                window.loadTeamBoard(window.currentTeamName, true);
             }
         },
         error: function (xhr) {
@@ -432,9 +436,7 @@ function archiveSingleTask(taskId) {
         success: function () {
             showToast('Task archived to history', 'success');
             if (window.currentTeamName && window.loadTeamBoard) {
-                window.loadTeamBoard(window.currentTeamName);
-            } else {
-                location.reload();
+                window.loadTeamBoard(window.currentTeamName, true);
             }
         },
         error: function (xhr) {

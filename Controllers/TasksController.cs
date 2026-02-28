@@ -145,7 +145,7 @@ public class TasksController : Controller
             int imageCount = model.CustomFieldValues.Values
                 .SelectMany(v => v)
                 .Count(val => !string.IsNullOrEmpty(val) && (val.StartsWith("data:image/") || val.StartsWith("/Tasks/GetFieldImage")));
-            
+
             if (imageCount > 2) return BadRequest("Maximum of 2 images allowed per task.");
 
             foreach (var kvp in model.CustomFieldValues)
@@ -468,7 +468,7 @@ public class TasksController : Controller
             int totalImages = model.CustomFieldValues.Values
                 .SelectMany(v => v)
                 .Count(val => !string.IsNullOrEmpty(val) && (val.StartsWith("data:image/") || val.Contains("/Tasks/GetFieldImage")));
-            
+
             if (totalImages > 2) return BadRequest("Maximum of 2 images allowed per task.");
 
             // 1. Update or Insert
@@ -536,7 +536,7 @@ public class TasksController : Controller
                     {
                         _context.TaskFieldValues.Add(newVal);
                     }
-                    
+
                     await _historyService.LogCustomFieldChange(task.Id, fieldDef.FieldName, "(added)", val, user.Id);
                 }
             }
@@ -957,6 +957,11 @@ public class TasksController : Controller
             .OrderByDescending(p => p.Id)
             .FirstOrDefaultAsync();
 
+        var colPerms = user == null ? new List<ColumnPermission>() : await _context.ColumnPermissions
+            .Include(p => p.Column)
+            .Where(p => p.UserId == user.Id && p.Column != null && p.Column.TeamName != null && p.Column.TeamName.ToLower().Trim() == team.ToLower().Trim())
+            .ToListAsync();
+
         var vm = new TeamBoardViewModel
         {
             TeamName = team,
@@ -967,6 +972,7 @@ public class TasksController : Controller
             AllTeamNames = allTeamNames,
             CustomFields = customFields,
             UserPermissions = userPerms,
+            ColumnPermissions = colPerms,
             TeamSettings = teamSettings,
             UserRolesMap = feUserRolesMap
         };
@@ -1850,6 +1856,16 @@ public class TasksController : Controller
             .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .ToListAsync();
 
+        var teamColumns = await _context.TeamColumns
+            .Where(c => c.TeamName.ToLower().Trim() == team.ToLower().Trim())
+            .OrderBy(c => c.Order)
+            .ToListAsync();
+
+        var columnIds = teamColumns.Select(c => c.Id).ToList();
+        var colPerms = await _context.ColumnPermissions
+            .Where(cp => columnIds.Contains(cp.ColumnId))
+            .ToListAsync();
+
         // Get the set of user IDs that belong to this specific team
         var teamUserIds = await _context.UserTeams
             .Where(ut => ut.TeamName == team)
@@ -1879,6 +1895,8 @@ public class TasksController : Controller
 
             var p = perms.FirstOrDefault(x => x.UserId == u.Id);
 
+            var userColPerms = colPerms.Where(cp => cp.UserId == u.Id).ToList();
+
             result.Add(new BoardPermissionDto
             {
                 UserId = u.Id,
@@ -1893,7 +1911,26 @@ public class TasksController : Controller
                 CanDeleteTask = p?.CanDeleteTask ?? false,
                 CanReviewTask = p?.CanReviewTask ?? false,
                 CanImportExcel = p?.CanImportExcel ?? false,
-                CanAssignTask = p?.CanAssignTask ?? false
+                CanAssignTask = p?.CanAssignTask ?? false,
+                CanViewHistory = p?.CanViewHistory ?? false,
+
+                // Populate Granular Column Permissions
+                ColumnPermissions = teamColumns.Select(tc =>
+                {
+                    var ucp = userColPerms.FirstOrDefault(ucp => ucp.ColumnId == tc.Id);
+                    return new ColumnPermissionDto
+                    {
+                        ColumnId = tc.Id,
+                        ColumnName = tc.ColumnName,
+                        CanRename = ucp?.CanRename ?? false,
+                        CanDelete = ucp?.CanDelete ?? false,
+                        CanAddTask = ucp?.CanAddTask ?? false,
+                        CanAssignTask = ucp?.CanAssignTask ?? false,
+                        CanEditTask = ucp?.CanEditTask ?? false,
+                        CanDeleteTask = ucp?.CanDeleteTask ?? false,
+                        CanViewHistory = ucp?.CanViewHistory ?? false
+                    };
+                }).ToList()
             });
         }
 
@@ -1958,6 +1995,38 @@ public class TasksController : Controller
         existing.CanReviewTask = dto.CanReviewTask;
         existing.CanImportExcel = dto.CanImportExcel;
         existing.CanAssignTask = dto.CanAssignTask;
+        existing.CanViewHistory = dto.CanViewHistory;
+
+        // --- NEW: Update Granular Column Permissions ---
+        if (dto.ColumnPermissions != null && dto.ColumnPermissions.Any())
+        {
+            var userColPerms = await _context.ColumnPermissions
+                .Where(cp => cp.UserId == dto.UserId)
+                .ToListAsync();
+
+            foreach (var cpDto in dto.ColumnPermissions)
+            {
+                var colPerm = userColPerms.FirstOrDefault(x => x.ColumnId == cpDto.ColumnId);
+                if (colPerm == null)
+                {
+                    colPerm = new ColumnPermission
+                    {
+                        UserId = dto.UserId,
+                        ColumnId = cpDto.ColumnId
+                    };
+                    _context.ColumnPermissions.Add(colPerm);
+                }
+
+                colPerm.CanRename = cpDto.CanRename;
+                colPerm.CanDelete = cpDto.CanDelete;
+                colPerm.CanClearTasks = cpDto.CanClearTasks;
+                colPerm.CanAddTask = cpDto.CanAddTask;
+                colPerm.CanAssignTask = cpDto.CanAssignTask;
+                colPerm.CanEditTask = cpDto.CanEditTask;
+                colPerm.CanDeleteTask = cpDto.CanDeleteTask;
+                colPerm.CanViewHistory = cpDto.CanViewHistory;
+            }
+        }
 
         await _context.SaveChangesAsync();
 

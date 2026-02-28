@@ -11,6 +11,9 @@
             onclick="resetBoardView()">
             <i class="bi bi-arrow-left"></i> Back
         </button>
+        <i class="bi bi-layout-sidebar-inset-reverse board-title-toggle-btn"
+            style="cursor: pointer; font-size: 1.2rem; vertical-align: middle;" onclick="toggleSidebarWide()"
+            title="Show Sidebar"></i>
         <h4 class="mb-0 board-title">
             <i class="bi bi-kanban me-2 text-info"></i>@Model.TeamName Board
         </h4>
@@ -114,7 +117,7 @@
                 <h5 class="mb-0">Task Details</h5>
                 <div class="modal-action-buttons mb-0 border-0 p-0 shadow-none">
                     <button class="modal-action-btn btn-modal-history"
-                        style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="History"
+                        style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="TaskHistory"
                         onclick="openTaskHistoryFromModal(document.getElementById('focusedTaskId').value)">
                         <i class="bi bi-clock-history"></i>
                     </button>
@@ -160,7 +163,7 @@
                 <button class="btn btn-primary" onclick="saveFocusedTask()">Save</button>
                 @if (User.IsInRole("Admin"))
                 {
-                    <button class="btn btn-danger" onclick="deleteFocusedTask()">Delete</button>
+                    <button class="btn btn-danger" onclick="deleteFocusedTask()">Del Task</button>
                 }
                 <button class="btn btn-secondary" onclick="exitTaskFocus()">Back</button>
             </div>
@@ -174,6 +177,7 @@
         var isCompletedCol = colNameLower == "completed" || colNameLower == "complete" || colNameLower == "done";
         var taskCount = column.Tasks?.Count ?? 0;
         var colAccentClass = isReviewCol ? "col-review" : isCompletedCol ? "col-completed" : "";
+        var colPerm = Model.ColumnPermissions?.FirstOrDefault(cp => cp.ColumnId == column.Id);
 
         <div class="kanban-column @colAccentClass" data-column-id="@column.Id" data-column-name="@column.ColumnName">
 
@@ -200,9 +204,8 @@
                             {
                                 <i class="bi bi-layout-three-columns col-icon"></i>
                             }
-                            @column.ColumnName
+                            @column.ColumnName (@taskCount)
                         </span>
-                        <span class="task-count-badge">@taskCount</span>
 
                         <!-- RENAME MODE -->
                         <div class="column-rename" id="column-rename-@column.Id" style="display:none;"
@@ -218,9 +221,11 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-1">
+                    @{
+                        bool canAddTask = User.IsInRole("Admin") || (colPerm?.CanAddTask == true);
+                    }
                     <!-- ADD TASK -->
-                    @if (!isCompletedCol && (User.IsInRole("Admin") || User.IsInRole("Manager") ||
-                   User.IsInRole("Sub-Manager") || User.IsInRole("SubManager") || User.IsInRole("User")))
+                    @if (!isCompletedCol && canAddTask)
                     {
                         <button class="header-icon-btn" title="Add task"
                             onclick="openCreateTaskModal(@column.Id); event.stopPropagation();">
@@ -235,23 +240,25 @@
                     </button>
 
                     <!-- ADMIN / GRANTED ACTIONS -->
-                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanRenameColumn == true))
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanRenameColumn == true) || (colPerm?.CanRename
+                   == true))
                     {
                         <button class="header-icon-btn" title="Edit"
                             onclick="startRename(@column.Id); event.stopPropagation();">
                             <i class="bi bi-pencil"></i>
                         </button>
                     }
-                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteTask == true))
+                    @if (User.IsInRole("Admin") || (colPerm?.CanClearTasks == true))
                     {
                         <button class="header-icon-btn text-warning" title="Clear All Tasks"
                             onclick="clearColumnTasks(@column.Id); event.stopPropagation();">
                             <i class="bi bi-eraser"></i>
                         </button>
                     }
-                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteColumn == true))
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteColumn == true) || (colPerm?.CanDelete
+                   == true))
                     {
-                        <button class="header-icon-btn text-danger" title="Delete"
+                        <button class="header-icon-btn text-danger" title="Del Col"
                             onclick="confirmDeleteColumn(@column.Id); event.stopPropagation();">
                             <i class="bi bi-trash3"></i>
                         </button>
@@ -284,6 +291,7 @@
                 { "ColumnName", column.ColumnName },
                 { "TeamSettings", Model.TeamSettings },
                 { "UserPermissions", Model.UserPermissions },
+                { "ColumnPermission", colPerm },
                 { "AssignableUsers", Model.AssignableUsers },
                 { "UserRolesMap", Model.UserRolesMap }
                 })
@@ -298,7 +306,7 @@
         <div class="kanban-column-header history-header">
             <div class="d-flex align-items-center flex-grow-1 ms-2">
                 <i class="bi bi-clock-history col-icon me-2"></i>
-                <span class="column-title">History</span>
+                <span class="column-title">TaskHistory</span>
             </div>
             <div class="d-flex align-items-center gap-1">
                 <!-- FILTER -->
@@ -566,20 +574,6 @@
         letter-spacing: -0.2px;
     }
 
-    .task-count-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 22px;
-        height: 22px;
-        padding: 0 6px;
-        border-radius: 11px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
-        margin-left: 8px;
-    }
 
     .column-drag-handle {
         padding: 4px 2px;

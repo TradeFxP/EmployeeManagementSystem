@@ -14,7 +14,7 @@ namespace UserRoles.Data
 
         public DbSet<TaskItem> TaskItems { get; set; }
 
-       
+
         public DbSet<TeamColumn> TeamColumns { get; set; }
 
         public DbSet<UserTeam> UserTeams { get; set; }
@@ -31,12 +31,13 @@ namespace UserRoles.Data
         // Custom Fields for Tasks
         public DbSet<TaskCustomField> TaskCustomFields { get; set; }
         public DbSet<TaskFieldValue> TaskFieldValues { get; set; }
-        
+
         // Task History
         public DbSet<TaskHistory> TaskHistories { get; set; }
 
         // Board Permissions
         public DbSet<BoardPermission> BoardPermissions { get; set; }
+        public DbSet<ColumnPermission> ColumnPermissions { get; set; }
 
         // Email Logs
         public DbSet<EmailLog> EmailLogs { get; set; }
@@ -69,7 +70,7 @@ namespace UserRoles.Data
                 .WithMany(t => t.CustomFieldValues)
                 .HasForeignKey(v => v.TaskId)
                 .OnDelete(DeleteBehavior.Cascade);
-            
+
             // Configure TaskHistory relationships
             builder.Entity<TaskHistory>()
                 .HasOne(h => h.Task)
@@ -153,6 +154,11 @@ namespace UserRoles.Data
             // BoardPermission configuration
             builder.Entity<BoardPermission>()
                 .HasIndex(p => new { p.UserId, p.TeamName })
+                .IsUnique();
+
+            // ColumnPermission configuration
+            builder.Entity<ColumnPermission>()
+                .HasIndex(p => new { p.UserId, p.ColumnId })
                 .IsUnique();
 
             // Feature Assignment

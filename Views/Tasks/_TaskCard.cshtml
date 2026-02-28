@@ -5,7 +5,7 @@
     var teamSettings = ViewData["TeamSettings"] as UserRoles.Models.Team;
     var userPermissions = ViewData["UserPermissions"] as UserRoles.Models.BoardPermission;
     var assignableUsers = ViewData["AssignableUsers"] as List<UserRoles.Models.Users> ?? new List<UserRoles.Models.Users>();
-    
+
     var colName = ViewData["ColumnName"] as string;
     var colNameLower = colName?.Trim().ToLower();
     var isReviewCol = colNameLower == "review";
@@ -67,12 +67,12 @@
 
             @if (finalDueDate != null)
             {
-                <span class="badge bg-light text-dark border d-flex align-items-center gap-1 small fw-normal" 
-                      title="Due Date" 
-                      style="font-size: 0.7rem; white-space: nowrap;">
-                    <i class="bi bi-calendar-event text-danger"></i>
+                    <span class="badge bg-light text-dark border d-flex align-items-center gap-1 small fw-normal" 
+                          title="Due Date" 
+                          style="font-size: 0.7rem; white-space: nowrap;">
+                        <i class="bi bi-calendar-event text-danger"></i>
                     @finalDueDate.Value.ToString("dd MMM, hh:mm tt")
-                </span>
+                    </span>
             }
 
             @{
@@ -93,9 +93,9 @@
 
         <div class="ms-auto d-flex flex-column align-items-end gap-1">
             <span class="badge bg-light text-muted border small" style="font-size: 0.7rem;">#@Model.Id</span>
-            
-            
-            
+
+
+
             <div class="d-flex align-items-center gap-1">
                 <span class="review-badge review-badge-fail" style="@(isFailed ? "" : "display:none")">
                     <i class="bi bi-x-circle-fill"></i> FAIL
@@ -114,10 +114,10 @@
     <!-- FAIL NOTE -->
     @if (isFailed && !string.IsNullOrWhiteSpace(Model.ReviewNote))
     {
-        <div class="review-note-callout mt-2">
-            <i class="bi bi-chat-left-text me-1"></i>
-            <span>@Model.ReviewNote</span>
-        </div>
+            <div class="review-note-callout mt-2">
+                <i class="bi bi-chat-left-text me-1"></i>
+                <span>@Model.ReviewNote</span>
+            </div>
     }
 
     <!-- TITLE -->
@@ -126,38 +126,38 @@
     <!-- CUSTOM FIELDS -->
     @if (Model.CustomFieldValues != null && Model.CustomFieldValues.Any())
     {
-        <div class="custom-fields-summary mt-2">
+            <div class="custom-fields-summary mt-2">
             @foreach (var fv in Model.CustomFieldValues.Where(f => f.Field != null && f.Field.IsActive).Take(2))
             {
-                <div class="cf-row">
-                    <span class="cf-label">@fv.Field.FieldName:</span>
+                        <div class="cf-row">
+                            <span class="cf-label">@fv.Field.FieldName:</span>
                     @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
                     {
-                        <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
+                                    <span>@sdt.ToString("dd MMM yyyy, hh:mm tt")</span>
                     }
                     else if (fv.Field.FieldType == "Image" && !string.IsNullOrEmpty(fv.Value))
                     {
-                        <div class="mt-1 shadow-sm d-inline-block position-relative" style="cursor: pointer;" onclick="event.stopPropagation(); if(typeof openLightbox === 'function') openLightbox('@fv.Value'); else window.open('@fv.Value', '_blank')">
-                            <img src="@fv.Value" class="rounded" style="max-width: 100%; max-height: 120px; object-fit: contain; border: 1px solid #e2e8f0;" />
-                            <div style="position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 4px; padding: 2px 4px; font-size: 0.65rem;">
-                                <i class="bi bi-arrows-fullscreen"></i>
-                            </div>
-                        </div>
+                                    <div class="mt-1 shadow-sm d-inline-block position-relative" style="cursor: pointer;" onclick="event.stopPropagation(); if(typeof openLightbox === 'function') openLightbox('@fv.Value'); else window.open('@fv.Value', '_blank')">
+                                        <img src="@fv.Value" class="rounded" style="max-width: 100%; max-height: 120px; object-fit: contain; border: 1px solid #e2e8f0;" />
+                                        <div style="position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 4px; padding: 2px 4px; font-size: 0.65rem;">
+                                            <i class="bi bi-arrows-fullscreen"></i>
+                                        </div>
+                                    </div>
                     }
                     else
                     {
-                        <span>@fv.Value</span>
+                                    <span>@fv.Value</span>
                     }
-                </div>
+                        </div>
             }
-        </div>
+            </div>
     }
 
     <!-- METADATA 
     <div class="task-meta mt-2">
          <div><i class="bi bi-person-circle me-1"></i>(string.IsNullOrEmpty(Model.CreatedByUser?.Name) ? Model.CreatedByUser?.UserName : Model.CreatedByUser.Name) </div>  
         <div><i class="bi bi-calendar3 me-1"></i>Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div> 
-       
+
         if (Model.UpdatedAt != null)
         {
             <div><i class="bi bi-pencil-square me-1"></i>Model.UpdatedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
@@ -166,28 +166,28 @@
     -->
     @if (Model.AssignedToUser != null && Model.AssignedAt != null)
     {
-        <div class="assigned-info-block mt-2" data-task-id="@Model.Id">
-            <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@(string.IsNullOrEmpty(Model.AssignedToUser.Name) ? Model.AssignedToUser.UserName : Model.AssignedToUser.Name)</strong></div>
+            <div class="assigned-info-block mt-2" data-task-id="@Model.Id">
+                <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@(string.IsNullOrEmpty(Model.AssignedToUser.Name) ? Model.AssignedToUser.UserName : Model.AssignedToUser.Name)</strong></div>
             @if (Model.AssignedByUser != null)
             {
-                <div class="assigned-row"><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
+                        <div class="assigned-row"><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
             }
-            <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
-        </div>
+                <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+            </div>
     }
 
     @if (Model.ReviewedByUser != null && Model.ReviewedAt != null)
     {
-        <div class="task-meta mt-1">
-            <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@(string.IsNullOrEmpty(Model.ReviewedByUser?.Name) ? Model.ReviewedByUser?.UserName : Model.ReviewedByUser.Name)</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
-        </div>
+            <div class="task-meta mt-1">
+                <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@(string.IsNullOrEmpty(Model.ReviewedByUser?.Name) ? Model.ReviewedByUser?.UserName : Model.ReviewedByUser.Name)</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+            </div>
     }
 
     @if (Model.CompletedByUser != null && Model.CompletedAt != null)
     {
-        <div class="task-meta mt-1">
-            <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@(string.IsNullOrEmpty(Model.CompletedByUser?.Name) ? Model.CompletedByUser?.UserName : Model.CompletedByUser.Name)</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
-        </div>
+            <div class="task-meta mt-1">
+                <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@(string.IsNullOrEmpty(Model.CompletedByUser?.Name) ? Model.CompletedByUser?.UserName : Model.CompletedByUser.Name)</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+            </div>
     }
 
     <!-- LATEST ACTIVITY INDICATOR -->
@@ -195,11 +195,11 @@
         <i class="bi bi-clock-history me-1"></i>
         @if (Model.UpdatedAt != null)
         {
-            <span>Modified @Model.UpdatedAt.Value.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
+                <span>Modified @Model.UpdatedAt.Value.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
         }
         else
         {
-            <span>Created @Model.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
+                <span>Created @Model.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
         }
     </div>
     <div class="task-assign-panel d-none" data-task-id="@Model.Id">
@@ -215,7 +215,8 @@
                 var isViewerAdmin = User.IsInRole("Admin");
 
                 // Filter users based on viewer role
-                var filteredManagement = assignableUsers.Where(u => {
+                var filteredManagement = assignableUsers.Where(u =>
+                {
                     if (!roleMap.ContainsKey(u.Id)) return false;
                     var r = roleMap[u.Id];
                     var isTargetAdmin = r == "Admin";
@@ -229,35 +230,37 @@
                     return true; // Admin sees everyone
                 }).ToList();
 
-                var filteredRegular = assignableUsers.Where(u => {
-                    if (roleMap.ContainsKey(u.Id)) {
+                var filteredRegular = assignableUsers.Where(u =>
+                {
+                    if (roleMap.ContainsKey(u.Id))
+                    {
                         var r = roleMap[u.Id];
                         if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
                     }
                     return true; // regular members are always visible to management
                 }).ToList();
             }
-            
+
             @if (filteredManagement.Any())
             {
-                <optgroup label="Management">
+                    <optgroup label="Management">
                     @foreach (var u in filteredManagement)
                     {
                         var role = roleMap.ContainsKey(u.Id) ? roleMap[u.Id] : "User";
-                        <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                     }
-                </optgroup>
+                    </optgroup>
             }
 
             @if (filteredRegular.Any())
             {
-                <optgroup label="Team Members">
+                    <optgroup label="Team Members">
                     @foreach (var u in filteredRegular)
                     {
                         var role = roleMap.ContainsKey(u.Id) ? roleMap[u.Id] : "User";
-                        <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                <option value="user:@u.Id" selected="@(Model.AssignedToUserId == u.Id)">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
                     }
-                </optgroup>
+                    </optgroup>
             }
         </select>
         <div class="d-flex gap-2 justify-content-end">
@@ -270,18 +273,41 @@
 
     <!-- ⚙️ Actions -->
     <div class="task-actions mt-2">
-        <button class="action-btn action-btn-info" title="View Task History"
-                onclick="openTaskHistoryModal(@Model.Id); event.stopPropagation();">
-            <i class="bi bi-clock-history"></i>
-        </button>
+        @{
+            var boardPerm = ViewData["UserPermissions"] as UserRoles.Models.BoardPermission;
+            var colPerm = ViewData["ColumnPermission"] as UserRoles.Models.ColumnPermission;
+            var isAdmin = User.IsInRole("Admin");
 
-        <button class="action-btn action-btn-edit" title="Edit Task"
-                style="display: @(!isCompletedCol || User.IsInRole("Admin") || (userPermissions?.CanEditAllFields == true) ? "inline-flex" : "none")"
-                onclick="openEditTaskModal(@Model.Id); event.stopPropagation();">
-            <i class="bi bi-pencil-square"></i>
-        </button>
+            // Edit logic: Board "Edit All" OR Column "Edit Task"
+            bool canEdit = isAdmin || (boardPerm?.CanEditAllFields == true) || (colPerm?.CanEditTask == true);
+            // Assign logic: Board "Assign Task" OR Column "Assign Task"
+            bool canAssign = isAdmin || (boardPerm?.CanAssignTask == true) || (colPerm?.CanAssignTask == true);
+            // Delete logic: Board "Delete Task" OR Column "Delete Task"
+            bool canDelete = isAdmin || (boardPerm?.CanDeleteTask == true) || (colPerm?.CanDeleteTask == true);
+            // History logic: Board "View History" OR Column "View History"
+            bool canViewHistory = isAdmin || (boardPerm?.CanViewHistory == true) || (colPerm?.CanViewHistory == true);
+            // Review logic: Board "Review Task" (Review is usually board-wide or role-based)
+            bool canReview = isAdmin || (boardPerm?.CanReviewTask == true);
+        }
 
-        @if (User.IsInRole("Admin") || (userPermissions?.CanAssignTask == true))
+        @if (canViewHistory)
+        {
+            <button class="action-btn action-btn-info" title="View Task History"
+                    onclick="openTaskHistoryModal(@Model.Id); event.stopPropagation();">
+                <i class="bi bi-clock-history"></i>
+            </button>
+        }
+
+        @if (canEdit)
+        {
+            <button class="action-btn action-btn-edit" title="Edit Task"
+                    style="display: @(!isCompletedCol || isAdmin || (boardPerm?.CanEditAllFields == true) ? "inline-flex" : "none")"
+                    onclick="openEditTaskModal(@Model.Id); event.stopPropagation();">
+                <i class="bi bi-pencil-square"></i>
+            </button>
+        }
+
+        @if (canAssign)
         {
             <button class="action-btn action-btn-secondary action-btn-assign" title="Assign Task"
                     data-task-id="@Model.Id"
@@ -291,19 +317,14 @@
             </button>
         }
 
-        @* ADMIN / GRANTED: Review button rendered if user has perms, display toggled by column *@
-        @if (User.IsInRole("Admin") || (userPermissions?.CanReviewTask == true))
+        @if (canReview)
         {
             <button class="action-btn action-btn-warning action-btn-review" title="Review Task"
                     style="display: @(isReviewCol && isPending ? "inline-flex" : "none")"
                     onclick="openReviewModal(@Model.Id, '@(Model.Title?.Replace("'", "\\'"))'); event.stopPropagation();">
                 <i class="bi bi-clipboard-check"></i>
             </button>
-        }
 
-        @* ADMIN / GRANTED: Archive button rendered if user has perms, display toggled by column *@
-        @if (User.IsInRole("Admin") || (userPermissions?.CanReviewTask == true))
-        {
             <button class="action-btn action-btn-success action-btn-archive" title="Archive Task"
                     style="display: @(isCompletedCol && isPassed ? "inline-flex" : "none")"
                     onclick="archiveSingleTask(@Model.Id); event.stopPropagation();">
@@ -311,9 +332,9 @@
             </button>
         }
 
-        @if (User.IsInRole("Admin") || (userPermissions?.CanDeleteTask == true))
+        @if (canDelete)
         {
-            <button class="action-btn action-btn-danger" title="Delete"
+            <button class="action-btn action-btn-danger" title="Del Task"
                     onclick="deleteTask(@Model.Id); event.stopPropagation();">
                 <i class="bi bi-trash3"></i>
             </button>

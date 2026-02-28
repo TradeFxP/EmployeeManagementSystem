@@ -22,11 +22,40 @@ namespace UserRoles.Services
                 await context.Database.EnsureCreatedAsync();
 
                 // Manual Migration: Add AssignedToUserId to Hierarchy Tables if missing
-                logger.LogInformation("Applying manual schema updates for assignments.");
+                logger.LogInformation("Applying manual schema updates for assignments and permissions.");
                 await context.Database.ExecuteSqlRawAsync(@"
                     ALTER TABLE ""Epics"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
                     ALTER TABLE ""Features"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
                     ALTER TABLE ""Stories"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
+
+                    -- Board Permissions Update
+                    ALTER TABLE ""BoardPermissions"" ADD COLUMN IF NOT EXISTS ""CanViewHistory"" boolean DEFAULT false;
+
+                    -- Column Permissions Table Creation (for fresh DBs)
+                    CREATE TABLE IF NOT EXISTS ""ColumnPermissions"" (
+                        ""Id"" SERIAL PRIMARY KEY,
+                        ""UserId"" text NOT NULL,
+                        ""ColumnId"" integer NOT NULL,
+                        ""CanRename"" boolean NOT NULL DEFAULT false,
+                        ""CanDelete"" boolean NOT NULL DEFAULT false,
+                        ""CanAddTask"" boolean NOT NULL DEFAULT false,
+                        ""CanAssignTask"" boolean NOT NULL DEFAULT false,
+                        ""CanEditTask"" boolean NOT NULL DEFAULT false,
+                        ""CanDeleteTask"" boolean NOT NULL DEFAULT false,
+                        ""CanClearTasks"" boolean NOT NULL DEFAULT false,
+                        ""CanViewHistory"" boolean NOT NULL DEFAULT false,
+                        CONSTRAINT ""FK_ColumnPermissions_AspNetUsers_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE CASCADE,
+                        CONSTRAINT ""FK_ColumnPermissions_TeamColumns_ColumnId"" FOREIGN KEY (""ColumnId"") REFERENCES ""TeamColumns"" (""Id"") ON DELETE CASCADE
+                    );
+
+                    -- Column Permissions Table Updates (for existing DBs)
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanAssignTask"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanEditTask"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanDeleteTask"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanClearTasks"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanViewHistory"" boolean NOT NULL DEFAULT false;
+
+                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ColumnPermissions_UserId_ColumnId"" ON ""ColumnPermissions"" (""UserId"", ""ColumnId"");
                 ");
 
                 // Add roles
@@ -103,36 +132,36 @@ namespace UserRoles.Services
                 }
 
                 // Add Manager user
-            //    logger.LogInformation("Seeding Manager user.");
-            //    var ManagerEmail = "manager@gmail.com";
-            //    if (await userManager.FindByEmailAsync(ManagerEmail) == null)
-            //    {
-            //        var ManagerUser = new Users
-            //        {
-            //            Name = "Manager",
-            //            UserName = ManagerEmail,
-            //            NormalizedUserName = ManagerEmail.ToUpper(),
-            //            Email = ManagerEmail,
-            //            NormalizedEmail = ManagerEmail.ToUpper(),
-            //            EmailConfirmed = true,
-            //            SecurityStamp = Guid.NewGuid().ToString()
-            //        };
+                //    logger.LogInformation("Seeding Manager user.");
+                //    var ManagerEmail = "manager@gmail.com";
+                //    if (await userManager.FindByEmailAsync(ManagerEmail) == null)
+                //    {
+                //        var ManagerUser = new Users
+                //        {
+                //            Name = "Manager",
+                //            UserName = ManagerEmail,
+                //            NormalizedUserName = ManagerEmail.ToUpper(),
+                //            Email = ManagerEmail,
+                //            NormalizedEmail = ManagerEmail.ToUpper(),
+                //            EmailConfirmed = true,
+                //            SecurityStamp = Guid.NewGuid().ToString()
+                //        };
 
-            //        var result = await userManager.CreateAsync(ManagerUser, "Manager@123");
-            //        if (result.Succeeded)
-            //        {
-            //            logger.LogInformation("Assigning Manager role to the Manager user.");
-            //            await userManager.AddToRoleAsync(ManagerUser, "Manager");
-            //        }
-            //        else
-            //        {
-            //            logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
-            //        }
-            //    }
+                //        var result = await userManager.CreateAsync(ManagerUser, "Manager@123");
+                //        if (result.Succeeded)
+                //        {
+                //            logger.LogInformation("Assigning Manager role to the Manager user.");
+                //            await userManager.AddToRoleAsync(ManagerUser, "Manager");
+                //        }
+                //        else
+                //        {
+                //            logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+                //        }
+                //    }
             }
             catch (Exception ex)
             {
-               logger.LogError(ex, "An error occurred while seeding the database.");
+                logger.LogError(ex, "An error occurred while seeding the database.");
 
             }
 

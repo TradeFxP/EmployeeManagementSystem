@@ -2,7 +2,7 @@
 
 @{
     var statuses = (UserRoles.Models.Enums.TaskStatus[])
-        Enum.GetValues(typeof(UserRoles.Models.Enums.TaskStatus));
+    Enum.GetValues(typeof(UserRoles.Models.Enums.TaskStatus));
 }
 
 
@@ -10,8 +10,7 @@
 
     @foreach (var status in statuses)
     {
-        <div class="col-md-3 kanban-column"
-             data-status="@status">
+        <div class="col-md-3 kanban-column" data-status="@status">
 
 
             <!-- COLUMN HEADER -->
@@ -21,9 +20,7 @@
                 <!-- ➕ ADD TASK (ONLY IN TODO) -->
                 @if (status == UserRoles.Models.Enums.TaskStatus.ToDo)
                 {
-                    <button class="btn btn-sm btn-outline-primary"
-                            data-bs-toggle="modal"
-                            data-bs-target="#addTaskModal">
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addTaskModal">
                         +
                     </button>
                 }
@@ -41,18 +38,14 @@
             {
                 foreach (var task in tasksInColumn)
                 {
-                    <div class="card mb-2 task-card"
-                         draggable="true"
-                         data-task-id="@task.Id"
-                         data-current-status="@task.Status">
+                    <div class="card mb-2 task-card" draggable="true" data-task-id="@task.Id" data-current-status="@task.Status">
 
 
                         <div class="card-body p-2">
 
                             <!-- CLICKABLE TITLE -->
                             <!-- CLICKABLE TITLE WITH LABEL -->
-                            <div class="task-title small"
-                                 data-task-id="@task.Id">
+                            <div class="task-title small" data-task-id="@task.Id">
                                 <strong>Title:</strong>
                                 <span>@task.Title</span>
                             </div>
@@ -102,58 +95,64 @@
                                         }
                                     </div>
                                 }
-                             <!-- TOP ROW (New) -->
-                            @{
-                                var priorityBorderClass = task.Priority switch
-                                {
-                                    UserRoles.Models.Enums.TaskPriority.Low => "priority-low",
-                                    UserRoles.Models.Enums.TaskPriority.Medium => "priority-medium",
-                                    UserRoles.Models.Enums.TaskPriority.High => "priority-high",
-                                    UserRoles.Models.Enums.TaskPriority.Critical => "priority-critical",
-                                    _ => "priority-low"
-                                };
-                                var priorityLabel = task.Priority.ToString();
-                                var customPriority = task.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldName?.Trim()?.ToLower() == "priority")?.Value;
-                                var effectivePriorityLabel = !string.IsNullOrWhiteSpace(customPriority) ? customPriority : priorityLabel;
-                                var effectivePriorityClass = effectivePriorityLabel.ToLower() switch
-                                {
-                                    "low" => "priority-low",
-                                    "medium" => "priority-medium",
-                                    "high" => "priority-high",
-                                    "critical" => "priority-critical",
-                                    _ => priorityBorderClass
-                                };
-                            }
-
-                            @{
-                                DateTime? finalDueDate = task.DueDate;
-                                if (finalDueDate == null && task.CustomFieldValues != null)
-                                {
-                                    var cfDueDate = task.CustomFieldValues.FirstOrDefault(f => f.Field?.FieldName?.Trim().ToLower() == "due date")?.Value;
-                                    if (DateTime.TryParse(cfDueDate, out var parsedDate))
+                                <!-- TOP ROW (New) -->
+                                @{
+                                    var priorityBorderClass = task.Priority switch
                                     {
-                                        finalDueDate = parsedDate;
+                                        UserRoles.Models.Enums.TaskPriority.Low => "priority-low",
+                                        UserRoles.Models.Enums.TaskPriority.Medium => "priority-medium",
+                                        UserRoles.Models.Enums.TaskPriority.High => "priority-high",
+                                        UserRoles.Models.Enums.TaskPriority.Critical => "priority-critical",
+                                        _ => "priority-low"
+                                    };
+                                    var priorityLabel = task.Priority.ToString();
+                                    var customPriority = task.CustomFieldValues?.FirstOrDefault(f =>
+                                    f.Field?.FieldName?.Trim()?.ToLower() == "priority")?.Value;
+                                    var effectivePriorityLabel = !string.IsNullOrWhiteSpace(customPriority) ? customPriority :
+                                    priorityLabel;
+                                    var effectivePriorityClass = effectivePriorityLabel.ToLower() switch
+                                    {
+                                        "low" => "priority-low",
+                                        "medium" => "priority-medium",
+                                        "high" => "priority-high",
+                                        "critical" => "priority-critical",
+                                        _ => priorityBorderClass
+                                    };
+                                }
+
+                                @{
+                                    DateTime? finalDueDate = task.DueDate;
+                                    if (finalDueDate == null && task.CustomFieldValues != null)
+                                    {
+                                        var cfDueDate = task.CustomFieldValues.FirstOrDefault(f => f.Field?.FieldName?.Trim().ToLower() ==
+                                        "due date")?.Value;
+                                        if (DateTime.TryParse(cfDueDate, out var parsedDate))
+                                        {
+                                            finalDueDate = parsedDate;
+                                        }
                                     }
                                 }
-                            }
 
-                            <div class="d-flex flex-column gap-1 mb-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        @if (finalDueDate != null)
-                        {
-                            <span class="badge @effectivePriorityClass text-white" style="font-size: 0.7rem; padding: 2px 6px;">@effectivePriorityLabel.ToUpper()</span>
-                        }
-                        <span class="badge bg-light text-muted border small ms-auto" style="font-size: 0.7rem;">#@task.Id</span>
-                    </div>
-                
-                    @if (finalDueDate != null)
-                    {
-                        <span class="badge bg-light text-dark border small d-flex align-items-center gap-1" title="Due Date" style="font-size: 0.7rem; width: fit-content;">
-                            <i class="bi bi-calendar-event text-danger"></i>
-                            Due Date: @finalDueDate.Value.ToString("dd MMM, hh:mm tt")
-                        </span>
-                    }
-                </div>
+                                <div class="d-flex flex-column gap-1 mb-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        @if (finalDueDate != null)
+                                        {
+                                            <span class="badge @effectivePriorityClass text-white"
+                                                style="font-size: 0.7rem; padding: 2px 6px;">@effectivePriorityLabel.ToUpper()</span>
+                                        }
+                                        <span class="badge bg-light text-muted border small ms-auto"
+                                            style="font-size: 0.7rem;">#@task.Id</span>
+                                    </div>
+
+                                    @if (finalDueDate != null)
+                                    {
+                                        <span class="badge bg-light text-dark border small d-flex align-items-center gap-1"
+                                            title="Due Date" style="font-size: 0.7rem; width: fit-content;">
+                                            <i class="bi bi-calendar-event text-danger"></i>
+                                            Due Date: @finalDueDate.Value.ToString("dd MMM, hh:mm tt")
+                                        </span>
+                                    }
+                                </div>
                                 <!-- ADMIN ACTIONS -->
                                 @if (User.IsInRole("Admin"))
                                 {
@@ -162,13 +161,11 @@
                                         <!-- ASSIGN TO -->
                                         <div class="mb-2">
                                             <label class="small fw-bold">Assign To</label>
-                                            <select class="form-select form-select-sm assign-task"
-                                                    data-id="@task.Id">
+                                            <select class="form-select form-select-sm assign-task" data-id="@task.Id">
                                                 <option value="">-- Select User --</option>
                                                 @foreach (var u in ViewBag.Users as List<Users>)
                                                 {
-                                                    <option value="@u.Id"
-                                                            selected="@(u.Id == task.AssignedToUserId)">
+                                                    <option value="@u.Id" selected="@(u.Id == task.AssignedToUserId)">
                                                         @u.Name
                                                     </option>
                                                 }
@@ -177,14 +174,12 @@
 
                                         <!-- ACTION BUTTONS -->
                                         <div class="d-flex gap-2">
-                                            <button class="btn btn-sm btn-outline-primary edit-task"
-                                                    data-id="@task.Id">
+                                            <button class="btn btn-sm btn-outline-primary edit-task" data-id="@task.Id">
                                                 Edit
                                             </button>
 
-                                            <button class="btn btn-sm btn-outline-danger delete-task"
-                                                    data-id="@task.Id">
-                                                Delete
+                                            <button class="btn btn-sm btn-outline-danger delete-task" data-id="@task.Id">
+                                                Del Task
                                             </button>
                                         </div>
                                     </div>
@@ -219,12 +214,7 @@
 
                     <div class="mb-3">
                         <label class="form-label">Title</label>
-                        <input type="text"
-                               class="form-control"
-                               name="Title"
-                               maxlength="50"
-                               id="taskTitle"
-                               required />
+                        <input type="text" class="form-control" name="Title" maxlength="50" id="taskTitle" required />
                         <small class="text-muted">
                             <span id="titleCount">50</span> characters remaining
                         </small>
@@ -232,10 +222,8 @@
 
                     <div class="mb-3">
                         <label class="form-label">Description</label>
-                        <textarea class="form-control"
-                                  name="Description"
-                                  maxlength="200"
-                                  id="taskDescription"></textarea>
+                        <textarea class="form-control" name="Description" maxlength="200"
+                            id="taskDescription"></textarea>
                         <small class="text-muted">
                             <span id="descCount">200</span> characters remaining
                         </small>

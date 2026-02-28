@@ -22,13 +22,13 @@ namespace UserRoles.ViewModels
 
         // ✅ ADD THIS
         public List<Users> AssignableUsers { get; set; } = new();
-        
+
         // Custom field definitions
         public List<TaskCustomField> CustomFields { get; set; } = new();
 
         // ✅ User's permissions for this board
         public BoardPermission? UserPermissions { get; set; }
-        
+
         // Users who can appear in the "Filter By Assignor" dropdown
         public List<Users> Assignors { get; set; } = new();
 
@@ -36,8 +36,11 @@ namespace UserRoles.ViewModels
         public List<Users> FilteredAssignees { get; set; } = new();
 
         public Team? TeamSettings { get; set; }
-        
+
         // Map of UserId to their primary role (used for frontend filtering)
         public Dictionary<string, string> UserRolesMap { get; set; } = new();
+
+        // User's column-specific permissions for this board
+        public List<ColumnPermission> ColumnPermissions { get; set; } = new();
     }
 }
