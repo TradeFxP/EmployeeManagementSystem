@@ -618,6 +618,7 @@ namespace UserRoles.Controllers
                 return BadRequest();
 
             var reports = await _context.DailyReports
+                .AsNoTracking()
                 .Where(r => r.ApplicationUserId == userId)
                 .OrderByDescending(r => r.Date)
                 .ToListAsync();

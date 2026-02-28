@@ -11,24 +11,12 @@
             onclick="resetBoardView()">
             <i class="bi bi-arrow-left"></i> Back
         </button>
-        <i class="bi bi-layout-sidebar-inset-reverse board-title-toggle-btn"
-            style="cursor: pointer; font-size: 1.2rem; vertical-align: middle;" onclick="toggleSidebarWide()"
-            title="Show Sidebar"></i>
         <h4 class="mb-0 board-title">
             <i class="bi bi-kanban me-2 text-info"></i>@Model.TeamName Board
         </h4>
     </div>
 
     <div class="d-flex gap-2">
-        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager") || User.IsInRole("SubManager"))
-        {
-            <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="openMoveRequestsModal('@Model.TeamName')"
-                title="View Column Move Requests">
-                <i class="bi bi-mailbox me-1"></i> Move Requests
-                <span id="moveRequestBadge" class="badge bg-danger rounded-pill d-none" style="font-size: 0.6rem;">0</span>
-            </button>
-        }
-
         @if (User.IsInRole("Admin"))
         {
             <button class="btn btn-sm btn-outline-info" onclick="openBoardPermissionModal('@Model.TeamName')"
@@ -103,10 +91,6 @@
 
 <!-- KANBAN BOARD -->
 <div class="kanban-board" id="kanbanBoard" data-team-name="@Model.TeamName"
-    data-priority-visible="@((Model.TeamSettings?.IsPriorityVisible ?? true) ? "true" : "false")"
-    data-due-date-visible="@((Model.TeamSettings?.IsDueDateVisible ?? true) ? "true" : "false")"
-    data-title-visible="@((Model.TeamSettings?.IsTitleVisible ?? true) ? "true" : "false")"
-    data-description-visible="@((Model.TeamSettings?.IsDescriptionVisible ?? true) ? "true" : "false")"
     data-perm-add-col="@((Model.UserPermissions?.CanAddColumn ?? false) ? "true" : "false")"
     data-perm-rename-col="@((Model.UserPermissions?.CanRenameColumn ?? false) ? "true" : "false")"
     data-perm-reorder-cols="@((Model.UserPermissions?.CanReorderColumns ?? false) ? "true" : "false")"
@@ -130,7 +114,7 @@
                 <h5 class="mb-0">Task Details</h5>
                 <div class="modal-action-buttons mb-0 border-0 p-0 shadow-none">
                     <button class="modal-action-btn btn-modal-history"
-                        style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="TaskHistory"
+                        style="width: 36px; height: 36px; font-size: 1.1rem; border-radius: 8px;" title="History"
                         onclick="openTaskHistoryFromModal(document.getElementById('focusedTaskId').value)">
                         <i class="bi bi-clock-history"></i>
                     </button>
@@ -176,7 +160,7 @@
                 <button class="btn btn-primary" onclick="saveFocusedTask()">Save</button>
                 @if (User.IsInRole("Admin"))
                 {
-                    <button class="btn btn-danger" onclick="deleteFocusedTask()">Del Task</button>
+                    <button class="btn btn-danger" onclick="deleteFocusedTask()">Delete</button>
                 }
                 <button class="btn btn-secondary" onclick="exitTaskFocus()">Back</button>
             </div>
@@ -190,7 +174,6 @@
         var isCompletedCol = colNameLower == "completed" || colNameLower == "complete" || colNameLower == "done";
         var taskCount = column.Tasks?.Count ?? 0;
         var colAccentClass = isReviewCol ? "col-review" : isCompletedCol ? "col-completed" : "";
-        var colPerm = Model.ColumnPermissions?.FirstOrDefault(cp => cp.ColumnId == column.Id);
 
         <div class="kanban-column @colAccentClass" data-column-id="@column.Id" data-column-name="@column.ColumnName">
 
@@ -217,8 +200,9 @@
                             {
                                 <i class="bi bi-layout-three-columns col-icon"></i>
                             }
-                            @column.ColumnName (@taskCount)
+                            @column.ColumnName
                         </span>
+                        <span class="task-count-badge">@taskCount</span>
 
                         <!-- RENAME MODE -->
                         <div class="column-rename" id="column-rename-@column.Id" style="display:none;"
@@ -234,11 +218,9 @@
                 </div>
 
                 <div class="d-flex align-items-center gap-1">
-                    @{
-                        bool canAddTask = User.IsInRole("Admin") || (colPerm?.CanAddTask == true);
-                    }
                     <!-- ADD TASK -->
-                    @if (!isCompletedCol && canAddTask)
+                    @if (!isCompletedCol && (User.IsInRole("Admin") || User.IsInRole("Manager") ||
+                   User.IsInRole("Sub-Manager") || User.IsInRole("SubManager") || User.IsInRole("User")))
                     {
                         <button class="header-icon-btn" title="Add task"
                             onclick="openCreateTaskModal(@column.Id); event.stopPropagation();">
@@ -253,25 +235,23 @@
                     </button>
 
                     <!-- ADMIN / GRANTED ACTIONS -->
-                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanRenameColumn == true) || (colPerm?.CanRename
-                   == true))
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanRenameColumn == true))
                     {
                         <button class="header-icon-btn" title="Edit"
                             onclick="startRename(@column.Id); event.stopPropagation();">
                             <i class="bi bi-pencil"></i>
                         </button>
                     }
-                    @if (User.IsInRole("Admin") || (colPerm?.CanClearTasks == true))
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteTask == true))
                     {
                         <button class="header-icon-btn text-warning" title="Clear All Tasks"
                             onclick="clearColumnTasks(@column.Id); event.stopPropagation();">
                             <i class="bi bi-eraser"></i>
                         </button>
                     }
-                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteColumn == true) || (colPerm?.CanDelete
-                   == true))
+                    @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanDeleteColumn == true))
                     {
-                        <button class="header-icon-btn text-danger" title="Del Col"
+                        <button class="header-icon-btn text-danger" title="Delete"
                             onclick="confirmDeleteColumn(@column.Id); event.stopPropagation();">
                             <i class="bi bi-trash3"></i>
                         </button>
@@ -304,7 +284,6 @@
                 { "ColumnName", column.ColumnName },
                 { "TeamSettings", Model.TeamSettings },
                 { "UserPermissions", Model.UserPermissions },
-                { "ColumnPermission", colPerm },
                 { "AssignableUsers", Model.AssignableUsers },
                 { "UserRolesMap", Model.UserRolesMap }
                 })
@@ -319,7 +298,7 @@
         <div class="kanban-column-header history-header">
             <div class="d-flex align-items-center flex-grow-1 ms-2">
                 <i class="bi bi-clock-history col-icon me-2"></i>
-                <span class="column-title">TaskHistory</span>
+                <span class="column-title">History</span>
             </div>
             <div class="d-flex align-items-center gap-1">
                 <!-- FILTER -->
@@ -358,16 +337,17 @@
 </div>
 
 
-<script>
-    function clearFocusedDescription() {
-        const desc = document.getElementById("focusedTaskDescription");
+<style>
+    <script>function clearFocusedDescription() {
+        const desc=document.getElementById("focusedTaskDescription");
+
         if (desc) {
-            desc.value = "";
+            desc .value="";
+            // clears the textarea
         }
     }
-</script>
 
-<style>
+    </script>
     /* ═══════════════════════════════════════════════════════
        PREMIUM KANBAN BOARD — INDUSTRY STANDARD UI
        ═══════════════════════════════════════════════════════ */
@@ -475,7 +455,7 @@
         display: flex;
         gap: 16px;
         overflow-x: auto;
-        padding-bottom: 1px;
+        padding-bottom: 12px;
         height: calc(100vh - 220px);
         scrollbar-width: thin;
     }
@@ -586,6 +566,20 @@
         letter-spacing: -0.2px;
     }
 
+    .task-count-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 22px;
+        height: 22px;
+        padding: 0 6px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        margin-left: 8px;
+    }
 
     .column-drag-handle {
         padding: 4px 2px;
@@ -642,8 +636,6 @@
 
     /* ===== TASK LIST (SCROLLS) ===== */
     .kanban-tasks {
-        display: flex;
-        flex-direction: column;
         height: 100%;
         overflow-y: auto;
         padding-right: 4px;
@@ -674,7 +666,6 @@
         cursor: grab;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
         overflow-wrap: anywhere;
-        flex-shrink: 0;
     }
 
     .task-card:hover {
@@ -702,18 +693,6 @@
 
     .priority-critical {
         border-left: 4px solid #dc3545;
-    }
-
-    /* ===== FOLLOW-UP TODAY HIGHLIGHT ===== */
-    .follow-up-today {
-        border: 2px solid #ffc107 !important;
-        box-shadow: 0 0 15px rgba(255, 193, 7, 0.3) !important;
-        order: -10 !important; /* Force to top of column */
-        background: #fffef2 !important;
-    }
-
-    .follow-up-today:hover {
-        box-shadow: 0 0 20px rgba(255, 193, 7, 0.5) !important;
     }
 
     /* ===== CARD TOP ROW — BADGES ===== */

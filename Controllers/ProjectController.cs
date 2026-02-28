@@ -7,6 +7,7 @@ using UserRoles.Hubs;
 using UserRoles.Data;
 using UserRoles.Models;
 using UserRoles.ViewModels;
+using UserRoles.Services;
 
 namespace UserRoles.Controllers
 {
@@ -16,12 +17,17 @@ namespace UserRoles.Controllers
         private readonly AppDbContext _context;
         private readonly UserManager<Users> _userManager;
         private readonly IHubContext<TaskHub> _hubContext;
+        private readonly ITaskHistoryService _historyService;
 
-        public ProjectController(AppDbContext context, UserManager<Users> userManager, IHubContext<TaskHub> hubContext)
+        public ProjectController(AppDbContext context, 
+            UserManager<Users> userManager, 
+            IHubContext<TaskHub> hubContext,
+            ITaskHistoryService historyService)
         {
             _context = context;
             _userManager = userManager;
             _hubContext = hubContext;
+            _historyService = historyService;
         }
 
         // ==================== INDEX ====================
@@ -34,6 +40,7 @@ namespace UserRoles.Controllers
             var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
 
             IQueryable<Project> query = _context.Projects
+                .AsNoTracking()
                 .Include(p => p.CreatedByUser);
 
             if (!isAdmin)
@@ -57,6 +64,7 @@ namespace UserRoles.Controllers
             var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
 
             var project = await _context.Projects
+                .AsNoTracking()
                 .Include(p => p.Members).ThenInclude(m => m.User)
                 .Include(p => p.Epics.OrderBy(e => e.Order))
                     .ThenInclude(e => e.AssignedToUser)
@@ -85,11 +93,23 @@ namespace UserRoles.Controllers
                 return Forbid();
             }
 
+            // 🔥 PERFORMANCE: Bulk-fetch roles
+            var userRolesData = await (from ur in _context.UserRoles
+                                       join r in _context.Roles on ur.RoleId equals r.Id
+                                       select new { ur.UserId, RoleName = r.Name })
+                                      .AsNoTracking()
+                                      .ToListAsync();
+
+            var userRolesMap = userRolesData
+                .GroupBy(ur => ur.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(ur => ur.RoleName).FirstOrDefault() ?? "User");
+
             var vm = new ProjectBoardViewModel
             {
                 Project = project,
                 Epics = project.Epics.ToList(),
-                AssignableUsers = await _userManager.Users.ToListAsync()
+                AssignableUsers = await _userManager.Users.AsNoTracking().ToListAsync(),
+                UserRolesMap = userRolesMap
             };
 
             return PartialView("_ProjectBoard", vm);
@@ -104,7 +124,7 @@ namespace UserRoles.Controllers
 
             var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
 
-            IQueryable<Project> query = _context.Projects;
+            IQueryable<Project> query = _context.Projects.AsNoTracking();
 
             if (!isAdmin)
             {
@@ -342,6 +362,7 @@ namespace UserRoles.Controllers
 
             // Search Epics
             var epics = await _context.Epics
+                .AsNoTracking()
                 .Include(e => e.Project)
                 .Where(e => e.WorkItemId.Contains(query) || e.Title.Contains(q))
                 .Take(10)
@@ -358,6 +379,7 @@ namespace UserRoles.Controllers
 
             // Search Features
             var features = await _context.Features
+                .AsNoTracking()
                 .Include(f => f.Epic).ThenInclude(e => e.Project)
                 .Where(f => f.WorkItemId.Contains(query) || f.Title.Contains(q))
                 .Take(10)
@@ -374,6 +396,7 @@ namespace UserRoles.Controllers
 
             // Search Stories
             var stories = await _context.Stories
+                .AsNoTracking()
                 .Include(s => s.Feature).ThenInclude(f => f.Epic).ThenInclude(e => e.Project)
                 .Where(s => s.WorkItemId.Contains(query) || s.Title.Contains(q))
                 .Take(10)
@@ -390,6 +413,7 @@ namespace UserRoles.Controllers
 
             // Search Tasks
             var tasks = await _context.TaskItems
+                .AsNoTracking()
                 .Include(t => t.Story).ThenInclude(s => s.Feature).ThenInclude(f => f.Epic).ThenInclude(e => e.Project)
                 .Where(t => t.WorkItemId != null && (t.WorkItemId.Contains(query) || t.Title.Contains(q)))
                 .Take(10)
@@ -534,7 +558,7 @@ namespace UserRoles.Controllers
         [HttpPost]
         public async Task<IActionResult> UpdateEpic([FromBody] CreateEpicRequest model)
         {
-            var epic = await _context.Epics.FindAsync(model.ProjectId);
+            var epic = await _context.Epics.FindAsync(model.Id);
             if (epic == null) return NotFound();
 
             epic.Title = model.Title.Trim();
@@ -550,7 +574,7 @@ namespace UserRoles.Controllers
         [HttpPost]
         public async Task<IActionResult> UpdateFeature([FromBody] CreateFeatureRequest model)
         {
-            var feature = await _context.Features.FindAsync(model.EpicId);
+            var feature = await _context.Features.FindAsync(model.Id);
             if (feature == null) return NotFound();
 
             feature.Title = model.Title.Trim();
@@ -566,7 +590,7 @@ namespace UserRoles.Controllers
         [HttpPost]
         public async Task<IActionResult> UpdateStory([FromBody] CreateStoryRequest model)
         {
-            var story = await _context.Stories.FindAsync(model.FeatureId);
+            var story = await _context.Stories.FindAsync(model.Id);
             if (story == null) return NotFound();
 
             story.Title = model.Title.Trim();
@@ -679,6 +703,10 @@ namespace UserRoles.Controllers
                 case "task":
                     var task = await _context.TaskItems.FindAsync(model.ItemId);
                     if (task == null) return NotFound();
+                    
+                    // Log history for task assignment
+                    await _historyService.LogAssignment(task.Id, model.UserId ?? "", user.Id);
+                    
                     task.AssignedToUserId = model.UserId;
                     task.UpdatedAt = DateTime.UtcNow;
                     break;
@@ -689,6 +717,35 @@ namespace UserRoles.Controllers
 
             await _context.SaveChangesAsync();
             return Ok(new { success = true });
+        }
+
+        // ==================== UPDATE TASK ====================
+        [HttpPost]
+        public async Task<IActionResult> UpdateProjectTask([FromBody] CreateProjectTaskRequest model)
+        {
+            var task = await _context.TaskItems.FindAsync(model.Id);
+            if (task == null) return NotFound();
+
+            task.Title = model.Title.Trim();
+            task.Description = model.Description?.Trim() ?? "";
+            task.AssignedToUserId = model.AssignedToUserId;
+            task.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+
+        // ==================== DELETE TASK ====================
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteProjectTask([FromBody] int taskId)
+        {
+            var task = await _context.TaskItems.FindAsync(taskId);
+            if (task == null) return NotFound();
+
+            _context.TaskItems.Remove(task);
+            await _context.SaveChangesAsync();
+            return Ok();
         }
 
         // ==================== DELETE PROJECT ====================

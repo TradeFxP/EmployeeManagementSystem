@@ -87,6 +87,104 @@
     .modal-action-btn-sm:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    /* Nested Dropdown Styling */
+    .nested-dropdown-group {
+        border: 1px solid #e2e8f0;
+        padding: 6px 14px;
+        background: #f8fafc;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+    }
+    
+    .nested-dropdown-group:focus-within {
+        border-color: #6366f1 !important;
+        background: #ffffff !important;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12) !important;
+    }
+    
+    .nested-dropdown-group select {
+        border: none !important;
+        background: transparent !important;
+        padding-right: 25px !important;
+        box-shadow: none !important;
+        font-size: 1rem;
+        color: #1e293b;
+        cursor: pointer;
+        min-width: 140px;
+        width: auto;
+        max-width: none;
+        flex: 1 1 auto;
+        white-space: nowrap;
+    }
+
+    .nested-dropdown-group select:disabled {
+        cursor: not-allowed;
+        opacity: 0.4;
+    }
+
+    .field-group {
+        transition: all 0.2s ease;
+        padding: 8px;
+        border-radius: 8px;
+    }
+    
+    .field-group:hover {
+        background: #f8fafc;
+    }
+
+    .edit-options-list {
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 8px;
+        background: #fdfdfd;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+
+    .btn-xs {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.7rem;
+        border-radius: 4px;
+        line-height: 1;
+    }
+
+    .parent-group-container {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #ffffff;
+        transition: all 0.2s ease;
+    }
+
+    .parent-group-container:hover {
+        border-color: #6366f1;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+    }
+
+    .child-option-row input:focus {
+        background: #fff !important;
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1) !important;
+    }
+
+    .standalone-option-row:hover {
+        transform: translateX(4px);
+    }
+
+    .edit-options-list::-webkit-scrollbar {
+        width: 6px;
+    }
+    .edit-options-list::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 10px;
+    }
+    .edit-options-list::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
     }
 </style>
 
@@ -386,79 +484,38 @@
 
 
     <div class="modal fade" id="createTaskModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-
-                <div class="modal-header">
-                    <h5 class="modal-title">Create Task</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>Create Task</h5>
+                    <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div class="modal-body">
                     <input type="hidden" id="taskColumnId" />
 
                     <div class="mb-3" id="groupCreateTaskTitle">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0" id="labelCreateTaskTitle">Title</label>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Title" onclick="renameField('labelCreateTaskTitle')">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-link text-danger p-0" title="Delete Title" onclick="hideField('groupCreateTaskTitle')">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <input type="text" id="taskTitle" class="form-control" required />
+                        <label class="form-label mb-1" id="labelCreateTaskTitle">Title</label>
+                        <input type="text" id="taskTitle" class="form-control" placeholder="Enter task title..." required />
                     </div>
 
                     <div class="mb-3" id="groupCreateTaskDescription">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0" id="labelCreateTaskDescription">Description</label>
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Description" onclick="renameField('labelCreateTaskDescription')">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Description" onclick="hideField('groupCreateTaskDescription')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                        </div>
-                        <textarea id="taskDescription" class="form-control" rows="3"></textarea>
+                        <label class="form-label mb-1" id="labelCreateTaskDescription">Description</label>
+                        <textarea id="taskDescription" class="form-control" rows="3" placeholder="Add a description..."></textarea>
                     </div>
 
                     <div class="mb-3" id="groupCreateTaskPriority">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0" id="labelCreateTaskPriority">Priority</label>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Priority" onclick="renameField('labelCreateTaskPriority')">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-link text-danger p-0" title="Delete Priority" onclick="hideField('groupCreateTaskPriority')">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
+                        <label class="form-label mb-1" id="labelCreateTaskPriority">Priority</label>
                         <select id="taskPriority" class="form-select">
-                            <option value="0">Low</option>
-                            <option value="1" selected>Medium</option>
-                            <option value="2">High</option>
-                            <option value="3">Critical</option>
+                            <option value="0">🟢 Low</option>
+                            <option value="1" selected>🟡 Medium</option>
+                            <option value="2">🟠 High</option>
+                            <option value="3">🔴 Critical</option>
                         </select>
                     </div>
 
-                    <div class="mb-3" id="groupCreateTaskDueDate" style="display: @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "block" : "none")">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0" id="labelCreateTaskDueDate">Due Date & Time</label>
-                            <div class="btn-group btn-group-sm">
-                                <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Due Date" onclick="renameField('labelCreateTaskDueDate')">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button" class="btn btn-link text-danger p-0" title="Delete Due Date" onclick="hideField('groupCreateTaskDueDate')">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </div>
+                    <div class="mb-3" id="groupCreateTaskDueDate">
+                        <label class="form-label mb-1" id="labelCreateTaskDueDate">Due Date & Time</label>
                         <input type="datetime-local" id="taskDueDate" class="form-control" />
                     </div>
 
@@ -475,16 +532,22 @@
                     <div id="customFieldsContainer"></div>
                 </div>
 
-                <div class="modal-footer">
+                <div class="modal-footer bg-light border-0 py-3">
                     @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                     {
-                            <button class="btn btn-sm btn-outline-secondary me-auto"
+                        <div class="me-auto d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary px-3 fw-bold" style="border-radius: 8px;"
                                 onclick="openManageFieldsModal(); event.preventDefault();">
-                                <i class="bi bi-gear"></i> Manage Fields
+                                <i class="bi bi-gear me-1"></i> Manage Fields
                             </button>
+                            <button class="btn btn-sm btn-outline-primary px-3 fw-bold" style="border-radius: 8px;"
+                                onclick="addNewCustomField(); event.preventDefault();">
+                                <i class="bi bi-plus-lg me-1"></i> Add Field
+                            </button> 
+                        </div>
                     }
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" onclick="submitCreateTask()">Create</button>
+                    <button class="btn btn-secondary px-4 fw-bold" style="border-radius: 8px;" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary px-4 fw-bold shadow-sm" style="border-radius: 8px;" onclick="submitCreateTask()">Create</button>
                 </div>
 
             </div>
@@ -493,79 +556,38 @@
 
     <!-- EDIT TASK MODAL -->
     <div class="modal fade" id="editTaskModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Task</h5>
-                    <button class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff;">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Task</h5>
+                    <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div class="modal-body">
                     <input type="hidden" id="editTaskId" />
 
                     <div class="mb-3" id="groupEditTaskTitle">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0" id="labelEditTaskTitle">Title</label>
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Title" onclick="renameField('labelEditTaskTitle')">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Title" onclick="hideField('groupEditTaskTitle')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                        </div>
+                        <label class="form-label mb-1" id="labelEditTaskTitle">Title</label>
                         <input type="text" id="editTaskTitle" class="form-control" required />
                     </div>
 
                     <div class="mb-3" id="groupEditTaskDescription">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label mb-0" id="labelEditTaskDescription">Description</label>
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Description" onclick="renameField('labelEditTaskDescription')">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Description" onclick="hideField('groupEditTaskDescription')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                        </div>
+                        <label class="form-label mb-1" id="labelEditTaskDescription">Description</label>
                         <textarea id="editTaskDescription" class="form-control" rows="4"></textarea>
                     </div>
 
                     <div class="row">
                         <div class="col-md-6 mb-3" id="groupEditTaskPriority">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <label class="form-label mb-0" id="labelEditTaskPriority">Priority</label>
-                                    <div class="btn-group btn-group-sm">
-                                        <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Priority" onclick="renameField('labelEditTaskPriority')">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-link text-danger p-0" title="Delete Priority" onclick="hideField('groupEditTaskPriority')">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                            </div>
+                            <label class="form-label mb-1" id="labelEditTaskPriority">Priority</label>
                             <select id="editTaskPriority" class="form-select">
-                                <option value="0">Low</option>
-                                <option value="1">Medium</option>
+                                <option value="0">🟢 Low</option>
+                                <option value="1">🟡 Medium</option>
                                 <option value="2">High</option>
-                                <option value="3">Critical</option>
+                                <option value="3">🔴 Critical</option>
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3" id="groupEditTaskDueDate" style="display: @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "block" : "none")">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <label class="form-label mb-0" id="labelEditTaskDueDate">Due Date & Time</label>
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-link text-secondary p-0 me-2" title="Rename Due Date" onclick="renameField('labelEditTaskDueDate')">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button type="button" class="btn btn-link text-danger p-0" title="Delete Due Date" onclick="hideField('groupEditTaskDueDate')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
+                        <div class="col-md-6 mb-3" id="groupEditTaskDueDate">
+                            <label class="form-label mb-1" id="labelEditTaskDueDate">Due Date & Time</label>
                             <input type="datetime-local" id="editTaskDueDate" class="form-control" />
                         </div>
                         <div class="col-md-6 mb-3" id="groupEditTaskAssignTo">
@@ -637,22 +659,35 @@
                                 }
                             </select>
                         </div>
+                         @*
+                        <div class="col-md-6 mb-3" id="groupEditTaskMoveTo">
+                           <label class="form-label mb-1" id="labelEditTaskMoveTo">Move To Column</label>
+                            <select id="editTaskMoveTo" class="form-select" onchange="moveTaskFromEditModal()">
+                                <!-- Dynamically populated -->
+                            </select>
+                        </div>*@
                     </div>
 
                     <!-- Custom Fields Container -->
                     <div id="editCustomFieldsContainer"></div>
                 </div>
 
-                <div class="modal-footer">
+                <div class="modal-footer bg-light border-0 py-3">
                     @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                     {
-                            <button class="btn btn-sm btn-outline-secondary me-auto"
+                        <div class="me-auto d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-secondary px-3 fw-bold" style="border-radius: 8px;"
                                 onclick="openManageFieldsModal(); event.preventDefault();">
-                                <i class="bi bi-gear"></i> Manage Fields
+                                <i class="bi bi-gear me-1"></i> Manage Fields
                             </button>
+                            <button class="btn btn-sm btn-outline-primary px-3 fw-bold" style="border-radius: 8px;"
+                                onclick="addNewCustomField(); event.preventDefault();">
+                                <i class="bi bi-plus-lg me-1"></i> Add Field
+                            </button> 
+                        </div>
                     }
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" onclick="submitEditTask()">Save Changes</button>
+                    <button class="btn btn-secondary px-4 fw-bold" style="border-radius: 8px;" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary px-4 fw-bold shadow-sm" style="border-radius: 8px;" onclick="submitEditTask()">Save Changes</button>
                 </div>
 
             </div>
@@ -778,9 +813,9 @@
     <!-- MANAGE CUSTOM FIELDS MODAL (Admin Only) -->
     <div class="modal fade" id="manageFieldsModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title"><i class="bi bi-sliders me-2"></i>Manage Custom Fields</h5>
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff;">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-sliders me-2"></i>Manage Custom Fields</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
@@ -790,13 +825,32 @@
                             <i class="bi bi-toggle-on me-1"></i> System Fields Visibility
                         </div>
                         <div class="card-body py-2">
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="showPriorityCheckbox" @(Model?.TeamSettings?.IsPriorityVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                <label class="form-check-label" for="showPriorityCheckbox">Show Priority Dropdown & Badge</label>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="showDueDateCheckbox" @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                <label class="form-check-label" for="showDueDateCheckbox">Show Due Date Picker & Badge</label>
+                            <div class="row row-cols-1 row-cols-md-2 g-2">
+                                <div class="col">
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showOtherCheckbox" onchange="updateTeamSettings()">
+                                        <label class="form-check-label fw-bold" for="showOtherCheckbox">Show Other</label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showTitleCheckbox" @(Model?.TeamSettings?.IsTitleVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                        <label class="form-check-label" for="showTitleCheckbox">Show Title Field</label>
+                                    </div>
+                                    <div class="form-check form-switch mb-2">
+                                        <input class="form-check-input" type="checkbox" id="showDescriptionCheckbox" @(Model?.TeamSettings?.IsDescriptionVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                        <label class="form-check-label" for="showDescriptionCheckbox">Show Description Field</label>
+                                    </div>
+                                </div>
+                                <div class="col text-md-end text-start">
+                                    <div class="form-check form-switch mb-2 d-md-inline-block">
+                                        <input class="form-check-input" type="checkbox" id="showPriorityCheckbox" @(Model?.TeamSettings?.IsPriorityVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                        <label class="form-check-label me-md-5" for="showPriorityCheckbox">Show Priority</label>
+                                    </div>
+                                    <br class="d-none d-md-block" />
+                                    <div class="form-check form-switch mb-2 d-md-inline-block">
+                                        <input class="form-check-input" type="checkbox" id="showDueDateCheckbox" @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                        <label class="form-check-label me-md-5" for="showDueDateCheckbox">Show Due Date</label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -807,53 +861,58 @@
                         <!-- Dynamically loaded fields -->
                     </div>
 
-                    <!-- Add New Field Form -->
-                    <h6 class="mb-3 border-top pt-3">Add New Field</h6>
-                    <div class="row g-3">
-                        <div class="col-md-5">
-                            <label class="form-label">Field Name</label>
-                            <input type="text" id="newFieldName" class="form-control"
-                                placeholder="e.g., Estimated Hours" />
+                    <!-- Unified Add New Field Form -->
+                    <div class="border-top pt-3 mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0 text-dark fw-bold" style="font-size: 0.9rem;">Add New Activity Field</h6>
+                            <span class="text-muted" style="font-size: 10px;">Quick Configuration</span>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Field Type</label>
-                            <select id="newFieldType" class="form-select">
-                                <option value="Text">Text</option>
-                                <option value="Number">Number</option>
-                                <option value="Date">Date</option>
-                                <option value="Time">Time</option>
-                                <option value="DateTime">Date & Time</option>
-                                <option value="Dropdown">Dropdown</option>
-                                <option value="Image">Image</option>
-                            </select>
+                        <div class="row g-2 align-items-end mb-2">
+                            <div class="col-md-5">
+                                <label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 9px; letter-spacing: 0.5px;">Label Name</label>
+                                <input type="text" id="newFieldName" class="form-control form-control-sm border-secondary-subtle"
+                                    placeholder="e.g., Estimated Hours" style="font-size: 0.8rem; height: 36px; padding: 0.4rem 0.8rem;" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 9px; letter-spacing: 0.5px;">Input Type</label>
+                                <select id="newFieldType" class="form-select form-select-sm border-secondary-subtle" style="font-size: 0.8rem; height: 36px; padding: 0.4rem 0.8rem;" onchange="toggleNewOptionsSection()">
+                                    <option value="Text">🔤 Text</option>
+                                    <option value="Number">🔢 Number</option>
+                                    <option value="Date">📅 Date</option>
+                                    <option value="Time">🕐 Time</option>
+                                    <option value="DateTime">🗓️ Date & Time</option>
+                                    <option value="Dropdown">▼ Dropdown</option>
+                                    <option value="List">📋 List (Columns)</option>
+                                    <option value="Image">🖼️ Image</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" style="transform: scale(0.75);" type="checkbox" id="newFieldRequired" />
+                                        <label class="form-check-label" style="font-size: 0.75rem; color: #64748b;" for="newFieldRequired">Req</label>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm flex-grow-1" style="height: 36px; font-size: 0.85rem; font-weight: 600; border-radius: 8px;" onclick="createNewField()">
+                                        <i class="bi bi-plus-lg me-1"></i> Add
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-3 d-flex align-items-end">
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" id="newFieldRequired" />
-                                <label class="form-check-label" for="newFieldRequired">
-                                    Required
-                                </label>
+
+                        <!-- Dropdown Options (Compact inline row) -->
+                        <div id="newFieldOptionsSection" class="mt-2 p-2 bg-light border rounded d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="x-small fw-bold text-muted text-uppercase" style="font-size: 9px;">Configure Options</label>
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn btn-xs btn-outline-primary" style="font-size: 9px; padding: 1px 6px;" onclick="addParentGroup('', 'newFieldOptionsList')">+ Group</button>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary" style="font-size: 9px; padding: 1px 6px;" onclick="addStandaloneOption('', 'newFieldOptionsList')">+ Opt</button>
+                                </div>
+                            </div>
+                            <div id="newFieldOptionsList" class="p-1 bg-white border rounded" style="max-height: 120px; overflow-y: auto;">
+                                <!-- Dynamic options -->
                             </div>
                         </div>
                     </div>
-
-                    <!-- Dropdown Options Section (Hidden by default) -->
-                    <div id="newFieldOptionsSection" class="mt-3 p-3 bg-light border rounded d-none">
-                        <label class="form-label d-flex justify-content-between align-items-center">
-                            Dropdown Options
-                            <button type="button" class="btn btn-sm btn-link p-0" onclick="addDropdownOptionRow()">
-                                <i class="bi bi-plus-circle me-1"></i>Add Option
-                            </button>
-                        </label>
-                        <div id="newFieldOptionsList">
-                            <!-- Option rows will be added here -->
-                        </div>
-                        <small class="text-muted">Users will pick one of these from a list.</small>
-                    </div>
-
-                    <button class="btn btn-sm btn-success mt-3" onclick="createNewField()">
-                        <i class="bi bi-plus-lg"></i> Add Field
-                    </button>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -866,8 +925,8 @@
     <div class="modal fade" id="excelImportModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
-                <div class="modal-header" style="background: linear-gradient(135deg, #0d9488, #0891b2); border-radius: 16px 16px 0 0;">
-                    <h5 class="modal-title text-white">
+                <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #0d9488, #0891b2); border-radius: 16px 16px 0 0;">
+                    <h5 class="modal-title text-white fw-bold">
                         <i class="bi bi-file-earmark-spreadsheet me-2"></i>Import Tasks from Excel
                     </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="resetExcelImport()"></button>
@@ -1075,6 +1134,57 @@
     </div>
 
     <style>
+        /* ═══════ PREMIUM UI/UX ENHANCEMENTS ═══════ */
+        .modal-content { border-radius: 16px; overflow: hidden; }
+        .modal-header { border-bottom: none !important; padding: 1.5rem 2rem; }
+        .modal-body { padding: 2rem; }
+        .modal-footer { border-top: none !important; padding: 1.5rem 2rem; }
+        
+        .form-control, .form-select {
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
+            border: 1px solid #e2e8f0;
+            background-color: #f8fafc;
+            transition: all 0.2s ease;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #fff;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1);
+            font-weight: 600;
+            padding: 0.6rem 1.5rem;
+            border_radius: 10px;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+        }
+        
+        .btn-outline-primary {
+            border: 2px solid #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+            border-radius: 10px;
+        }
+        .btn-outline-primary:hover {
+            background-color: #3b82f6;
+            color: #fff;
+        }
+
+        /* Existing Field Item Enhancements */
+        .field-item:hover {
+            border-color: #3b82f6 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+        }
+        
         /* ═══════ EXCEL IMPORT MODAL STYLES ═══════ */
         .excel-drop-zone {
             border: 2px dashed #0d9488;
@@ -1637,6 +1747,26 @@
         handleTaskAssignedUpdate(data);
     });
 
+    taskHubConnection.on("NewMoveRequest", function (data) {
+        console.log("New move request received:", data);
+        if (typeof showToast === 'function') {
+            showToast(`📩 New Move Request from ${data.requestedBy} for task: ${data.taskTitle}`, 'info', 10000);
+        }
+        const badge = document.getElementById('moveRequestBadge');
+        if (badge) {
+            badge.textContent = parseInt(badge.textContent || 0) + 1;
+            badge.classList.remove('d-none');
+        }
+    });
+
+    taskHubConnection.on("MoveRequestHandled", function (data) {
+        console.log("Move request handled received:", data);
+        if (typeof showToast === 'function') {
+            const status = data.approved ? '✅ Approved' : '❌ Rejected';
+            showToast(`Move Request ${status}: ${data.reply || ''}`, data.approved ? 'success' : 'warning', 10000);
+        }
+    });
+
     taskHubConnection.on("PermissionsUpdated", function (userId, teamName) {
         console.log("Permissions updated received for:", userId, teamName);
         const currentUserId = '@UserManager.GetUserId(User)';
@@ -1996,6 +2126,31 @@
                     return parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : name.substring(0, 2).toUpperCase();
                 };
 
+                const taskTypeObj = (t.customFields || []).find(f => f.fieldName && f.fieldName.trim().toLowerCase() === 'task type');
+                const taskType = taskTypeObj ? taskTypeObj.value : null;
+                
+                let taskTypeBadge = '';
+                if (taskType) {
+                    const typeIconMap = {
+                        "story": "bi-journal-text",
+                        "bug": "bi-bug-fill",
+                        "feature": "bi-star-fill",
+                        "enhancement": "bi-rocket-takeoff-fill"
+                    };
+                    const typeColorMap = {
+                        "story": "#6366f1",
+                        "bug": "#ef4444",
+                        "feature": "#f59e0b",
+                        "enhancement": "#10b981"
+                    };
+                    const typeIcon = typeIconMap[taskType.toLowerCase()] || "bi-tag-fill";
+                    const typeColor = typeColorMap[taskType.toLowerCase()] || "#64748b";
+                    
+                    taskTypeBadge = `<span title="Type: ${escapeHtml(taskType)}" style="background: ${typeColor}15; color: ${typeColor}; border: 1px solid ${typeColor}30; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; font-size: 0.8rem;">
+                        <i class="bi ${typeIcon}"></i>
+                    </span>`;
+                }
+
                 body.innerHTML = `
                     <!-- Title + Badges -->
                     <div style="border-left: 5px solid ${prio.color}; padding-left: 16px; margin-bottom: 16px;">
@@ -2004,9 +2159,10 @@
                             <span style="background: ${prio.bg}; color: ${prio.color}; border: 1px solid ${prio.border}; padding: 3px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
                                 <i class="bi ${prio.icon}" style="margin-right: 4px;"></i>${escapeHtml(effectivePriority.toUpperCase())}
                             </span>
+                            ${taskTypeBadge}
                             ${reviewBadge}
                             <span style="background: #f1f5f9; color: #475569; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #e2e8f0;">${escapeHtml(t.column || t.status)}</span>
-                            ${t.dueDate ? `<span style="color: #dc2626; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #fecaca; background: #fef2f2;"><i class="bi bi-calendar-event" style="margin-right: 4px;"></i>${formatDate(t.dueDate)}</span>` : ''}
+                            ${t.dueDateFormatted ? `<span style="color: #dc2626; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #fecaca; background: #fef2f2;"><i class="bi bi-calendar-event" style="margin-right: 4px;"></i>${t.dueDateFormatted}</span>` : ''}
                         </div>
                     </div>
 
@@ -2055,10 +2211,10 @@
                                 <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px;"><i class="bi bi-clock-history me-1"></i>Timeline</div>
                                 <div style="position: relative; padding-left: 20px;">
                                     <div style="position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: #e2e8f0;"></div>
-                                    ${t.createdAt ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #6366f1;"></div><strong>Created</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.createdAt)}</span></div>` : ''}
-                                    ${t.assignedAt ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #06b6d4;"></div><strong>Assigned</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.assignedAt)}</span></div>` : ''}
-                                    ${t.reviewedAt ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></div><strong>Reviewed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.reviewedAt)}</span></div>` : ''}
-                                    ${t.completedAt ? `<div style="position: relative; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></div><strong>Completed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${formatDate(t.completedAt)}</span></div>` : ''}
+                                    ${t.createdAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #6366f1;"></div><strong>Created</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.createdAtFormatted}</span></div>` : ''}
+                                    ${t.assignedAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #06b6d4;"></div><strong>Assigned</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.assignedAtFormatted}</span></div>` : ''}
+                                    ${t.reviewedAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></div><strong>Reviewed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.reviewedAtFormatted}</span></div>` : ''}
+                                    ${t.completedAtFormatted ? `<div style="position: relative; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></div><strong>Completed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.completedAtFormatted}</span></div>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -2202,27 +2358,46 @@
 </script>
 
 <script>
-    function openCreateTaskModal(columnId) {
-        document.getElementById('taskColumnId').value = columnId;
-        document.getElementById('taskTitle').value = '';
-        document.getElementById('taskDescription').value = '';
-        document.getElementById('taskPriority').value = '1';
-        document.getElementById('taskDueDate').value = '';
+    async function openCreateTaskModal(columnId) {
+        document.getElementById("taskColumnId").value = columnId;
+        document.getElementById("taskTitle").value = "";
+        document.getElementById("taskDescription").value = "";
+        document.getElementById("taskPriority").value = "1"; // Default to Medium
+        document.getElementById("taskDueDate").value = "";
 
-        const team = window.currentTeamName;
+        const board = document.getElementById('kanbanBoard');
+        const team = board?.dataset.teamName;
+        const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
+        
+        // 🔥 Dynamic Visibility for System Fields
+        const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
+        const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
+        const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
+        const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
+        
+        const priorityGroup = document.getElementById('groupCreateTaskPriority');
+        const dueDateGroup = document.getElementById('groupCreateTaskDueDate');
+        const titleGroup = document.getElementById('groupCreateTaskTitle');
+        const descriptionGroup = document.getElementById('groupCreateTaskDescription');
+        
+        if (priorityGroup) priorityGroup.style.display = priorityVisible ? 'block' : 'none';
+        if (dueDateGroup) dueDateGroup.style.display = dueDateVisible ? 'block' : 'none';
+        if (titleGroup) titleGroup.style.display = titleVisible ? 'block' : 'none';
+        if (descriptionGroup) descriptionGroup.style.display = descriptionVisible ? 'block' : 'none';
 
-        // Load projects into dropdown
-        loadProjectsForTaskModal();
-
-        // Render custom fields into the modal
+        // Render custom fields if available and wait for them to load
         if (typeof renderCustomFieldInputs === 'function') {
             try {
-                renderCustomFieldInputs('customFieldsContainer', {}, team);
-            } catch (e) { console.error(e); }
+                await renderCustomFieldInputs('customFieldsContainer', {}, team);
+            } catch (e) {
+                console.error('Failed to render custom fields before showing modal', e);
+            }
         }
 
-        new bootstrap.Modal(document.getElementById('createTaskModal')).show();
+        const modal = new bootstrap.Modal(document.getElementById('createTaskModal'));
+        modal.show();
     }
+
 
     // ================= EDIT TASK MODAL =================
 
@@ -2243,42 +2418,34 @@
                 document.getElementById('editTaskAssignedTo').value = task.assignedToUserId || "";
                 document.getElementById('editTaskDueDate').value = task.dueDate || "";
 
-                // Render Custom Fields with values
+                // Show Modal
+                const board = document.getElementById('kanbanBoard');
+                const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
+
+                const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
+                const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
+                const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
+                const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
+                
+                const priorityGroup = document.getElementById('groupEditTaskPriority');
+                const dueDateGroup = document.getElementById('groupEditTaskDueDate');
+                const titleGroup = document.getElementById('groupEditTaskTitle');
+                const descriptionGroup = document.getElementById('groupEditTaskDescription');
+                
+                if (priorityGroup) priorityGroup.style.display = priorityVisible ? 'block' : 'none';
+                if (dueDateGroup) dueDateGroup.style.display = dueDateVisible ? 'block' : 'none';
+                if (titleGroup) titleGroup.style.display = titleVisible ? 'block' : 'none';
+                if (descriptionGroup) descriptionGroup.style.display = descriptionVisible ? 'block' : 'none';
+
+
+                // Render custom fields if available
                 if (typeof renderCustomFieldInputs === 'function') {
                     renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
                 }
 
-                // Show Modal
-                new bootstrap.Modal(document.getElementById('editTaskModal')).show();
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error loading task details");
-            });
-    }
-
-    function submitEditTask() {
-        const taskId = parseInt(document.getElementById('editTaskId').value);
-        const titleEl = document.getElementById('editTaskTitle');
-        const title = titleEl ? titleEl.value.trim() : "";
-
-        const descEl = document.getElementById('editTaskDescription');
-        const description = descEl ? descEl.value.trim() : "";
-
-        const priority = parseInt(document.getElementById('editTaskPriority').value);
-        const assignedToUserId = document.getElementById('editTaskAssignedTo').value;
-
-        const titleVisible = titleEl && titleEl.closest('.mb-3') && titleEl.closest('.mb-3').style.display !== 'none';
-
-        if (titleVisible && !title) {
-            showToast("Title is required", "warning");
-            return;
-        }
-
-        // Validate custom fields
-        if (typeof validateCustomFields === 'function' && !validateCustomFields('editCustomFieldsContainer')) {
-            return;
-        }
+                if (typeof populateMoveToDropdown === 'function') {
+                    populateMoveToDropdown();
+                }
 
         const editDueDateVal = document.getElementById('editTaskDueDate') ? document.getElementById('editTaskDueDate').value : null;
 
@@ -2314,13 +2481,12 @@
             })
             .catch(err => {
                 console.error(err);
-                showToast("Failed to update task", "danger");
+                alert("Error loading task details");
             });
     }
 
-    function loadProjectsForTaskModal() {
-        const select = document.getElementById('taskProjectId');
-        if (!select) return;
+    // Consolidated task logic moved to tasks.js
+    // openCreateTaskModal and openEditTaskModal are kept here as they are view-specific for modal initialization.
 
         fetch('/Project/GetProjects')
             .then(res => res.json())
@@ -2456,91 +2622,7 @@
 
 
 <script>
-    // --- Dropdown Options Management ---
-    function addDropdownOptionRow(value = "") {
-        const list = document.getElementById('newFieldOptionsList');
-        if (!list) return;
-
-        const row = document.createElement('div');
-        row.className = 'input-group input-group-sm mb-2 dropdown-option-row';
-        row.innerHTML = `
-            <input type="text" class="form-control dropdown-option-input" value="${value}" placeholder="Option name" />
-            <button class="btn btn-outline-danger" type="button" onclick="this.parentElement.remove()">
-                <i class="bi bi-trash"></i>
-            </button>
-        `;
-        list.appendChild(row);
-    }
-
-    // Toggle options section based on field type
-    document.addEventListener('change', function(e) {
-        if (e.target && e.target.id === 'newFieldType') {
-            const section = document.getElementById('newFieldOptionsSection');
-            if (section) {
-                if (e.target.value === 'Dropdown') {
-                    section.classList.remove('d-none');
-                    const list = document.getElementById('newFieldOptionsList');
-                    if (list && list.children.length === 0) {
-                        addDropdownOptionRow();
-                    }
-                } else {
-                    section.classList.add('d-none');
-                }
-            }
-        }
-    });
-
-    async function createNewField() {
-        const fieldName = document.getElementById('newFieldName').value.trim();
-        const fieldType = document.getElementById('newFieldType').value;
-        const isRequired = document.getElementById('newFieldRequired').checked;
-
-        if (!fieldName) {
-            alert('Please enter a field name');
-            return;
-        }
-
-        // Collect dropdown options
-        let dropdownOptions = null;
-        if (fieldType === 'Dropdown') {
-            const optionInputs = document.querySelectorAll('#newFieldOptionsList .dropdown-option-input');
-            const options = Array.from(optionInputs).map(i => i.value.trim()).filter(v => v !== '');
-            if (options.length === 0) {
-                alert('Please add at least one option for the dropdown.');
-                return;
-            }
-            dropdownOptions = options.join(',');
-        }
-
-        try {
-            const res = await fetch('/Tasks/CreateCustomField', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fieldName, fieldType, isRequired, dropdownOptions })
-            });
-
-            if (!res.ok) throw new Error('Server error');
-
-            // Clear form
-            document.getElementById('newFieldName').value = '';
-            document.getElementById('newFieldType').value = 'Text';
-            document.getElementById('newFieldRequired').checked = false;
-            document.getElementById('newFieldOptionsList').innerHTML = '';
-            document.getElementById('newFieldOptionsSection').classList.add('d-none');
-
-            // ✅ Reload Manage Fields list
-            window.customFieldsCache = null;
-            if (typeof loadFieldsList === 'function') await loadFieldsList();
-
-            // ✅ Refresh Create / Edit modals immediately — no page refresh needed
-            if (typeof refreshOpenModals === 'function') await refreshOpenModals();
-
-            showToast(`✅ Field "${fieldName}" added!`, 'success');
-
-        } catch (err) {
-            alert('Failed to create field: ' + err.message);
-        }
-    }
+    // Custom field creation/management logic moved to customFields.js
 </script>
 
 
@@ -2683,7 +2765,7 @@
                         if (pendingBadge) pendingBadge.style.display = 'none';
                     }
 
-                    updateTaskColumn(taskId, newColumnId);
+                    updateTaskColumn(taskId, newColumnId, evt.from);
                 }
             });
         });
@@ -2691,10 +2773,7 @@
 
 
 
-    function updateTaskColumn(taskId, columnId) {
-        // ✅ Show toast immediately (optimistic UI — no waiting for server)
-        showToast('✅ Task moved successfull!', 'success');
-
+    function updateTaskColumn(taskId, columnId, fromContainer) {
         fetch('/Tasks/MoveTask', {
             method: 'POST',
             headers: {
@@ -2706,12 +2785,38 @@
             })
         })
             .then(res => {
-                if (!res.ok) return res.text().then(t => { throw new Error(t || 'Failed to move task'); });
+                if (!res.ok) {
+                    return res.text().then(t => { 
+                        throw new Error(t || 'Failed to move task'); 
+                    });
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (typeof showToast === 'function') {
+                    showToast('✅ Task moved successfully!', 'success');
+                }
             })
             .catch(err => {
-                showToast(err.message || 'Failed to move task', 'danger');
-                // reload board to recover UI
-                loadTeamBoard(currentTeamName);
+                if (typeof showToast === 'function') {
+                    // Use server message "you have not acess to move" if provided
+                    const msg = err.message.includes("acess") ? "❌ " + err.message : "⚠ " + err.message;
+                    showToast(msg, 'danger');
+                }
+
+                // REVERT UI WITHOUT RELOAD
+                if (fromContainer) {
+                    const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                    if (card) {
+                        fromContainer.appendChild(card);
+                        updateColumnCounts();
+                    }
+                } else {
+                    // Fallback to reload if container reference is lost
+                    if (typeof loadTeamBoard === 'function' && window.currentTeamName) {
+                        loadTeamBoard(window.currentTeamName);
+                    }
+                }
             });
     }
 
@@ -3379,3 +3484,104 @@ async function clearColumnTasks(columnId) {
     }
 }
 </script>
+
+<!-- MOVE REQUEST MODAL (Requester) -->
+<div class="modal fade" id="submitMoveRequestModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold"><i class="bi bi-send-fill me-2 text-primary"></i>Request Task Move</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="moveReqTaskId" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Task</label>
+                    <div id="moveReqTaskTitle" class="form-control-plaintext ps-2 border-start border-primary border-4 bg-light rounded"></div>
+                </div>
+                <div class="mb-4">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted text-uppercase">From Column</label>
+                            <div id="moveReqFromColName" class="p-2 border rounded bg-light fw-bold text-secondary"></div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted text-uppercase">Target Column</label>
+                            <select id="moveReqToColId" class="form-select shadow-sm border-primary">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info py-2 shadow-sm" style="font-size: 0.85rem; border-left: 4px solid #0dcaf0;">
+                    <i class="bi bi-info-circle-fill me-2"></i> Your request will be sent to the board admins and managers for approval.
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary px-4 shadow-sm" onclick="confirmSubmitMoveRequest()">
+                    <i class="bi bi-send-check me-1"></i> Send Request
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MOVE REQUESTS MANAGEMENT MODAL (Admin/Manager) -->
+<div class="modal fade" id="moveRequestsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="bi bi-mailbox me-2"></i>Column Move Requests</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="moveRequestsTable">
+                        <thead class="table-light text-uppercase small fw-bold text-muted">
+                            <tr>
+                                <th class="ps-3">Task / Requested By</th>
+                                <th>Movement</th>
+                                <th>Status</th>
+                                <th class="text-end pe-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="moveRequestsTableBody" class="small">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="moveRequestsEmptyState" class="text-center py-5 d-none">
+                    <i class="bi bi-inbox text-muted display-1 opacity-25"></i>
+                    <p class="text-muted mt-3 fw-bold">No move requests found.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MOVE REQUEST REPLY MODAL (Approval/Rejection) -->
+<div class="modal fade" id="handleMoveRequestModal" tabindex="-1" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header" id="handleRequestHeader">
+                <h5 class="modal-title fw-bold" id="handleRequestTitle">Handle Request</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="handleRequestId" />
+                <input type="hidden" id="handleRequestApproved" />
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Admin Note / Reason <span class="text-muted fw-normal">(Optional)</span></label>
+                    <textarea id="handleRequestReply" class="form-control shadow-sm" rows="3" placeholder="Enter a message for the requester..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="handleRequestSubmitBtn" class="btn btn-primary px-4 shadow-sm" onclick="confirmHandleMoveRequest()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="~/js/move-requests.js"></script>

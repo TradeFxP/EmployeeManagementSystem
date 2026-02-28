@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UserRoles.Data;
@@ -11,9 +12,11 @@ using UserRoles.Data;
 namespace UserRoles.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260227111251_AddAllowedTransitionsToBoardPermissionFinal")]
+    partial class AddAllowedTransitionsToBoardPermissionFinal
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -235,12 +238,6 @@ namespace UserRoles.Migrations
                     b.Property<bool>("CanReviewTask")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("CanViewHistory")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("MoveRequestsJson")
-                        .HasColumnType("text");
-
                     b.Property<string>("TeamName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -255,55 +252,6 @@ namespace UserRoles.Migrations
                         .IsUnique();
 
                     b.ToTable("BoardPermissions");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.ColumnPermission", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("CanAddTask")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanAssignTask")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanClearTasks")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanDelete")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanDeleteTask")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanEditTask")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanRename")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanViewHistory")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("ColumnId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ColumnId");
-
-                    b.HasIndex("UserId", "ColumnId")
-                        .IsUnique();
-
-                    b.ToTable("ColumnPermissions");
                 });
 
             modelBuilder.Entity("UserRoles.Models.DailyReport", b =>
@@ -1168,25 +1116,6 @@ namespace UserRoles.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("UserRoles.Models.ColumnPermission", b =>
-                {
-                    b.HasOne("UserRoles.Models.TeamColumn", "Column")
-                        .WithMany()
-                        .HasForeignKey("ColumnId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("UserRoles.Models.Users", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Column");
 
                     b.Navigation("User");
                 });
