@@ -58,6 +58,14 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
 
     // Always load fresh fields
     const fields = await loadCustomFields(team);
+
+    // Sort fields so 'List' (Column) type is always at the bottom
+    fields.sort((a, b) => {
+        if (a.fieldType === 'List' && b.fieldType !== 'List') return 1;
+        if (a.fieldType !== 'List' && b.fieldType === 'List') return -1;
+        return a.order - b.order;
+    });
+
     const today = new Date().toISOString().split('T')[0];
 
     container.innerHTML = '';
@@ -65,8 +73,9 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
     // Apply grid layout
     container.style.display = 'grid';
     container.style.gridTemplateColumns = 'repeat(4, 1fr)';
-    container.style.gap = '12px';
+    container.style.gap = '10px';
     container.style.alignItems = 'start';
+    container.style.padding = '4px 0';
 
     if (!fields || fields.length === 0) {
         console.log('No custom fields to render');
@@ -90,8 +99,10 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         header.className = 'd-flex justify-content-between align-items-center mb-1 px-1';
 
         const label = document.createElement('label');
-        label.className = 'form-label mb-2 fw-medium text-dark';
-        label.style.fontSize = '0.95rem';
+        label.className = 'form-label mb-1 fw-bold text-secondary';
+        label.style.fontSize = '11px';
+        label.style.letterSpacing = '0.3px';
+        label.style.textTransform = 'uppercase';
         label.textContent = field.fieldName + (field.isRequired ? ' *' : '');
         label.htmlFor = `field_${field.id}`;
         header.appendChild(label);
@@ -298,10 +309,40 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                     `;
                 }
                 break;
+                input.dataset.fieldId = field.id;
+                input.dataset.required = field.isRequired;
+                break;
+            case 'List':
+                {
+                    input = document.createElement('select');
+                    input.className = 'form-select shadow-sm border-light bg-light rounded-3';
+                    input.id = `field_${field.id}`;
+                    input.innerHTML = '<option value="">-- Loading Columns --</option>';
+
+                    // Fetch columns for the team
+                    if (team) {
+                        fetch(`/Tasks/GetColumns?team=${encodeURIComponent(team)}`)
+                            .then(res => res.json())
+                            .then(cols => {
+                                input.innerHTML = '<option value="">-- Select Column --</option>';
+                                cols.forEach(c => {
+                                    const isSelected = existingValues[field.id] == c.id ? 'selected' : '';
+                                    input.innerHTML += `<option value="${c.id}" ${isSelected}>${c.columnName}</option>`;
+                                });
+                            })
+                            .catch(err => {
+                                console.error('Error loading columns:', err);
+                                input.innerHTML = '<option value="">Error Loading</option>';
+                            });
+                    } else {
+                        input.innerHTML = '<option value="">Team not specified</option>';
+                    }
+                }
+                break;
             default: // Text
                 input = document.createElement('input');
                 input.type = 'text';
-                input.className = 'form-control';
+                input.className = 'form-control shadow-sm border-light bg-light rounded-3';
                 break;
         }
 
@@ -320,27 +361,10 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         container.appendChild(fieldGroup);
     });
 
-    // Add "Add Field" button at the bottom (All Roles)
-    {
-        const addBtnContainer = document.createElement('div');
-        addBtnContainer.className = 'mt-3 pt-2 border-top text-center d-flex justify-content-center gap-2';
-
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'btn btn-sm btn-outline-primary';
-        addBtn.innerHTML = '<i class="bi bi-plus-lg"></i> Add New Field';
-        addBtn.onclick = (e) => { e.preventDefault(); addNewCustomField(); };
-        addBtnContainer.appendChild(addBtn);
-
-        // Remove duplicate manageBtn from here as it's in the modal footer
-
-        container.appendChild(addBtnContainer);
-    }
-
-    // Reset grid for the button container to center it
+    // Reset grid for the last row if needed
     const lastChild = container.lastElementChild;
-    if (lastChild) {
-        lastChild.style.gridColumn = 'span 2';
+    if (lastChild && fields.length % 4 !== 0) {
+        // Optional: styling adjustments for the last field if it doesn't fit the grid perfectly
     }
 }
 
@@ -599,33 +623,7 @@ function populateFieldOptionsGrouped(field) {
     standalone.forEach(s => addStandaloneOption(s, containerId));
 }
 
-// Toggle options section based on field type in Create form
-$(document).on('change', '#newFieldType', function () {
-    const section = document.getElementById('newFieldOptionsSection');
-    if (section) {
-        if (this.value === 'Dropdown') {
-            section.classList.remove('d-none');
-            const list = document.getElementById('newFieldOptionsList');
-            if (list) {
-                list.innerHTML = `
-                    <div class="d-flex gap-2 mb-3 mt-1">
-                        <button type="button" class="btn btn-xs btn-outline-primary" onclick="addParentGroup('', 'newFieldOptionsList')">
-                            <i class="bi bi-collection me-1"></i> Add Parent Group
-                        </button>
-                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="addStandaloneOption('', 'newFieldOptionsList')">
-                            <i class="bi bi-plus-circle me-1"></i> Add Standalone Option
-                        </button>
-                    </div>
-                `;
-                // Add initial group
-                const childId = addParentGroup('Category', 'newFieldOptionsList');
-                addChildOption('Option 1', childId);
-            }
-        } else {
-            section.classList.add('d-none');
-        }
-    }
-});
+// Toggle options section based on field type is now handled by toggleNewOptionsSection() in Index.cshtml
 
 async function loadFieldsList(team) {
     const container = document.getElementById('fieldsList');
@@ -645,34 +643,36 @@ async function loadFieldsList(team) {
         }
 
 
-        container.innerHTML = `<div class="row g-2">
+        container.innerHTML = `<div class="row g-1 sortable-fields">
             ${fields.map(f => `
-                <div class="col-md-6 animate__animated animate__fadeIn" style="animation-duration: 0.3s">
-                    <div class="field-item d-flex flex-column border shadow-sm" id="field_item_${f.id}" style="border-radius: 8px; background: #fff; transition: all 0.2s ease; min-height: 40px; margin-bottom: 6px;">
-                        <div class="p-2 px-3 flex-grow-1 d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center gap-3 overflow-hidden">
-                                <div class="flex-shrink-0" style="width: 32px; height: 32px; background: #f8fafc; border-radius: 6px; display: flex; align-items: center; justify-content: center; border: 1px solid #f1f5f9;">
-                                    ${f.fieldType === 'DateTime' ? '<i class="bi bi-calendar-event text-primary" style="font-size: 14px;"></i>' :
-                f.fieldType === 'Date' ? '<i class="bi bi-calendar text-primary" style="font-size: 14px;"></i>' :
-                    f.fieldType === 'Image' ? '<i class="bi bi-image text-primary" style="font-size: 14px;"></i>' :
-                        f.fieldType === 'Dropdown' ? '<i class="bi bi-list-nested text-primary" style="font-size: 14px;"></i>' :
-                            f.fieldType === 'Number' ? '<i class="bi bi-hash text-primary" style="font-size: 14px;"></i>' : '<i class="bi bi-fonts text-primary" style="font-size: 14px;"></i>'}
+                <div class="col-md-3 field-order-item" data-id="${f.id}">
+                    <div class="field-item d-flex flex-column border shadow-sm" id="field_item_${f.id}" 
+                         style="border-radius: 6px; background: #fff; transition: all 0.2s ease; min-height: 48px; margin-bottom: 4px; border-color: rgba(0,0,0,0.05) !important;">
+                        <div class="p-1 px-2 flex-grow-1 d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2 overflow-hidden">
+                                <div class="flex-shrink-0" style="width: 24px; height: 24px; background: #f1f5f9; border-radius: 4px; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0;">
+                                    ${f.fieldType === 'DateTime' ? '<i class="bi bi-calendar-event text-primary" style="font-size: 11px;"></i>' :
+                f.fieldType === 'Date' ? '<i class="bi bi-calendar text-primary" style="font-size: 11px;"></i>' :
+                    f.fieldType === 'Image' ? '<i class="bi bi-image text-primary" style="font-size: 11px;"></i>' :
+                        f.fieldType === 'Dropdown' ? '<i class="bi bi-list-nested text-primary" style="font-size: 11px;"></i>' :
+                            f.fieldType === 'Number' ? '<i class="bi bi-hash text-primary" style="font-size: 11px;"></i>' :
+                                f.fieldType === 'List' ? '<i class="bi bi-columns text-primary" style="font-size: 11px;"></i>' : '<i class="bi bi-fonts text-primary" style="font-size: 11px;"></i>'}
                                 </div>
                                 <div class="overflow-hidden">
-                                    <h6 class="mb-0 text-dark fw-bold text-truncate" style="font-size: 0.85rem; letter-spacing: -0.2px;">${f.fieldName}</h6>
-                                    <div class="d-flex align-items-center gap-2" style="font-size: 9px; margin-top: -2px;">
-                                        <span class="text-muted text-uppercase fw-bold opacity-75">${f.fieldType}</span>
-                                        ${f.isRequired ? '<span class="text-danger fw-black">[REQUIRED]</span>' : ''}
+                                    <h6 class="mb-0 text-dark fw-bold text-truncate" style="font-size: 0.75rem; letter-spacing: -0.1px;">${f.fieldName}</h6>
+                                    <div class="d-flex align-items-center gap-1" style="font-size: 8px; margin-top: -1px;">
+                                        <span class="text-muted text-uppercase fw-semibold opacity-75">${f.fieldType}</span>
+                                        ${f.isRequired ? '<span class="text-danger fw-bold">[REQ]</span>' : ''}
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="d-flex gap-1 flex-shrink-0">
-                                <button class="btn btn-link btn-sm text-muted p-1 hover-primary" style="text-decoration: none;" onclick="toggleFieldEditor(${f.id})" title="Edit">
-                                    <i class="bi bi-pencil-square" style="font-size: 13px;"></i>
+                            <div class="d-flex gap-0 flex-shrink-0">
+                                <button class="btn btn-link btn-sm text-muted p-1" style="text-decoration: none;" onclick="toggleFieldEditor(${f.id})" title="Edit">
+                                    <i class="bi bi-pencil" style="font-size: 11px;"></i>
                                 </button>
-                                <button class="btn btn-link btn-sm text-danger p-1 hover-danger" style="text-decoration: none;" onclick="deleteField(${f.id})" title="Deactivate">
-                                    <i class="bi bi-trash3" style="font-size: 13px;"></i>
+                                <button class="btn btn-link btn-sm text-danger p-1" style="text-decoration: none;" onclick="deleteField(${f.id})" title="Deactivate">
+                                    <i class="bi bi-x-circle" style="font-size: 11px;"></i>
                                 </button>
                             </div>
                         </div>
@@ -688,6 +688,7 @@ async function loadFieldsList(team) {
                                         <option value="Time" ${f.fieldType === 'Time' ? 'selected' : ''}>Time</option>
                                         <option value="DateTime" ${f.fieldType === 'DateTime' ? 'selected' : ''}>DateTime</option>
                                         <option value="Dropdown" ${f.fieldType === 'Dropdown' ? 'selected' : ''}>Dropdown</option>
+                                        <option value="List" ${f.fieldType === 'List' ? 'selected' : ''}>List (Column)</option>
                                         <option value="Image" ${f.fieldType === 'Image' ? 'selected' : ''}>Image</option>
                                     </select>
                                 </div>
@@ -738,9 +739,34 @@ async function loadFieldsList(team) {
             }
         });
 
+        // Initialize Sortable for fields
+        if (typeof Sortable !== 'undefined') {
+            const sortableEl = container.querySelector('.sortable-fields');
+            if (sortableEl) {
+                new Sortable(sortableEl, {
+                    animation: 150,
+                    handle: '.field-item',
+                    onEnd: async function () {
+                        const ids = Array.from(sortableEl.querySelectorAll('.field-order-item')).map(el => parseInt(el.dataset.id));
+                        try {
+                            const response = await fetch('/Tasks/ReorderCustomFields', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(ids)
+                            });
+                            if (response.ok) {
+                                if (typeof showToast === 'function') showToast('✅ Field order updated!', 'success');
+                                refreshOpenModals();
+                            }
+                        } catch (e) { console.error('Failed to reorder fields', e); }
+                    }
+                });
+            }
+        }
+
     } catch (error) {
-        console.error('Error in loadFieldsList:', error);
-        container.innerHTML = '<div class="text-danger">Error loading fields</div>';
+        console.error('Error loading fields list:', error);
+        container.innerHTML = '<div class="text-center p-4">Error loading fields.</div>';
     }
 }
 
@@ -875,15 +901,88 @@ function toggleFieldEditor(fieldId) {
     }
 }
 
-function toggleEditOptionsSection(fieldId) {
+async function toggleNewOptionsSection() {
+    const type = document.getElementById('newFieldType').value;
+    const section = document.getElementById('newFieldOptionsSection');
+    const list = document.getElementById('newFieldOptionsList');
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+
+    if (!section || !list) return;
+
+    if (type === 'Dropdown') {
+        section.classList.remove('d-none');
+        list.innerHTML = `
+            <div class="d-flex gap-2 mb-3 mt-1">
+                <button type="button" class="btn btn-xs btn-outline-primary" onclick="addParentGroup('', 'newFieldOptionsList')">
+                    <i class="bi bi-collection me-1"></i> Add Parent Group
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="addStandaloneOption('', 'newFieldOptionsList')">
+                    <i class="bi bi-plus-circle me-1"></i> Add Standalone Option
+                </button>
+            </div>
+        `;
+        // Add one initial group for user convenience
+        const childId = addParentGroup('Category', 'newFieldOptionsList');
+        addChildOption('Option 1', childId);
+    } else if (type === 'List') {
+        section.classList.remove('d-none');
+        list.innerHTML = '<div class="p-2 text-muted small"><i class="bi bi-info-circle me-1"></i> This field will display board columns as a dropdown.</div>';
+
+        if (team) {
+            try {
+                const res = await fetch(`/Tasks/GetColumns?team=${encodeURIComponent(team)}`);
+                const cols = await res.json();
+                if (cols && cols.length > 0) {
+                    let preview = '<div class="mt-2 border-top pt-2"><label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 8px;">Column Preview</label><select class="form-select form-select-sm" disabled>';
+                    cols.forEach(c => {
+                        preview += `<option>${c.columnName}</option>`;
+                    });
+                    preview += '</select></div>';
+                    list.innerHTML += preview;
+                }
+            } catch (err) {
+                console.error('Error fetching columns for preview:', err);
+            }
+        }
+    } else {
+        section.classList.add('d-none');
+        list.innerHTML = '';
+    }
+}
+
+async function toggleEditOptionsSection(fieldId) {
     const type = document.getElementById(`edit_type_${fieldId}`).value;
     const section = document.getElementById(`edit_options_section_${fieldId}`);
-    if (section) {
-        if (type === 'Dropdown') {
-            section.classList.remove('d-none');
-        } else {
-            section.classList.add('d-none');
+    const list = document.getElementById(`edit_options_list_${fieldId}`);
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+
+    if (!section || !list) return;
+
+    if (type === 'Dropdown') {
+        section.classList.remove('d-none');
+        // Logic for dropdown is usually managed by populateFieldOptionsGrouped
+    } else if (type === 'List') {
+        section.classList.remove('d-none');
+        list.innerHTML = '<div class="p-2 text-muted small"><i class="bi bi-info-circle me-1"></i> This field displays board columns.</div>';
+
+        if (team) {
+            try {
+                const res = await fetch(`/Tasks/GetColumns?team=${encodeURIComponent(team)}`);
+                const cols = await res.json();
+                if (cols && cols.length > 0) {
+                    let preview = '<div class="mt-2 border-top pt-2"><label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 8px;">Column Preview</label><select class="form-select form-select-sm" disabled>';
+                    cols.forEach(c => {
+                        preview += `<option>${c.columnName}</option>`;
+                    });
+                    preview += '</select></div>';
+                    list.innerHTML += preview;
+                }
+            } catch (err) {
+                console.error('Error fetching columns for preview:', err);
+            }
         }
+    } else {
+        section.classList.add('d-none');
     }
 }
 

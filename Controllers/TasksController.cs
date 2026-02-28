@@ -497,11 +497,8 @@ public class TasksController : Controller
                 // Identify values to ADD
                 foreach (var val in newValues)
                 {
-                    // Check if this value already exists in records
-                    bool alreadyExists = existingRecords.Any(r => r.Value == val);
-                    if (alreadyExists) continue;
+                    if (existingRecords.Any(r => r.Value == val)) continue;
 
-                    // It's a NEW value
                     var newVal = new TaskFieldValue
                     {
                         TaskId = task.Id,
@@ -510,6 +507,15 @@ public class TasksController : Controller
                         CreatedAt = DateTime.UtcNow
                     };
 
+                    // 🔥 NEW: Trigger Task Movement if field type is "List" (Column)
+                    if (fieldDef.FieldType == "List" && int.TryParse(val, out int targetColumnId))
+                    {
+                        if (task.ColumnId != targetColumnId)
+                        {
+                            await MoveTaskInternal(task.Id, targetColumnId, user);
+                        }
+                    }
+                    
                     // Handle Image Data if it's a Base64 string
                     if (val.StartsWith("data:image/"))
                     {
@@ -524,6 +530,7 @@ public class TasksController : Controller
                                 newVal.ImageData = Convert.FromBase64String(base64Data);
                                 newVal.ImageMimeType = mimeType;
                                 newVal.FileName = $"upload_{fieldId}_{DateTime.UtcNow.Ticks}";
+                                
                                 _context.TaskFieldValues.Add(newVal);
                                 await _context.SaveChangesAsync(); // Need ID for URL
                                 newVal.Value = $"/Tasks/GetFieldImageById/{newVal.Id}";
@@ -1146,6 +1153,22 @@ public class TasksController : Controller
     }
 
 
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetColumns(string team)
+    {
+        if (string.IsNullOrEmpty(team))
+            return BadRequest("Team name is required");
+
+        var columns = await _context.TeamColumns
+            .Where(c => c.TeamName == team)
+            .OrderBy(c => c.Order)
+            .Select(c => new { c.Id, c.ColumnName })
+            .ToListAsync();
+
+        return Ok(columns);
+    }
+
     [HttpPost]
     [Authorize]
     public async Task<IActionResult> MoveTask([FromBody] MoveTaskDto model)
@@ -1153,23 +1176,43 @@ public class TasksController : Controller
         if (model == null)
             return BadRequest("Invalid payload");
 
-        var task = await _context.TaskItems
-            .Include(t => t.Column)
-            .FirstOrDefaultAsync(t => t.Id == model.TaskId);
-
-        if (task == null)
-            return NotFound("Task not found");
-
-        var targetColumn = await _context.TeamColumns
-            .FirstOrDefaultAsync(c => c.Id == model.ColumnId);
-
-        if (targetColumn == null)
-            return NotFound("Target column not found");
-
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
 
-        var isAdmin = User.IsInRole("Admin");
+        var result = await MoveTaskInternal(model.TaskId, model.ColumnId, user);
+        if (!result.Success)
+        {
+            if (result.StatusCode == 403) return StatusCode(403, result.Message);
+            if (result.StatusCode == 404) return NotFound(result.Message);
+            return BadRequest(result.Message);
+        }
+
+        return Ok(new { success = true, message = "Task moved successfully" });
+    }
+
+    private class MoveResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; }
+        public int StatusCode { get; set; }
+    }
+
+    private async Task<MoveResult> MoveTaskInternal(int taskId, int columnId, Users user)
+    {
+        var task = await _context.TaskItems
+            .Include(t => t.Column)
+            .FirstOrDefaultAsync(t => t.Id == taskId);
+
+        if (task == null)
+            return new MoveResult { Success = false, Message = "Task not found", StatusCode = 404 };
+
+        var targetColumn = await _context.TeamColumns
+            .FirstOrDefaultAsync(c => c.Id == columnId);
+
+        if (targetColumn == null)
+            return new MoveResult { Success = false, Message = "Target column not found", StatusCode = 404 };
+
+        var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
         var targetColName = targetColumn.ColumnName?.Trim().ToLower();
         var sourceColName = task.Column?.ColumnName?.Trim().ToLower();
         int oldColId = task.ColumnId;
@@ -1177,7 +1220,7 @@ public class TasksController : Controller
         // ══════ STRICT PERMISSION CHECK ══════
         if (!await CanUserMoveTask(task, user, targetColumn.Id))
         {
-            return StatusCode(403, "you have not acess to move");
+            return new MoveResult { Success = false, Message = "you have not acess to move", StatusCode = 403 };
         }
 
         // ═══════ ROLE-BASED RESTRICTIONS ═══════
@@ -1186,34 +1229,25 @@ public class TasksController : Controller
         if (targetColName == "completed")
         {
             if (!isAdmin && !await AuthorizeBoardAction(task.TeamName, "ReviewTask"))
-                return StatusCode(403, "Only Admin or authorized reviewers can move tasks to Completed.");
+                return new MoveResult { Success = false, Message = "Only Admin or authorized reviewers can move tasks to Completed.", StatusCode = 403 };
 
             // Task must have passed review first
             if (task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.Passed)
-                return BadRequest("Task must pass review before moving to Completed.");
-        }
-
-        // 2. REVIEW column: Check hierarchy
-        if (targetColName == "review")
-        {
-            // Already checked by global CanUserMoveTask above, but kept for clarity/legacy
+                return new MoveResult { Success = false, Message = "Task must pass review before moving to Completed.", StatusCode = 400 };
         }
 
         // 3. Moving FROM review back (fail rework): allowed if task was failed
         if (sourceColName == "review" && targetColName != "completed" && !isAdmin)
         {
-            // Non-admin can only move back if review was failed
+            // Non-admin can only move back if review was failed or none
             if (task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.Failed &&
                 task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.None)
             {
-                // Already checked globally, but can override with specific message if needed
+                // Logic kept from original
             }
         }
 
-        // ═══════ LOG & MOVE ═══════
-        await _historyService.LogColumnMove(task.Id, task.ColumnId, targetColumn.Id, user.Id);
-
-        // Save previous column for fail-return
+        // Apply Move Logic...
         task.PreviousColumnId = task.ColumnId;
         task.ColumnId = targetColumn.Id;
 
@@ -1235,7 +1269,7 @@ public class TasksController : Controller
             await _historyService.LogReviewSubmitted(task.Id, user.Id);
         }
 
-        // If moving to completed (admin only), track completion
+        // If moving to completed (admin logic), track completion
         if (targetColName == "completed")
         {
             task.CompletedByUserId = task.AssignedToUserId;
@@ -1245,18 +1279,26 @@ public class TasksController : Controller
         task.UpdatedAt = DateTime.UtcNow;
         task.CurrentColumnEntryAt = DateTime.UtcNow;
 
+        _context.TaskItems.Update(task);
         await _context.SaveChangesAsync();
 
-        // 🚀 BROADCAST UPDATE
-        await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskMoved", new
-        {
-            taskId = task.Id,
-            oldColumnId = oldColId,
-            newColumnId = task.ColumnId,
-            columnName = targetColumn.ColumnName
-        });
+        // Log history
+        await _historyService.LogColumnMove(task.Id, oldColId, targetColumn.Id, user.Id);
 
-        return Ok(new { success = true, message = "Task moved successfully" });
+        // Notify via SignalR
+        if (_hubContext != null)
+        {
+            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskMoved", new
+            {
+                taskId = task.Id,
+                columnId = targetColumn.Id,
+                oldColumnId = oldColId,
+                movedBy = user.UserName,
+                columnName = targetColumn.ColumnName
+            });
+        }
+
+        return new MoveResult { Success = true };
     }
 
     // ═══════ HIERARCHY-BASED MOVE PERMISSION CHECK ═══════
