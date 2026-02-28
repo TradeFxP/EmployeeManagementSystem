@@ -11,6 +11,7 @@ using UserRoles.DTOs;
 using UserRoles.Services; // Added for ITaskHistoryService
 using Microsoft.AspNetCore.SignalR;
 using UserRoles.Hubs;
+using System.Text.Json;
 
 using TaskStatusEnum = UserRoles.Models.Enums.TaskStatus;
 
@@ -227,6 +228,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetTaskCardPartial(int taskId)
     {
         var task = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
@@ -495,11 +497,8 @@ public class TasksController : Controller
                 // Identify values to ADD
                 foreach (var val in newValues)
                 {
-                    // Check if this value already exists in records
-                    bool alreadyExists = existingRecords.Any(r => r.Value == val);
-                    if (alreadyExists) continue;
+                    if (existingRecords.Any(r => r.Value == val)) continue;
 
-                    // It's a NEW value
                     var newVal = new TaskFieldValue
                     {
                         TaskId = task.Id,
@@ -508,6 +507,15 @@ public class TasksController : Controller
                         CreatedAt = DateTime.UtcNow
                     };
 
+                    // 🔥 NEW: Trigger Task Movement if field type is "List" (Column)
+                    if (fieldDef.FieldType == "List" && int.TryParse(val, out int targetColumnId))
+                    {
+                        if (task.ColumnId != targetColumnId)
+                        {
+                            await MoveTaskInternal(task.Id, targetColumnId, user);
+                        }
+                    }
+                    
                     // Handle Image Data if it's a Base64 string
                     if (val.StartsWith("data:image/"))
                     {
@@ -522,6 +530,7 @@ public class TasksController : Controller
                                 newVal.ImageData = Convert.FromBase64String(base64Data);
                                 newVal.ImageMimeType = mimeType;
                                 newVal.FileName = $"upload_{fieldId}_{DateTime.UtcNow.Ticks}";
+                                
                                 _context.TaskFieldValues.Add(newVal);
                                 await _context.SaveChangesAsync(); // Need ID for URL
                                 newVal.Value = $"/Tasks/GetFieldImageById/{newVal.Id}";
@@ -568,6 +577,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetTask(int id)
     {
         var task = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.CustomFieldValues)
             .FirstOrDefaultAsync(t => t.Id == id);
 
@@ -602,6 +612,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetTaskDetail(int id)
     {
         var task = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
             .Include(t => t.AssignedByUser)
@@ -629,15 +640,18 @@ public class TasksController : Controller
             AssignedBy = task.AssignedByUser?.UserName,
             ReviewedBy = task.ReviewedByUser?.UserName,
             CompletedBy = task.CompletedByUser?.UserName,
-            task.CreatedAt,
-            task.AssignedAt,
-            task.ReviewedAt,
-            task.CompletedAt,
-            task.DueDate,
+            CreatedAtFormatted = task.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
+            AssignedAtFormatted = task.AssignedAt?.ToString("dd MMM yyyy, hh:mm tt"),
+            ReviewedAtFormatted = task.ReviewedAt?.ToString("dd MMM yyyy, hh:mm tt"),
+            CompletedAtFormatted = task.CompletedAt?.ToString("dd MMM yyyy, hh:mm tt"),
+            DueDateFormatted = task.DueDate?.ToString("dd MMM, hh:mm tt"),
             CustomFields = task.CustomFieldValues?.Select(fv => new
             {
                 FieldName = fv.Field?.FieldName,
-                fv.Value
+                FieldType = fv.Field?.FieldType,
+                Value = fv.Field?.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var dt) 
+                        ? dt.ToString("dd MMM yyyy, hh:mm tt") 
+                        : fv.Value
             }).ToList()
         });
     }
@@ -672,37 +686,41 @@ public class TasksController : Controller
         if (string.IsNullOrEmpty(team))
             return BadRequest("Team name is required");
 
+        // Fetch tasks
         var tasks = await _context.TaskItems
+            .AsNoTracking()
             .Include(t => t.AssignedByUser)
             .Include(t => t.AssignedToUser)
             .Where(t => t.TeamName == team && !t.IsArchived && t.AssignedToUserId != null)
             .OrderByDescending(t => t.AssignedAt)
             .ToListAsync();
 
-        // Fetch members of this team for the filter
-        var teamUserIds = await _context.UserTeams
-            .Where(ut => ut.TeamName == team)
-            .Select(ut => ut.UserId)
-            .ToListAsync();
+        // 🔥 PERFORMANCE: Bulk-fetch ALL users, teams, and roles once
+        var allUsers = await _userManager.Users.AsNoTracking().ToListAsync();
+        var allTeams = await _context.Teams.AsNoTracking().ToListAsync();
+        var allUserTeams = await _context.UserTeams.AsNoTracking().ToListAsync();
+        
+        var userRolesData = await (from ur in _context.UserRoles
+                                   join r in _context.Roles on ur.RoleId equals r.Id
+                                   select new { ur.UserId, RoleName = r.Name })
+                                  .AsNoTracking()
+                                  .ToListAsync();
 
-        // Fetch ALL teams and their members for the grouped filter
-        var allTeams = await _context.Teams.ToListAsync();
+        var userRolesMap = userRolesData
+            .GroupBy(ur => ur.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(ur => ur.RoleName).ToList());
+
         var groupedMembers = new List<dynamic>();
+        var userTeamsLookup = allUserTeams.ToLookup(ut => ut.TeamName);
 
         foreach (var t in allTeams)
         {
-            var userIds = await _context.UserTeams
-                .Where(ut => ut.TeamName == t.Name)
-                .Select(ut => ut.UserId)
-                .ToListAsync();
-
-            var teamUsers = await _userManager.Users
-                .Where(u => userIds.Contains(u.Id))
-                .ToListAsync();
+            var userIdsInTeam = userTeamsLookup[t.Name].Select(ut => ut.UserId).ToList();
+            var teamUsers = allUsers.Where(u => userIdsInTeam.Contains(u.Id)).ToList();
 
             foreach (var u in teamUsers)
             {
-                var roles = await _userManager.GetRolesAsync(u);
+                var roles = userRolesMap.GetValueOrDefault(u.Id, new List<string>());
                 var primaryRole = roles.FirstOrDefault() ?? "User";
                 bool isManagement = roles.Contains("Admin") || roles.Contains("Manager") || roles.Contains("Sub-Manager") || roles.Contains("SubManager");
 
@@ -779,8 +797,9 @@ public class TasksController : Controller
             })
             .ToList();
 
-        // Load all tasks for this team:
+        // Load all tasks for this team strictly (AsNoTracking for performance)
         var allTasks = await _context.TaskItems
+            .AsNoTracking()
             .Where(t => t.TeamName == team && !t.IsArchived)
             .Include(t => t.CreatedByUser)
             .Include(t => t.AssignedToUser)
@@ -792,36 +811,25 @@ public class TasksController : Controller
                 .ThenInclude(v => v.Field)
             .ToListAsync();
 
+        // 🔥 PERFORMANCE: Bulk-fetch roles for ALL users in one query
+        var userRolesData = await (from ur in _context.UserRoles
+                                   join r in _context.Roles on ur.RoleId equals r.Id
+                                   select new { ur.UserId, RoleName = r.Name })
+                                  .AsNoTracking()
+                                  .ToListAsync();
 
-        // 🔥 PERFORMANCE OPTIMIZATION: Pre-fetch roles for all users involved to avoid N+1 queries in CanUserSeeTask
-        var usersToFetchRolesFor = allTasks
-            .Select(t => t.CreatedByUserId)
-            .Where(id => !string.IsNullOrEmpty(id))
-            .Distinct()
-            .ToList();
+        var userRolesMap = userRolesData
+            .GroupBy(ur => ur.UserId)
+            .ToDictionary(g => g.Key, g => (IList<string>)g.Select(ur => ur.RoleName).ToList());
 
-        if (user != null && !usersToFetchRolesFor.Contains(user.Id))
-            usersToFetchRolesFor.Add(user.Id);
-
-        var userRolesMap = new Dictionary<string, IList<string>>();
-        foreach (var uid in usersToFetchRolesFor)
-        {
-            var u = await _userManager.FindByIdAsync(uid);
-            if (u != null)
-            {
-                userRolesMap[uid] = await _userManager.GetRolesAsync(u);
-            }
-        }
-
-        // 🔥 FILTER TASKS BASED ON ROLE RULES
-        // Pre-fetch hierarchy for visibility check
+        // Pre-fetch hierarchy for visibility check (AsNoTracking)
         var userHierarchy = await _userManager.Users
-            .Where(u => u.Id != null)
+            .AsNoTracking()
             .Select(u => new { u.Id, u.ManagerId })
             .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
 
         var visibleTasks = new List<TaskItem>();
-        var viewerRoles = userRolesMap.ContainsKey(user.Id) ? userRolesMap[user.Id] : new List<string>();
+        var viewerRoles = userRolesMap.GetValueOrDefault(user.Id, new List<string>());
 
         foreach (var task in allTasks)
         {
@@ -832,127 +840,94 @@ public class TasksController : Controller
         // Attach filtered tasks to columns
         foreach (var col in columns)
         {
-            // Task belongs here if it is explicitly in this column
             col.Tasks = visibleTasks
                 .Where(t => t.ColumnId == col.Id)
                 .ToList();
         }
 
-        // ✅ 1. Load assignable users and assignors based on role/hierarchy
+        // ✅ 1. Load assignable users (AsNoTracking)
         var allUsers = await _userManager.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync();
 
         // Fetch UserIds belonging to the current team
         var teamUserIds = await _context.UserTeams
+            .AsNoTracking()
             .Where(ut => ut.TeamName == team)
             .Select(ut => ut.UserId)
             .ToListAsync();
 
-        var assignableUsers = new List<Users>();
-        var assignors = new List<Users>();
-
-        // We need hierarchy map for visibility check
-        var fullHierarchy = allUsers.Where(u => !string.IsNullOrEmpty(u.Id)).ToDictionary(u => u.Id, u => u.ParentUserId);
-
-        // Roles for everyone for filtering
-        var allUserRoles = new Dictionary<string, string>();
-        foreach (var u in allUsers)
-        {
-            var r = await _userManager.GetRolesAsync(u);
-            var primaryRole = r.FirstOrDefault() ?? "User";
-
-            // Prioritize Sub-Manager for display. 
-            // In this system, a Sub-Manager often has the Identity role "Manager" but has a ParentUserId.
-            if (r.Contains("Sub-Manager") || r.Contains("SubManager") || (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId)))
-                allUserRoles[u.Id] = "Sub-Manager";
-            else if (primaryRole == "Manager")
-                allUserRoles[u.Id] = "Manager";
-            else
-                allUserRoles[u.Id] = primaryRole;
-        }
-
-        // Populate FilteredAssignees for the top-level board filter (Hierarchical + Team restricted)
-        var filteredAssignees = new List<Users>();
-        if (viewerRoles.Contains("Admin"))
-        {
-            filteredAssignees = allUsers;
-        }
-        else if (viewerRoles.Contains("Manager"))
-        {
-            filteredAssignees.Add(user);
-            var directSubordinates = allUsers.Where(u => u.ParentUserId == user.Id).ToList();
-            filteredAssignees.AddRange(directSubordinates);
-            foreach (var sub in directSubordinates)
-            {
-                filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == sub.Id));
-            }
-        }
-        else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
-        {
-            filteredAssignees.Add(user);
-            filteredAssignees.AddRange(allUsers.Where(u => u.ParentUserId == user.Id));
-        }
-        else
-        {
-            filteredAssignees.Add(user);
-        }
-
-        // Role priority for sorting: Admin (1), Manager (2), Sub-Manager (3), User (4)
-        var rolePriority = new Dictionary<string, int>
-        {
-            { "Admin", 1 },
-            { "Manager", 2 },
-            { "Sub-Manager", 3 },
-            { "User", 4 }
-        };
-
-        // ✅ Apply Team Filter: "show only fronted team" (the selected team members only)
-        filteredAssignees = filteredAssignees
-            .DistinctBy(u => u.Id)
-            .Where(u => teamUserIds.Contains(u.Id))
-            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles.ContainsKey(u.Id) ? allUserRoles[u.Id] : "User", 99))
-            .ThenBy(u => u.Name ?? u.UserName)
-            .ToList();
-
-        // Also restrict assignableUsers (Quick Assign) to the team members
-        assignableUsers = allUsers.Where(u => teamUserIds.Contains(u.Id)).ToList();
-
-        // Role mapping for FE logic
+        // Pre-calculate primary roles for all users for filtering/FE
         var feUserRolesMap = new Dictionary<string, string>();
         foreach (var u in allUsers)
         {
-            if (allUserRoles.ContainsKey(u.Id))
-                feUserRolesMap[u.Id] = allUserRoles[u.Id];
+            var r = userRolesMap.GetValueOrDefault(u.Id, new List<string>());
+            var primaryRole = r.FirstOrDefault() ?? "User";
+
+            if (r.Contains("Sub-Manager") || r.Contains("SubManager") || (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId)))
+                feUserRolesMap[u.Id] = "Sub-Manager";
+            else if (r.Contains("Admin"))
+                feUserRolesMap[u.Id] = "Admin";
+            else if (primaryRole == "Manager")
+                feUserRolesMap[u.Id] = "Manager";
+            else
+                feUserRolesMap[u.Id] = primaryRole;
         }
 
-        // ✅ 2. Define Assignors (Who can assign tasks)
-        // Includes anyone with Admin, Manager, or Sub-Manager role, sorted by priority
-        assignors = allUsers
-            .Where(u => allUserRoles.ContainsKey(u.Id) &&
-                (allUserRoles[u.Id] == "Admin" || allUserRoles[u.Id] == "Manager" || allUserRoles[u.Id] == "Sub-Manager"))
-            .OrderBy(u => rolePriority.GetValueOrDefault(allUserRoles[u.Id], 99))
+        // Populate FilteredAssignees (Hierarchical + Team restricted)
+        var filteredAssignees = new List<Users>();
+        if (viewerRoles.Contains("Admin"))
+        {
+            filteredAssignees = allUsers.Where(u => teamUserIds.Contains(u.Id)).ToList();
+        }
+        else if (viewerRoles.Contains("Manager"))
+        {
+            var accessibleIds = new HashSet<string> { user.Id };
+            var directSubordinates = allUsers.Where(u => u.ParentUserId == user.Id).Select(u => u.Id).ToList();
+            foreach(var id in directSubordinates) accessibleIds.Add(id);
+            var indirect = allUsers.Where(u => directSubordinates.Contains(u.ParentUserId ?? "")).Select(u => u.Id);
+            foreach(var id in indirect) accessibleIds.Add(id);
+
+            filteredAssignees = allUsers.Where(u => accessibleIds.Contains(u.Id) && teamUserIds.Contains(u.Id)).ToList();
+        }
+        else if (viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager"))
+        {
+            var accessibleIds = new HashSet<string> { user.Id };
+            var subs = allUsers.Where(u => u.ParentUserId == user.Id).Select(u => u.Id);
+            foreach(var id in subs) accessibleIds.Add(id);
+
+            filteredAssignees = allUsers.Where(u => accessibleIds.Contains(u.Id) && teamUserIds.Contains(u.Id)).ToList();
+        }
+        else
+        {
+            filteredAssignees = allUsers.Where(u => u.Id == user.Id && teamUserIds.Contains(u.Id)).ToList();
+        }
+
+        // Role priority for sorting
+        var rolePriority = new Dictionary<string, int> { { "Admin", 1 }, { "Manager", 2 }, { "Sub-Manager", 3 }, { "User", 4 } };
+
+        filteredAssignees = filteredAssignees
+            .OrderBy(u => rolePriority.GetValueOrDefault(feUserRolesMap.GetValueOrDefault(u.Id, "User"), 99))
             .ThenBy(u => u.Name ?? u.UserName)
             .ToList();
 
-        // ✅ 3. Define Assignable Users (Who can be assigned tasks)
-        // Pass ALL users to the view; visibility will be handled by the view logic based on role hierarchy
-        assignableUsers = allUsers;
-
-        // Get all team names for the assignment dropdown
-        var allTeamNames = await _context.TeamColumns
-            .Select(c => c.TeamName)
-            .Distinct()
-            .ToListAsync();
+        // Assignors: Anyone with Management role
+        var assignors = allUsers
+            .Where(u => feUserRolesMap.ContainsKey(u.Id) &&
+                (feUserRolesMap[u.Id] == "Admin" || feUserRolesMap[u.Id] == "Manager" || feUserRolesMap[u.Id] == "Sub-Manager"))
+            .OrderBy(u => rolePriority.GetValueOrDefault(feUserRolesMap[u.Id], 99))
+            .ThenBy(u => u.Name ?? u.UserName)
+            .ToList();
 
         // Load active custom fields
         var customFields = await _context.TaskCustomFields
-            .Where(f => f.IsActive && (string.IsNullOrEmpty(f.TeamName) || f.TeamName == team))
+            .AsNoTracking()
+            .Where(f => f.IsActive && f.TeamName == team)
             .OrderBy(f => f.Order)
             .ToListAsync();
 
-        var teamSettings = await _context.Teams.FirstOrDefaultAsync(t => t.Name == team);
+        var teamSettings = await _context.Teams.AsNoTracking().FirstOrDefaultAsync(t => t.Name == team);
 
-        // ✅ 2. Build ViewModel AFTER data exists
-        var userPerms = user == null ? null : await _context.BoardPermissions
+        var userPerms = await _context.BoardPermissions
+            .AsNoTracking()
             .Where(p => p.UserId == user.Id && p.TeamName != null && p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .OrderByDescending(p => p.Id)
             .FirstOrDefaultAsync();
@@ -961,17 +936,16 @@ public class TasksController : Controller
         {
             TeamName = team,
             Columns = columns,
-            AssignableUsers = assignableUsers,
+            AssignableUsers = allUsers, // Industry standard: can assign to anyone (cross-team)
             FilteredAssignees = filteredAssignees,
             Assignors = assignors,
-            AllTeamNames = allTeamNames,
+            AllTeamNames = await _context.TeamColumns.AsNoTracking().Select(c => c.TeamName).Distinct().ToListAsync(),
             CustomFields = customFields,
             UserPermissions = userPerms,
             TeamSettings = teamSettings,
             UserRolesMap = feUserRolesMap
         };
 
-        // ✅ 3. Return partial view
         return PartialView("_TeamBoard", vm);
 
 
@@ -1179,6 +1153,22 @@ public class TasksController : Controller
     }
 
 
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetColumns(string team)
+    {
+        if (string.IsNullOrEmpty(team))
+            return BadRequest("Team name is required");
+
+        var columns = await _context.TeamColumns
+            .Where(c => c.TeamName == team)
+            .OrderBy(c => c.Order)
+            .Select(c => new { c.Id, c.ColumnName })
+            .ToListAsync();
+
+        return Ok(columns);
+    }
+
     [HttpPost]
     [Authorize]
     public async Task<IActionResult> MoveTask([FromBody] MoveTaskDto model)
@@ -1186,25 +1176,52 @@ public class TasksController : Controller
         if (model == null)
             return BadRequest("Invalid payload");
 
-        var task = await _context.TaskItems
-            .Include(t => t.Column)
-            .FirstOrDefaultAsync(t => t.Id == model.TaskId);
-
-        if (task == null)
-            return NotFound("Task not found");
-
-        var targetColumn = await _context.TeamColumns
-            .FirstOrDefaultAsync(c => c.Id == model.ColumnId);
-
-        if (targetColumn == null)
-            return NotFound("Target column not found");
-
         var user = await _userManager.GetUserAsync(User);
         if (user == null) return Unauthorized();
 
-        var isAdmin = User.IsInRole("Admin");
+        var result = await MoveTaskInternal(model.TaskId, model.ColumnId, user);
+        if (!result.Success)
+        {
+            if (result.StatusCode == 403) return StatusCode(403, result.Message);
+            if (result.StatusCode == 404) return NotFound(result.Message);
+            return BadRequest(result.Message);
+        }
+
+        return Ok(new { success = true, message = "Task moved successfully" });
+    }
+
+    private class MoveResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; }
+        public int StatusCode { get; set; }
+    }
+
+    private async Task<MoveResult> MoveTaskInternal(int taskId, int columnId, Users user)
+    {
+        var task = await _context.TaskItems
+            .Include(t => t.Column)
+            .FirstOrDefaultAsync(t => t.Id == taskId);
+
+        if (task == null)
+            return new MoveResult { Success = false, Message = "Task not found", StatusCode = 404 };
+
+        var targetColumn = await _context.TeamColumns
+            .FirstOrDefaultAsync(c => c.Id == columnId);
+
+        if (targetColumn == null)
+            return new MoveResult { Success = false, Message = "Target column not found", StatusCode = 404 };
+
+        var isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
         var targetColName = targetColumn.ColumnName?.Trim().ToLower();
         var sourceColName = task.Column?.ColumnName?.Trim().ToLower();
+        int oldColId = task.ColumnId;
+
+        // ══════ STRICT PERMISSION CHECK ══════
+        if (!await CanUserMoveTask(task, user, targetColumn.Id))
+        {
+            return new MoveResult { Success = false, Message = "you have not acess to move", StatusCode = 403 };
+        }
 
         // ═══════ ROLE-BASED RESTRICTIONS ═══════
 
@@ -1212,36 +1229,25 @@ public class TasksController : Controller
         if (targetColName == "completed")
         {
             if (!isAdmin && !await AuthorizeBoardAction(task.TeamName, "ReviewTask"))
-                return StatusCode(403, "Only Admin or authorized reviewers can move tasks to Completed.");
+                return new MoveResult { Success = false, Message = "Only Admin or authorized reviewers can move tasks to Completed.", StatusCode = 403 };
 
             // Task must have passed review first
             if (task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.Passed)
-                return BadRequest("Task must pass review before moving to Completed.");
-        }
-
-        // 2. REVIEW column: Check hierarchy - user can only move tasks they or subordinates own
-        if (targetColName == "review")
-        {
-            if (!await CanUserMoveTask(task, user))
-                return StatusCode(403, "You can only move tasks assigned to you or your subordinates to Review.");
+                return new MoveResult { Success = false, Message = "Task must pass review before moving to Completed.", StatusCode = 400 };
         }
 
         // 3. Moving FROM review back (fail rework): allowed if task was failed
         if (sourceColName == "review" && targetColName != "completed" && !isAdmin)
         {
-            // Non-admin can only move back if review was failed
+            // Non-admin can only move back if review was failed or none
             if (task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.Failed &&
                 task.ReviewStatus != UserRoles.Models.Enums.ReviewStatus.None)
             {
-                if (!await CanUserMoveTask(task, user))
-                    return StatusCode(403, "You cannot move this task.");
+                // Logic kept from original
             }
         }
 
-        // ═══════ LOG & MOVE ═══════
-        await _historyService.LogColumnMove(task.Id, task.ColumnId, targetColumn.Id, user.Id);
-
-        // Save previous column for fail-return
+        // Apply Move Logic...
         task.PreviousColumnId = task.ColumnId;
         task.ColumnId = targetColumn.Id;
 
@@ -1263,7 +1269,7 @@ public class TasksController : Controller
             await _historyService.LogReviewSubmitted(task.Id, user.Id);
         }
 
-        // If moving to completed (admin only), track completion
+        // If moving to completed (admin logic), track completion
         if (targetColName == "completed")
         {
             task.CompletedByUserId = task.AssignedToUserId;
@@ -1273,60 +1279,93 @@ public class TasksController : Controller
         task.UpdatedAt = DateTime.UtcNow;
         task.CurrentColumnEntryAt = DateTime.UtcNow;
 
+        _context.TaskItems.Update(task);
         await _context.SaveChangesAsync();
 
-        // 🚀 BROADCAST UPDATE
-        await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskMoved", new
-        {
-            taskId = task.Id,
-            oldColumnId = model.ColumnId, // this was the source in MoveTaskDto
-            newColumnId = task.ColumnId,
-            columnName = targetColumn.ColumnName
-        });
+        // Log history
+        await _historyService.LogColumnMove(task.Id, oldColId, targetColumn.Id, user.Id);
 
-        return Ok(new { success = true, message = "Task moved successfully" });
+        // Notify via SignalR
+        if (_hubContext != null)
+        {
+            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskMoved", new
+            {
+                taskId = task.Id,
+                columnId = targetColumn.Id,
+                oldColumnId = oldColId,
+                movedBy = user.UserName,
+                columnName = targetColumn.ColumnName
+            });
+        }
+
+        return new MoveResult { Success = true };
     }
 
     // ═══════ HIERARCHY-BASED MOVE PERMISSION CHECK ═══════
-    private async Task<bool> CanUserMoveTask(TaskItem task, Users currentUser)
+    private async Task<bool> CanUserMoveTask(TaskItem task, Users currentUser, int? targetColumnId = null)
     {
         // Admin can do anything
         if (await _userManager.IsInRoleAsync(currentUser, "Admin"))
             return true;
 
-        // User can move their own assigned tasks
-        if (task.AssignedToUserId == currentUser.Id)
-            return true;
+        // Fetch granular permissions specifically for this user and team
+        var boardPerm = await _context.BoardPermissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == currentUser.Id && p.TeamName.ToLower().Trim() == task.TeamName.ToLower().Trim());
 
-        // User can move tasks they created
-        if (task.CreatedByUserId == currentUser.Id)
-            return true;
+        // ══════ Specific Granular Transitions ══════
+        // If the admin has defined ANY transitions for this user, we follow them STRICTLY.
+        if (boardPerm != null && !string.IsNullOrEmpty(boardPerm.AllowedTransitionsJson) && targetColumnId.HasValue)
+        {
+            try
+            {
+                var transitions = JsonSerializer.Deserialize<Dictionary<int, List<int>>>(boardPerm.AllowedTransitionsJson);
+                if (transitions != null)
+                {
+                    // Check if current column has ANY allowed targets
+                    if (transitions.TryGetValue(task.ColumnId, out var allowedTargets))
+                    {
+                        if (allowedTargets.Contains(targetColumnId.Value))
+                            return true;
+                    }
+                    
+                    // If a transition map exists (even empty), and this move isn't allowed, return FALSE.
+                    // This creates a "restricted" mode for the user.
+                    return false;
+                }
+            }
+            catch { /* corrupted JSON fallback to default rules below */ }
+        }
+
+        // ══════ Default Rules (Owner/Hierarchy) ══════
+        // User can move their own assigned tasks
+        bool isOwner = task.AssignedToUserId == currentUser.Id || task.CreatedByUserId == currentUser.Id;
 
         var userRoles = await _userManager.GetRolesAsync(currentUser);
 
         // Manager: can move tasks of users under them
+        bool isHierarchyAuthorized = false;
         if (userRoles.Contains("Manager") || userRoles.Contains("Sub-Manager"))
         {
-            // Check if the assigned user is a subordinate
             var assignedUser = await _userManager.FindByIdAsync(task.AssignedToUserId);
             if (assignedUser != null)
             {
-                // Direct report check
                 if (assignedUser.ManagerId == currentUser.Id)
-                    return true;
+                    isHierarchyAuthorized = true;
+                else
+                {
+                    var subordinateIds = await _context.Users
+                        .Where(u => u.ManagerId == currentUser.Id)
+                        .Select(u => u.Id)
+                        .ToListAsync();
 
-                // Indirect: sub-manager's reports
-                var subordinateIds = await _context.Users
-                    .Where(u => u.ManagerId == currentUser.Id)
-                    .Select(u => u.Id)
-                    .ToListAsync();
-
-                if (subordinateIds.Contains(task.AssignedToUserId))
-                    return true;
+                    if (subordinateIds.Contains(task.AssignedToUserId))
+                        isHierarchyAuthorized = true;
+                }
             }
         }
 
-        return false;
+        return isOwner || isHierarchyAuthorized;
     }
 
     // ═══════ ADMIN REVIEW ENDPOINT ═══════
@@ -1675,7 +1714,7 @@ public class TasksController : Controller
     public async Task<IActionResult> GetCustomFields(string? team)
     {
         var fields = await _context.TaskCustomFields
-            .Where(f => f.IsActive && (string.IsNullOrEmpty(f.TeamName) || f.TeamName == team))
+            .Where(f => f.IsActive && f.TeamName == team)
             .OrderBy(f => f.Order)
             .Select(f => new
             {
@@ -1845,13 +1884,26 @@ public class TasksController : Controller
     {
         if (string.IsNullOrWhiteSpace(team)) return BadRequest();
 
-        var users = await _userManager.Users.OrderBy(u => u.UserName).ToListAsync();
+        var users = await _userManager.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
         var perms = await _context.BoardPermissions
+            .AsNoTracking()
             .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
             .ToListAsync();
 
+        // 🔥 PERFORMANCE: Bulk-fetch roles
+        var userRolesData = await (from ur in _context.UserRoles
+                                   join r in _context.Roles on ur.RoleId equals r.Id
+                                   select new { ur.UserId, RoleName = r.Name })
+                                  .AsNoTracking()
+                                  .ToListAsync();
+
+        var userRolesMap = userRolesData
+            .GroupBy(ur => ur.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(ur => ur.RoleName).ToList());
+
         // Get the set of user IDs that belong to this specific team
         var teamUserIds = await _context.UserTeams
+            .AsNoTracking()
             .Where(ut => ut.TeamName == team)
             .Select(ut => ut.UserId)
             .ToHashSetAsync();
@@ -1860,7 +1912,7 @@ public class TasksController : Controller
 
         foreach (var u in users)
         {
-            var rawRoles = await _userManager.GetRolesAsync(u);
+            var rawRoles = userRolesMap.GetValueOrDefault(u.Id, new List<string>());
             if (rawRoles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
 
             string primaryRole = rawRoles.FirstOrDefault() ?? "User";
@@ -1893,7 +1945,10 @@ public class TasksController : Controller
                 CanDeleteTask = p?.CanDeleteTask ?? false,
                 CanReviewTask = p?.CanReviewTask ?? false,
                 CanImportExcel = p?.CanImportExcel ?? false,
-                CanAssignTask = p?.CanAssignTask ?? false
+                CanAssignTask = p?.CanAssignTask ?? false,
+                AllowedTransitions = !string.IsNullOrEmpty(p?.AllowedTransitionsJson) 
+                    ? JsonSerializer.Deserialize<Dictionary<int, List<int>>>(p.AllowedTransitionsJson) ?? new()
+                    : new()
             });
         }
 
@@ -1958,6 +2013,7 @@ public class TasksController : Controller
         existing.CanReviewTask = dto.CanReviewTask;
         existing.CanImportExcel = dto.CanImportExcel;
         existing.CanAssignTask = dto.CanAssignTask;
+        existing.AllowedTransitionsJson = JsonSerializer.Serialize(dto.AllowedTransitions ?? new());
 
         await _context.SaveChangesAsync();
 
@@ -2108,6 +2164,201 @@ public class TasksController : Controller
         public bool IsDueDateVisible { get; set; }
         public bool IsTitleVisible { get; set; }
         public bool IsDescriptionVisible { get; set; }
+    }
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> SubmitMoveRequest([FromBody] MoveRequestSubmitModel model)
+    {
+        if (model == null || model.TaskId <= 0 || model.ToColumnId <= 0)
+            return BadRequest("Invalid request data.");
+
+        var task = await _context.TaskItems.FindAsync(model.TaskId);
+        if (task == null) return NotFound("Task not found.");
+
+        var toColumn = await _context.TeamColumns.FindAsync(model.ToColumnId);
+        if (toColumn == null) return NotFound("Target column not found.");
+
+        var fromColumn = await _context.TeamColumns.FindAsync(task.ColumnId);
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        // Get board permissions for this user to save the request
+        var boardPerm = await _context.BoardPermissions
+            .FirstOrDefaultAsync(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == task.TeamName.ToLower().Trim());
+
+        if (boardPerm == null)
+        {
+            // Create a basic permission record if it doesn't exist
+            boardPerm = new BoardPermission { UserId = user.Id, TeamName = task.TeamName };
+            _context.BoardPermissions.Add(boardPerm);
+        }
+
+        var requests = string.IsNullOrEmpty(boardPerm.MoveRequestsJson)
+            ? new List<MoveRequest>()
+            : JsonSerializer.Deserialize<List<MoveRequest>>(boardPerm.MoveRequestsJson) ?? new List<MoveRequest>();
+
+        var newRequest = new MoveRequest
+        {
+            TaskId = task.Id,
+            TaskTitle = task.Title,
+            FromColumnId = task.ColumnId,
+            FromColumnName = fromColumn?.ColumnName ?? "Unknown",
+            ToColumnId = toColumn.Id,
+            ToColumnName = toColumn.ColumnName,
+            RequestedByUserId = user.Id,
+            RequestedByUserName = user.UserName ?? "User",
+            RequestedAt = DateTime.UtcNow,
+            Status = "Pending"
+        };
+
+        requests.Insert(0, newRequest);
+        boardPerm.MoveRequestsJson = JsonSerializer.Serialize(requests);
+        await _context.SaveChangesAsync();
+
+        await _hubContext.Clients.Group(task.TeamName).SendAsync("NewMoveRequest", new
+        {
+            teamName = task.TeamName,
+            requestedBy = newRequest.RequestedByUserName,
+            taskTitle = newRequest.TaskTitle
+        });
+
+        return Ok(new { success = true, message = "Move request submitted successfully." });
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetBoardMoveRequests(string teamName)
+    {
+        if (string.IsNullOrEmpty(teamName)) return BadRequest();
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        bool isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
+        bool isManager = await _userManager.IsInRoleAsync(user, "Manager") || await _userManager.IsInRoleAsync(user, "Sub-Manager");
+
+        if (!isAdmin && !isManager) return Forbid();
+
+        var allPerms = await _context.BoardPermissions
+            .Where(p => p.TeamName.ToLower().Trim() == teamName.ToLower().Trim() && !string.IsNullOrEmpty(p.MoveRequestsJson))
+            .ToListAsync();
+
+        var allRequests = new List<object>();
+        foreach (var p in allPerms)
+        {
+            var reqs = JsonSerializer.Deserialize<List<MoveRequest>>(p.MoveRequestsJson);
+            if (reqs != null) 
+            {
+                foreach (var r in reqs)
+                {
+                    allRequests.Add(new
+                    {
+                        r.Id,
+                        r.TaskId,
+                        r.TaskTitle,
+                        r.FromColumnId,
+                        r.FromColumnName,
+                        r.ToColumnId,
+                        r.ToColumnName,
+                        r.RequestedByUserId,
+                        r.RequestedByUserName,
+                        r.RequestedAt,
+                        RequestedAtFormatted = r.RequestedAt.ToString("dd MMM, hh:mm tt"),
+                        r.Status,
+                        r.AdminReply,
+                        r.HandledAt,
+                        HandledAtFormatted = r.HandledAt?.ToString("dd MMM, hh:mm tt"),
+                        r.HandledByUserName,
+                        r.IsNew
+                    });
+                }
+            }
+        }
+
+        return Ok(allRequests.OrderByDescending(r => ((dynamic)r).RequestedAt).ToList());
+    }
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> HandleMoveRequest([FromBody] HandleMoveRequestModel model)
+    {
+        if (model == null || string.IsNullOrEmpty(model.RequestId))
+            return BadRequest();
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        var boardPerm = await _context.BoardPermissions
+            .FirstOrDefaultAsync(p => p.MoveRequestsJson != null && p.MoveRequestsJson.Contains(model.RequestId));
+
+        if (boardPerm == null) return NotFound("Request not found.");
+
+        var requests = JsonSerializer.Deserialize<List<MoveRequest>>(boardPerm.MoveRequestsJson);
+        var request = requests?.FirstOrDefault(r => r.Id.ToString() == model.RequestId);
+        if (request == null) return NotFound("Request data not found.");
+
+        if (request.Status != "Pending") return BadRequest("Request already handled.");
+
+        request.Status = model.Approved ? "Approved" : "Rejected";
+        request.AdminReply = model.AdminReply;
+        request.HandledAt = DateTime.UtcNow;
+        request.HandledByUserName = user.UserName;
+        request.IsNew = false;
+
+        if (model.Approved)
+        {
+            var task = await _context.TaskItems.FindAsync(request.TaskId);
+            if (task != null)
+            {
+                await _historyService.LogColumnMove(task.Id, task.ColumnId, request.ToColumnId, user.Id);
+                task.ColumnId = request.ToColumnId;
+                task.CurrentColumnEntryAt = DateTime.UtcNow;
+                
+                var toCol = await _context.TeamColumns.FindAsync(request.ToColumnId);
+                if (toCol != null && (toCol.ColumnName.ToLower().Trim() == "completed" || toCol.ColumnName.ToLower().Trim() == "done"))
+                {
+                    task.Status = TaskStatusEnum.Complete;
+                    task.CompletedByUserId = request.RequestedByUserId;
+                    task.CompletedAt = DateTime.UtcNow;
+                }
+                
+                await _context.SaveChangesAsync();
+
+                await _hubContext.Clients.Group(boardPerm.TeamName).SendAsync("TaskMoved", new
+                {
+                    taskId = task.Id,
+                    newColumnId = task.ColumnId,
+                    movedBy = user.UserName
+                });
+            }
+        }
+
+        boardPerm.MoveRequestsJson = JsonSerializer.Serialize(requests);
+        await _context.SaveChangesAsync();
+
+        await _hubContext.Clients.User(request.RequestedByUserId).SendAsync("MoveRequestHandled", new
+        {
+            taskId = request.TaskId,
+            approved = model.Approved,
+            reply = model.AdminReply
+        });
+
+        return Ok(new { success = true });
+    }
+
+    public class MoveRequestSubmitModel
+    {
+        public int TaskId { get; set; }
+        public int ToColumnId { get; set; }
+    }
+
+    public class HandleMoveRequestModel
+    {
+        public string RequestId { get; set; } = string.Empty;
+        public bool Approved { get; set; }
+        public string? AdminReply { get; set; }
     }
 }
 

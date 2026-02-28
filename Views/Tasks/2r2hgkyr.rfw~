@@ -4,7 +4,7 @@
 @inject UserManager<Users> UserManager
 @model TeamBoardViewModel
 
-<div class="board-top-bar d-flex justify-content-between align-items-center mb-1">
+<div class="board-top-bar d-flex justify-content-between align-items-center mb-3">
     <div class="d-flex align-items-center gap-3">
         <!-- 🔙 BACK TO BOARD -->
         <button id="backToBoardBtn" class="btn btn-sm btn-outline-primary" style="display:none;"
@@ -17,15 +17,6 @@
     </div>
 
     <div class="d-flex gap-2">
-        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Sub-Manager") || User.IsInRole("SubManager"))
-        {
-            <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="openMoveRequestsModal('@Model.TeamName')"
-                title="View Column Move Requests">
-                <i class="bi bi-mailbox me-1"></i> Move Requests
-                <span id="moveRequestBadge" class="badge bg-danger rounded-pill d-none" style="font-size: 0.6rem;">0</span>
-            </button>
-        }
-
         @if (User.IsInRole("Admin"))
         {
             <button class="btn btn-sm btn-outline-info" onclick="openBoardPermissionModal('@Model.TeamName')"
@@ -100,10 +91,6 @@
 
 <!-- KANBAN BOARD -->
 <div class="kanban-board" id="kanbanBoard" data-team-name="@Model.TeamName"
-    data-priority-visible="@((Model.TeamSettings?.IsPriorityVisible ?? true) ? "true" : "false")"
-    data-due-date-visible="@((Model.TeamSettings?.IsDueDateVisible ?? true) ? "true" : "false")"
-    data-title-visible="@((Model.TeamSettings?.IsTitleVisible ?? true) ? "true" : "false")"
-    data-description-visible="@((Model.TeamSettings?.IsDescriptionVisible ?? true) ? "true" : "false")"
     data-perm-add-col="@((Model.UserPermissions?.CanAddColumn ?? false) ? "true" : "false")"
     data-perm-rename-col="@((Model.UserPermissions?.CanRenameColumn ?? false) ? "true" : "false")"
     data-perm-reorder-cols="@((Model.UserPermissions?.CanReorderColumns ?? false) ? "true" : "false")"
@@ -350,16 +337,17 @@
 </div>
 
 
-<script>
-    function clearFocusedDescription() {
-        const desc = document.getElementById("focusedTaskDescription");
+<style>
+    <script>function clearFocusedDescription() {
+        const desc=document.getElementById("focusedTaskDescription");
+
         if (desc) {
-            desc.value = "";
+            desc .value="";
+            // clears the textarea
         }
     }
-</script>
 
-<style>
+    </script>
     /* ═══════════════════════════════════════════════════════
        PREMIUM KANBAN BOARD — INDUSTRY STANDARD UI
        ═══════════════════════════════════════════════════════ */
@@ -467,7 +455,7 @@
         display: flex;
         gap: 16px;
         overflow-x: auto;
-        padding-bottom: 1px;
+        padding-bottom: 12px;
         height: calc(100vh - 220px);
         scrollbar-width: thin;
     }
@@ -648,8 +636,6 @@
 
     /* ===== TASK LIST (SCROLLS) ===== */
     .kanban-tasks {
-        display: flex;
-        flex-direction: column;
         height: 100%;
         overflow-y: auto;
         padding-right: 4px;
@@ -680,7 +666,6 @@
         cursor: grab;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
         overflow-wrap: anywhere;
-        flex-shrink: 0;
     }
 
     .task-card:hover {
@@ -708,18 +693,6 @@
 
     .priority-critical {
         border-left: 4px solid #dc3545;
-    }
-
-    /* ===== FOLLOW-UP TODAY HIGHLIGHT ===== */
-    .follow-up-today {
-        border: 2px solid #ffc107 !important;
-        box-shadow: 0 0 15px rgba(255, 193, 7, 0.3) !important;
-        order: -10 !important; /* Force to top of column */
-        background: #fffef2 !important;
-    }
-
-    .follow-up-today:hover {
-        box-shadow: 0 0 20px rgba(255, 193, 7, 0.5) !important;
     }
 
     /* ===== CARD TOP ROW — BADGES ===== */

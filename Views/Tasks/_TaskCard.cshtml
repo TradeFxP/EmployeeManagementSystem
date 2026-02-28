@@ -35,9 +35,26 @@
     };
 
     var reviewCardClass = isFailed ? "task-failed" : isPassed ? "task-passed" : "";
+
+    // Follow-up Date Logic
+    bool isFollowUpToday = false;
+    DateTime? followUpDate = null;
+    if (Model.CustomFieldValues != null)
+    {
+        var fv = Model.CustomFieldValues.FirstOrDefault(f => f.Field?.FieldName?.Trim().ToLower().Contains("follow-up") == true || f.Field?.FieldName?.Trim().ToLower().Contains("followup") == true);
+        if (fv != null && DateTime.TryParse(fv.Value, out var dt))
+        {
+            followUpDate = dt;
+            if (dt.Date == DateTime.Today)
+            {
+                isFollowUpToday = true;
+            }
+        }
+    }
+    var followUpClass = isFollowUpToday ? "follow-up-today" : "";
 }
 
-<div class="task-card @priorityBorderClass @reviewCardClass"
+<div class="task-card @priorityBorderClass @reviewCardClass @followUpClass"
      draggable="true"
      data-task-id="@Model.Id"
      data-column-id="@Model.ColumnId"
@@ -89,6 +106,43 @@
             }
 
             <span class="priority-pill @effectivePriorityClass">@effectivePriorityLabel.ToUpper()</span>
+
+            @{
+                var taskType = Model.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldName?.Trim()?.ToLower() == "task type")?.Value;
+                if (!string.IsNullOrWhiteSpace(taskType))
+                {
+                    var typeIcon = taskType.ToLower() switch
+                    {
+                        "story" => "bi-journal-text",
+                        "bug" => "bi-bug-fill",
+                        "feature" => "bi-star-fill",
+                        "enhancement" => "bi-rocket-takeoff-fill",
+                        _ => "bi-tag-fill"
+                    };
+                    var typeColor = taskType.ToLower() switch
+                    {
+                        "story" => "#6366f1", // Indigo
+                        "bug" => "#ef4444",   // Red
+                        "feature" => "#f59e0b", // Amber
+                        "enhancement" => "#10b981", // Emerald
+                        _ => "#64748b" // Slate
+                    };
+                    <span class="badge d-flex align-items-center justify-content-center" 
+                          title="Type: @taskType"
+                          style="background: @(typeColor)15; color: @typeColor; border: 1px solid @(typeColor)30; font-size: 0.8rem; width: 24px; height: 24px; border-radius: 50%; font-weight: 700;">
+                        <i class="bi @typeIcon"></i>
+                    </span>
+                }
+            }
+
+            @if (isFollowUpToday)
+            {
+                <span class="badge bg-warning text-dark border-warning animate__animated animate__pulse animate__infinite d-flex align-items-center gap-1" 
+                      title="Follow-up Required Today"
+                      style="font-size: 0.7rem; font-weight: 800; box-shadow: 0 0 8px rgba(255,193,7,0.5);">
+                    <i class="bi bi-alarm-fill"></i> TODAY
+                </span>
+            }
         </div>
 
         <div class="ms-auto d-flex flex-column align-items-end gap-1">
@@ -166,14 +220,14 @@
     -->
     @if (Model.AssignedToUser != null && Model.AssignedAt != null)
     {
-        <div class="assigned-info-block mt-2" data-task-id="@Model.Id">
-            <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@(string.IsNullOrEmpty(Model.AssignedToUser.Name) ? Model.AssignedToUser.UserName : Model.AssignedToUser.Name)</strong></div>
-            @if (Model.AssignedByUser != null)
-            {
-                <div class="assigned-row"><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
-            }
-            <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
-        </div>
+        // <div class="assigned-info-block mt-2" data-task-id="@Model.Id">
+        //     <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@(string.IsNullOrEmpty(Model.AssignedToUser.Name) ? Model.AssignedToUser.UserName : Model.AssignedToUser.Name)</strong></div>
+        //     @if (Model.AssignedByUser != null)
+        //     {
+        //         <div class="assigned-row"><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
+        //     }
+        //     <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+        // </div>
     }
 
     @if (Model.ReviewedByUser != null && Model.ReviewedAt != null)
@@ -192,15 +246,15 @@
 
     <!-- LATEST ACTIVITY INDICATOR -->
     <div class="task-activity-indicator mt-2 pt-2 border-top" style="font-size: 0.7rem; color: #94a3b8; font-style: italic;">
-        <i class="bi bi-clock-history me-1"></i>
-        @if (Model.UpdatedAt != null)
+        <!-- <i class="bi bi-clock-history me-1"></i> -->
+        <!-- if (Model.UpdatedAt != null)
         {
-            <span>Modified @Model.UpdatedAt.Value.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
+            <span>Modified Model.UpdatedAt.Value.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
         }
         else
         {
-            <span>Created @Model.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
-        }
+            <span>Created Model.CreatedAt.ToLocalTime().ToString("dd MMM, hh:mm tt")</span>
+        } -->
     </div>
     <div class="task-assign-panel d-none" data-task-id="@Model.Id">
         <div class="assign-panel-header mb-2">
@@ -280,6 +334,15 @@
                 onclick="openEditTaskModal(@Model.Id); event.stopPropagation();">
             <i class="bi bi-pencil-square"></i>
         </button>
+
+        @if (!User.IsInRole("Admin"))
+        {
+            <button class="action-btn action-btn-primary action-btn-request-move" title="Request Task Move"
+                    style="display: @(!isCompletedCol ? "inline-flex" : "none")"
+                    onclick="openMoveRequestModal(@Model.Id, '@(Model.Title?.Replace("'", "\\'"))', @Model.ColumnId, '@(colName?.Replace("'", "\\'"))'); event.stopPropagation();">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        }
 
         @if (User.IsInRole("Admin") || (userPermissions?.CanAssignTask == true))
         {

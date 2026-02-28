@@ -30,5 +30,17 @@ namespace UserRoles.Models
         public bool CanReviewTask { get; set; }
         public bool CanImportExcel { get; set; }
         public bool CanAssignTask { get; set; }
+
+        /// <summary>
+        /// JSON string storing allowed transitions.
+        /// Format: {"SourceColumnId": [TargetColumnId1, TargetColumnId2], ...}
+        /// </summary>
+        public string? AllowedTransitionsJson { get; set; }
+
+        /// <summary>
+        /// JSON string storing move requests from users/sub-managers.
+        /// Format: List of MoveRequest objects.
+        /// </summary>
+        public string? MoveRequestsJson { get; set; }
     }
 }

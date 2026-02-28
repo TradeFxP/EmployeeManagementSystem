@@ -13,67 +13,73 @@
             </h4>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
-            <!-- MEMBER FILTER DROPDOWN -->
-            <div class="dropdown" id="memberFilterDropdown">
-                <button class="btn btn-sm btn-outline-info dropdown-toggle d-flex align-items-center" type="button" id="memberFilterBtn" data-bs-toggle="dropdown" aria-expanded="false" style="border-radius: 8px; padding: 6px 16px;">
-                    <i class="bi bi-people me-2"></i> <span id="selectedMemberName">Members</span>
+        <div class="d-flex align-items-center gap-3">
+            <!-- ASSIGNED TO FILTER DROPDOWN -->
+            <div class="dropdown" id="filterToDropdown">
+                <button class="btn btn-sm btn-outline-primary dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="border-radius: 8px; padding: 6px 16px; min-width: 160px;">
+                    <i class="bi bi-person-search me-2"></i> <span id="labelTo">Assigned To...</span>
                 </button>
-                <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" aria-labelledby="memberFilterBtn" style="min-width: 280px; border-radius: 12px; margin-top: 10px;">
+                <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="min-width: 280px; border-radius: 12px; margin-top: 10px;">
                     <div class="input-group input-group-sm mb-3">
                         <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" class="form-control border-start-0 ps-0" id="memberSearchInput" placeholder="Search members..." onkeyup="filterMemberList()">
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search members..." onkeyup="dropdownFilterSearch(this, 'assignedToListTo')">
                     </div>
-                    <div id="memberListContainer" style="max-height: 450px; overflow-y: auto;">
-                        <button class="dropdown-item rounded-2 py-2 mb-1 member-item active" onclick="selectMember('', 'All Assignees', this)">
+                    <div id="assignedToListTo" style="max-height: 350px; overflow-y: auto;">
+                        <button class="dropdown-item rounded-2 py-2 mb-1" onclick="selectFilterMember('To', '', 'Assigned To...')">
                             <i class="bi bi-grid-fill me-2 opacity-50"></i> All Assignees
                         </button>
-
                         @if (members != null)
                         {
-                            var teamsList = members.GroupBy(m => (string)m.TeamName);
-
-                            foreach (var teamGroup in teamsList)
+                            foreach (var m in members.OrderBy(x => x.Name))
                             {
-                                        <div class="dropdown-header fw-bold text-primary mt-3 mb-1 ps-2" style="font-size: 0.9rem; background: #f8fafc; border-radius: 4px; padding: 6px 12px;">
-                                            <i class="bi bi-people-fill me-2"></i> @teamGroup.Key Team
-                                        </div>
-
-                                var mgmt = teamGroup.Where(m => (string)m.Category == "Management");
-                                var teamMates = teamGroup.Where(m => (string)m.Category == "Team Members");
-
-                                @if (mgmt.Any())
-                                {
-                                                <div class="dropdown-header fw-bold text-dark mt-2 ps-3" style="font-size: 0.8rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 2px;">Management</div>
-                                    foreach (var m in mgmt)
-                                    {
-                                                        <button class="dropdown-item rounded-2 py-2 mb-1 member-item d-flex align-items-center justify-content-between ps-4" 
-                                                                onclick="selectMember('@m.Id', '@m.Name', this)" 
-                                                                data-name="@m.Name.ToLower()">
-                                                            <span>
-                                                                <small class="text-muted fw-bold me-1">[@m.Role]</small> @m.Name
-                                                            </span>
-                                                        </button>
-                                    }
-                                }
-
-                                @if (teamMates.Any())
-                                {
-                                                <div class="dropdown-header fw-bold text-dark mt-2 ps-3" style="font-size: 0.8rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 2px;">Team Members</div>
-                                    foreach (var m in teamMates)
-                                    {
-                                                        <button class="dropdown-item rounded-2 py-2 mb-1 member-item d-flex align-items-center justify-content-between ps-4" 
-                                                                onclick="selectMember('@m.Id', '@m.Name', this)" 
-                                                                data-name="@m.Name.ToLower()">
-                                                            <span>@m.Name</span>
-                                                        </button>
-                                    }
-                                }
+                                <button class="dropdown-item rounded-2 py-2 mb-1 d-flex align-items-center gap-2 filter-member-item" 
+                                        onclick="selectFilterMember('To', '@m.Name', '@m.Name')" 
+                                        data-name="@m.Name.ToLower()">
+                                    <div class="avatar-circle-xs" style="background: #e2e8f0; color: #475569; width: 24px; height: 24px; font-size: 0.65rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                        @m.Name.Substring(0, 1).ToUpper()
+                                    </div>
+                                    <span>@m.Name</span>
+                                </button>
                             }
                         }
                     </div>
                 </div>
             </div>
+
+            <!-- ASSIGNED BY FILTER DROPDOWN -->
+            <div class="dropdown" id="filterByDropdown">
+                <button class="btn btn-sm btn-outline-info dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="border-radius: 8px; padding: 6px 16px; min-width: 160px;">
+                    <i class="bi bi-person-up me-2"></i> <span id="labelBy">Assigned By...</span>
+                </button>
+                <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg border-0" style="min-width: 280px; border-radius: 12px; margin-top: 10px;">
+                    <div class="input-group input-group-sm mb-3">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0 ps-0" placeholder="Search members..." onkeyup="dropdownFilterSearch(this, 'assignedToListBy')">
+                    </div>
+                    <div id="assignedToListBy" style="max-height: 350px; overflow-y: auto;">
+                        <button class="dropdown-item rounded-2 py-2 mb-1" onclick="selectFilterMember('By', '', 'Assigned By...')">
+                            <i class="bi bi-grid-fill me-2 opacity-50"></i> All Assignors
+                        </button>
+                        @if (members != null)
+                        {
+                            foreach (var m in members.OrderBy(x => x.Name))
+                            {
+                                <button class="dropdown-item rounded-2 py-2 mb-1 d-flex align-items-center gap-2 filter-member-item" 
+                                        onclick="selectFilterMember('By', '@m.Name', '@m.Name')" 
+                                        data-name="@m.Name.ToLower()">
+                                    <div class="avatar-circle-xs" style="background: #e2e8f0; color: #475569; width: 24px; height: 24px; font-size: 0.65rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                        @m.Name.Substring(0, 1).ToUpper()
+                                    </div>
+                                    <span>@m.Name</span>
+                                </button>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <input type="hidden" id="filterValueTo" value="">
+            <input type="hidden" id="filterValueBy" value="">
 
             <button class="btn btn-sm btn-outline-secondary" onclick="loadTeamBoard('@ViewBag.TeamName')" style="border-radius: 8px; padding: 6px 16px;">
                 <i class="bi bi-arrow-left me-1"></i> Back to Board
@@ -117,7 +123,8 @@
 
                                     <tr class="task-row clickable-row" 
                                         data-task-id="@task.Id" 
-                                        data-assigned-to-id="@task.AssignedToUserId"
+                                        data-assigned-to="@(task.AssignedToUser?.Name ?? task.AssignedToUser?.UserName ?? "")"
+                                        data-assigned-by="@(task.AssignedByUser?.Name ?? task.AssignedByUser?.UserName ?? "Direct")"
                                         ondblclick="focusTask(@task.Id)"
                                         onclick="handleRowSingleClick(this)">
                                         <td class="ps-4">
@@ -125,7 +132,36 @@
                                                 <div style="width: 4px; height: 32px; background: @priorityColor; border-radius: 4px;" class="me-3"></div>
                                                 <div>
                                                     <div class="fw-bold text-dark mb-0" style="font-size: 0.95rem;">@task.Title</div>
-                                                    <div class="text-muted small">#@task.Id</div>
+                                                    <div class="d-flex align-items-center gap-2 mt-1">
+                                                        <span class="text-muted small">#@task.Id</span>
+                                                        @{
+                                                            var taskType = task.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldName?.Trim()?.ToLower() == "task type")?.Value;
+                                                            if (!string.IsNullOrWhiteSpace(taskType))
+                                                            {
+                                                                var typeIcon = taskType.ToLower() switch
+                                                                {
+                                                                    "story" => "bi-journal-text",
+                                                                    "bug" => "bi-bug-fill",
+                                                                    "feature" => "bi-star-fill",
+                                                                    "enhancement" => "bi-rocket-takeoff-fill",
+                                                                    _ => "bi-tag-fill"
+                                                                };
+                                                                var typeColor = taskType.ToLower() switch
+                                                                {
+                                                                    "story" => "#6366f1", // Indigo
+                                                                    "bug" => "#ef4444",   // Red
+                                                                    "feature" => "#f59e0b", // Amber
+                                                                    "enhancement" => "#10b981", // Emerald
+                                                                    _ => "#64748b" // Slate
+                                                                };
+                                                                <span class="badge d-flex align-items-center justify-content-center" 
+                                                                      title="Type: @taskType"
+                                                                      style="background: @(typeColor)15; color: @typeColor; border: 1px solid @(typeColor)30; font-size: 0.8rem; width: 24px; height: 24px; border-radius: 50%; font-weight: 700;">
+                                                                    <i class="bi @typeIcon"></i>
+                                                                </span>
+                                                            }
+                                                        }
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -259,84 +295,40 @@
 </style>
 
 <script>
-    function filterMemberList() {
-        const input = document.getElementById('memberSearchInput');
-        if (!input) return;
-
+    function dropdownFilterSearch(input, listId) {
         const filter = input.value.toLowerCase().trim();
-        const container = document.getElementById('memberListContainer');
-        if (!container) return;
-
-        const items = container.querySelectorAll('.member-item');
-        const headers = container.querySelectorAll('.dropdown-header');
-        const allAssigneesBtn = items[0];
-
-        // Reset display for everything if search is empty or too short
-        if (filter.length < 2) {
-            if (allAssigneesBtn) allAssigneesBtn.style.setProperty('display', 'flex', 'important');
-            items.forEach(item => item.style.setProperty('display', 'flex', 'important'));
-            headers.forEach(h => h.style.setProperty('display', 'block', 'important'));
-            return;
-        }
-
-        // Filter mode (2+ characters)
-        if (allAssigneesBtn) allAssigneesBtn.style.setProperty('display', 'none', 'important');
-
-        // Filter individual members
-        items.forEach((item, index) => {
-            if (index === 0) return; // Skip "All Assignees"
-            const nameAttr = item.getAttribute('data-name');
-            if (nameAttr && nameAttr.includes(filter)) {
-                item.style.setProperty('display', 'flex', 'important');
+        const container = document.getElementById(listId);
+        const items = container.querySelectorAll('.filter-member-item');
+        
+        items.forEach(item => {
+            const name = item.dataset.name || "";
+            if (name.includes(filter)) {
+                item.style.display = 'flex';
             } else {
-                item.style.setProperty('display', 'none', 'important');
-            }
-        });
-
-        // Manage headers (Team and Role sections)
-        const children = Array.from(container.children);
-        headers.forEach(h => h.style.setProperty('display', 'none', 'important'));
-
-        let lastTeamHeader = null;
-        let lastRoleHeader = null;
-
-        children.forEach(child => {
-            if (child.classList.contains('text-primary') && child.classList.contains('dropdown-header')) {
-                lastTeamHeader = child;
-                lastRoleHeader = null; 
-            } else if (child.classList.contains('text-dark') && child.classList.contains('dropdown-header')) {
-                lastRoleHeader = child;
-            } else if (child.classList.contains('member-item') && child.style.display !== 'none') {
-                if (lastTeamHeader) lastTeamHeader.style.setProperty('display', 'block', 'important');
-                if (lastRoleHeader) lastRoleHeader.style.setProperty('display', 'block', 'important');
+                item.style.display = 'none';
             }
         });
     }
 
-    function selectMember(userId, userName, element) {
-        // Toggle active states in dropdown
-        document.querySelectorAll('.member-item').forEach(item => item.classList.remove('active'));
-        if (element) {
-            element.classList.add('active');
-        } else {
-            // Find "All Assignees" if no element provided (on reset)
-            const allBtn = document.querySelector('.member-item');
-            if (allBtn) allBtn.classList.add('active');
-        }
+    function selectFilterMember(type, value, displayName) {
+        document.getElementById(`filterValue${type}`).value = value;
+        document.getElementById(`label${type}`).innerText = displayName;
+        filterAssignedTasks();
+    }
 
-        document.getElementById('selectedMemberName').innerText = userName;
-
-        // Clear search box
-        const input = document.getElementById('memberSearchInput');
-        if (input) {
-            input.value = '';
-        }
-        filterMemberList(); // Restore list visibility
-
-        // Table Filtering: "Unhide all things" if userId is empty
+    function filterAssignedTasks() {
+        const toFilter = document.getElementById('filterValueTo').value.toLowerCase().trim();
+        const byFilter = document.getElementById('filterValueBy').value.toLowerCase().trim();
         const rows = document.querySelectorAll('.task-row');
+
         rows.forEach(row => {
-            if (!userId || userId === '' || row.dataset.assignedToId === userId) {
+            const assignedTo = (row.dataset.assignedTo || "").toLowerCase();
+            const assignedBy = (row.dataset.assignedBy || "").toLowerCase();
+
+            const matchesTo = toFilter === "" || assignedTo.includes(toFilter);
+            const matchesBy = byFilter === "" || assignedBy.includes(byFilter);
+
+            if (matchesTo && matchesBy) {
                 row.style.display = '';
             } else {
                 row.style.display = 'none';
@@ -344,19 +336,30 @@
         });
     }
 
-    // Ensure state reset when dropdown closes (Using delegated event)
-    document.addEventListener('hidden.bs.dropdown', (event) => {
-        if (event.target && event.target.id === 'memberFilterDropdown') {
-            const input = document.getElementById('memberSearchInput');
-            if (input && input.value !== '') {
-                input.value = '';
-                filterMemberList();
-            }
-        }
-    });
-
     function handleRowSingleClick(row) {
         document.querySelectorAll('.task-row').forEach(r => r.classList.remove('active-row'));
         row.classList.add('active-row');
+    }
+
+    // Real-time status updates via SignalR
+    if (typeof taskHubConnection !== 'undefined') {
+        taskHubConnection.on("TaskMoved", function (data) {
+            console.log("Assigned Overview: Received TaskMoved", data);
+            const row = document.querySelector(`.task-row[data-task-id="${data.taskId}"]`);
+            if (row) {
+                const statusBadge = row.querySelector('td:nth-child(2) .badge');
+                if (statusBadge) {
+                    statusBadge.textContent = data.columnName;
+                }
+            }
+        });
+
+        // Also handle deletions
+        taskHubConnection.on("TaskRemoved", function (data) {
+            const row = document.querySelector(`.task-row[data-task-id="${data.taskId}"]`);
+            if (row) {
+                row.remove();
+            }
+        });
     }
 </script>
