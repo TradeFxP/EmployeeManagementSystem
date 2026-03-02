@@ -51,34 +51,6 @@ $(document).ready(function () {
 
 // Task creation is handled by submitCreateTask function in this file.
 
-    $.ajax({
-        url: "/Tasks/CreateTask",
-        type: "POST",
-        data: $(this).serialize(),
-        success: function () {
-
-            // Properly close Bootstrap 5 modal
-            const modalEl = document.getElementById("addTaskModal");
-            const modal = bootstrap.Modal.getInstance(modalEl);
-            modal.hide();
-
-            // 🔥 IMPORTANT: cleanup backdrop + body state
-            document.body.classList.remove("modal-open");
-
-            const backdrops = document.getElementsByClassName("modal-backdrop");
-            while (backdrops.length > 0) {
-                backdrops[0].parentNode.removeChild(backdrops[0]);
-            }
-
-            // Reload current board (quiet)
-            if (window.loadTeamBoard && window.currentTeamName) {
-                window.loadTeamBoard(window.currentTeamName, true);
-            }
-        }
-
-    });
-});
-
 $(document).on("input", "#taskTitle", function () {
     $("#titleCount").text(50 - $(this).val().length);
 });
@@ -192,52 +164,74 @@ $(document).on("click", ".edit-task", function () {
 
 // Open create task modal
 async function openCreateTaskModal(columnId) {
-    document.getElementById("taskColumnId").value = columnId;
-    document.getElementById("taskTitle").value = "";
-    document.getElementById("taskDescription").value = "";
-    document.getElementById("taskPriority").value = "1"; // Default to Medium
-    document.getElementById("taskDueDate").value = "";
+    const columnIdInput = document.getElementById("taskColumnId");
+    if (columnIdInput) columnIdInput.value = columnId;
 
-    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+    // Reset basic fields
+    ["taskTitle", "taskDescription", "taskDueDate"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
 
-    // Render custom fields if available and wait for them to load
+    const priorityEl = document.getElementById("taskPriority");
+    if (priorityEl) priorityEl.value = "1"; // Default to Medium
+
+    const board = document.getElementById('kanbanBoard');
+    const team = board?.dataset.teamName;
+    const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
+
+    // 🔥 Dynamic Visibility for System Fields
+    const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
+    const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
+    const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
+    const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
+
+    ["Priority", "DueDate", "Title", "Description"].forEach(field => {
+        const group = document.getElementById(`groupCreateTask${field}`);
+        const visible = eval(`${field.charAt(0).toLowerCase() + field.slice(1)}Visible`);
+        if (group) group.style.display = visible ? 'block' : 'none';
+    });
+
+    // Render custom fields if available
     if (typeof renderCustomFieldInputs === 'function') {
         try {
             await renderCustomFieldInputs('customFieldsContainer', {}, team);
         } catch (e) {
-            console.error('Failed to render custom fields before showing modal', e);
+            console.error('Failed to render custom fields', e);
         }
     }
 
-    const modal = new bootstrap.Modal(document.getElementById('createTaskModal'));
-    modal.show();
+    const modalEl = document.getElementById('createTaskModal');
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
 }
 
 // Submit create task form
-function submitCreateTask() {
+async function submitCreateTask() {
     const titleEl = document.getElementById("taskTitle");
-    const title = titleEl?.value.trim() || "New Task";
-    const description = document.getElementById("taskDescription")?.value.trim();
-    const columnId = document.getElementById("taskColumnId").value;
-    const projectId = document.getElementById("taskProjectId")?.value || null;
-    const priority = parseInt(document.getElementById("taskPriority").value);
+    const title = titleEl ? titleEl.value.trim() : "";
+    const columnId = document.getElementById("taskColumnId")?.value;
+    const priority = document.getElementById("taskPriority")?.value || "1";
     const dueDate = document.getElementById("taskDueDate")?.value || null;
+    const description = document.getElementById("taskDescription")?.value || "";
 
-    // Check if title is visible
     const titleGroup = document.getElementById('groupCreateTaskTitle');
     const isTitleVisible = titleGroup && titleGroup.style.display !== 'none';
 
-    if (isTitleVisible && (!title || title === "New Task")) {
-        showToast('Please enter a task title to continue.', 'warning');
+    if (isTitleVisible && !title) {
+        if (typeof showToast === 'function') showToast('Please enter a task title.', 'warning');
+        else alert('Please enter a task title.');
         return;
     }
 
     if (!columnId) {
-        showToast('Column not found — please refresh.', 'danger');
+        if (typeof showToast === 'function') showToast('Column identification failed.', 'danger');
         return;
     }
 
-    // Ensure custom fields are rendered and validated before collecting values
+    // Validate custom fields
     if (typeof validateCustomFields === 'function' && !validateCustomFields('customFieldsContainer')) {
         return;
     }
@@ -246,40 +240,100 @@ function submitCreateTask() {
         ? collectCustomFieldValues('customFieldsContainer')
         : {};
 
-    $.ajax({
-        url: "/Tasks/CreateTask",
-        method: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({
-            columnId: parseInt(columnId),
-            title: title,
-            description: description,
-            projectId: projectId ? parseInt(projectId) : null,
-            priority: priority,
-            dueDate: dueDate,
-            customFieldValues: customFieldValues
-        }),
-        success: function (response) {
-            if (response && response.success) {
-                // Properly close modal
-                const modalEl = document.getElementById("createTaskModal");
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
+    try {
+        const response = await fetch("/Tasks/CreateTask", {
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                columnId: parseInt(columnId),
+                title: title,
+                description: description,
+                priority: parseInt(priority),
+                dueDate: dueDate,
+                customFieldValues: customFieldValues
+            })
+        });
 
-                showToast("✅ Task created successfully!", "success");
-            } else {
-                showToast(response.message || 'Failed to create task.', 'danger');
+        if (response.ok) {
+            const modalEl = document.getElementById("createTaskModal");
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            if (typeof showToast === 'function') showToast("✅ Task created successfully!", "success");
+
+            // Reload board
+            if (window.loadTeamBoard && window.currentTeamName) {
+                window.loadTeamBoard(window.currentTeamName, true);
             }
-        },
-        error: function (xhr) {
-            const text = xhr.responseText || 'An error occurred while creating the task.';
-            showToast(text, 'danger');
+        } else {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create task');
         }
-    });
+    } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast(err.message, 'danger');
+    }
+}
+
+// Open edit task modal
+async function openEditTaskModal(taskId) {
+    const team = window.currentTeamName;
+    try {
+        const response = await fetch(`/Tasks/GetTask?id=${taskId}`);
+        if (!response.ok) throw new Error("Failed to load task details");
+        const task = await response.json();
+
+        // Populate Modal Fields
+        const idEl = document.getElementById('editTaskId');
+        const titleEl = document.getElementById('editTaskTitle');
+        const descEl = document.getElementById('editTaskDescription');
+        const priorityEl = document.getElementById('editTaskPriority');
+        const assignedEl = document.getElementById('editTaskAssignedTo');
+        const dueEl = document.getElementById('editTaskDueDate');
+
+        if (idEl) idEl.value = task.id;
+        if (titleEl) titleEl.value = task.title;
+        if (descEl) descEl.value = task.description || "";
+        if (priorityEl) priorityEl.value = task.priority;
+        if (assignedEl) assignedEl.value = task.assignedToUserId || "";
+        if (dueEl) dueEl.value = task.dueDate || "";
+
+        const board = document.getElementById('kanbanBoard');
+        const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
+
+        // 🔥 Dynamic Visibility
+        const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
+        const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
+        const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
+        const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
+
+        ["Priority", "DueDate", "Title", "Description"].forEach(field => {
+            const group = document.getElementById(`groupEditTask${field}`);
+            const visible = eval(`${field.charAt(0).toLowerCase() + field.slice(1)}Visible`);
+            if (group) group.style.display = visible ? 'block' : 'none';
+        });
+
+        // Render custom fields
+        if (typeof renderCustomFieldInputs === 'function') {
+            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
+        }
+
+        const modalEl = document.getElementById('editTaskModal');
+        if (modalEl) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+
+    } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast(err.message, 'danger');
+    }
 }
 
 function submitEditTask() {
-    const taskId = parseInt(document.getElementById('editTaskId').value);
+    const taskIdEl = document.getElementById('editTaskId');
+    if (!taskIdEl) return;
+    const taskId = parseInt(taskIdEl.value);
     const titleEl = document.getElementById('editTaskTitle');
     const title = titleEl ? titleEl.value.trim() || "Task" : "Task";
 

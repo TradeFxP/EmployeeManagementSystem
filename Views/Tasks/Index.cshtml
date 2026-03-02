@@ -1360,6 +1360,9 @@
                                 <option value="Task">Show Tasks</option>
                             </select>
                         </div>
+                        <button id="toggleDragDropMode" class="btn btn-sm btn-outline-info" onclick="toggleBoardPermissionMode()" title="Toggle Drag & Drop Permission View">
+                            <i class="bi bi-arrows-move me-1"></i>Drag & Drop
+                        </button>
                         <div id="columnSelectWrapper" class="d-flex align-items-center gap-2" style="display: none !important;">
                             <label class="small text-white-50 mb-0">Column:</label>
                             <select id="permissionColumnFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="renderPermissionTable()" style="width: auto; min-width: 140px;">
@@ -2357,216 +2360,6 @@
     });
 </script>
 
-<script>
-    async function openCreateTaskModal(columnId) {
-        document.getElementById("taskColumnId").value = columnId;
-        document.getElementById("taskTitle").value = "";
-        document.getElementById("taskDescription").value = "";
-        document.getElementById("taskPriority").value = "1"; // Default to Medium
-        document.getElementById("taskDueDate").value = "";
-
-        const board = document.getElementById('kanbanBoard');
-        const team = board?.dataset.teamName;
-        const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
-        
-        // 🔥 Dynamic Visibility for System Fields
-        const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
-        const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
-        const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
-        const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
-        
-        const priorityGroup = document.getElementById('groupCreateTaskPriority');
-        const dueDateGroup = document.getElementById('groupCreateTaskDueDate');
-        const titleGroup = document.getElementById('groupCreateTaskTitle');
-        const descriptionGroup = document.getElementById('groupCreateTaskDescription');
-        
-        if (priorityGroup) priorityGroup.style.display = priorityVisible ? 'block' : 'none';
-        if (dueDateGroup) dueDateGroup.style.display = dueDateVisible ? 'block' : 'none';
-        if (titleGroup) titleGroup.style.display = titleVisible ? 'block' : 'none';
-        if (descriptionGroup) descriptionGroup.style.display = descriptionVisible ? 'block' : 'none';
-
-        // Render custom fields if available and wait for them to load
-        if (typeof renderCustomFieldInputs === 'function') {
-            try {
-                await renderCustomFieldInputs('customFieldsContainer', {}, team);
-            } catch (e) {
-                console.error('Failed to render custom fields before showing modal', e);
-            }
-        }
-
-        const modal = new bootstrap.Modal(document.getElementById('createTaskModal'));
-        modal.show();
-    }
-
-
-    // ================= EDIT TASK MODAL =================
-
-    function openEditTaskModal(taskId) {
-        const team = window.currentTeamName;
-        // Fetch task details
-        fetch(`/Tasks/GetTask?id=${taskId}`)
-            .then(res => {
-                if (!res.ok) throw new Error("Failed to load task details");
-                return res.json();
-            })
-            .then(task => {
-                // Populate Modal
-                document.getElementById('editTaskId').value = task.id;
-                document.getElementById('editTaskTitle').value = task.title;
-                document.getElementById('editTaskDescription').value = task.description || "";
-                document.getElementById('editTaskPriority').value = task.priority;
-                document.getElementById('editTaskAssignedTo').value = task.assignedToUserId || "";
-                document.getElementById('editTaskDueDate').value = task.dueDate || "";
-
-                // Show Modal
-                const board = document.getElementById('kanbanBoard');
-                const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
-
-                const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
-                const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
-                const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
-                const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
-                
-                const priorityGroup = document.getElementById('groupEditTaskPriority');
-                const dueDateGroup = document.getElementById('groupEditTaskDueDate');
-                const titleGroup = document.getElementById('groupEditTaskTitle');
-                const descriptionGroup = document.getElementById('groupEditTaskDescription');
-                
-                if (priorityGroup) priorityGroup.style.display = priorityVisible ? 'block' : 'none';
-                if (dueDateGroup) dueDateGroup.style.display = dueDateVisible ? 'block' : 'none';
-                if (titleGroup) titleGroup.style.display = titleVisible ? 'block' : 'none';
-                if (descriptionGroup) descriptionGroup.style.display = descriptionVisible ? 'block' : 'none';
-
-
-                // Render custom fields if available
-                if (typeof renderCustomFieldInputs === 'function') {
-                    renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
-                }
-
-                if (typeof populateMoveToDropdown === 'function') {
-                    populateMoveToDropdown();
-                }
-
-        const editDueDateVal = document.getElementById('editTaskDueDate') ? document.getElementById('editTaskDueDate').value : null;
-
-        const data = {
-            taskId: taskId,
-            title: title,
-            description: description,
-            priority: priority,
-            dueDate: editDueDateVal || null,
-            assignedToUserId: assignedToUserId, // Send assigned user
-            customFieldValues: (typeof collectCustomFieldValues === 'function') ?
-                collectCustomFieldValues('editCustomFieldsContainer') : {}
-        };
-
-        fetch('/Tasks/UpdateTask', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        })
-            .then(res => {
-                if (!res.ok) throw new Error("Failed to update task");
-                return res.json();
-            })
-            .then(() => {
-                showToast("✅ Task updated successfully!", "success");
-                // Close modal
-                const modalEl = document.getElementById('editTaskModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-
-                // Reload board (quiet)
-                loadTeamBoard(currentTeamName, true);
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error loading task details");
-            });
-    }
-
-    // Consolidated task logic moved to tasks.js
-    // openCreateTaskModal and openEditTaskModal are kept here as they are view-specific for modal initialization.
-
-        fetch('/Project/GetProjects')
-            .then(res => res.json())
-            .then(projects => {
-                select.innerHTML = '<option value="">-- No Project --</option>';
-                projects.forEach(p => {
-                    select.innerHTML += `<option value="${p.id}">${p.name}</option>`;
-                });
-            })
-            .catch(() => {
-                select.innerHTML = '<option value="">-- No Project --</option>';
-            });
-    }
-
-    function submitCreateTask() {
-        const projectSelect = document.getElementById('taskProjectId');
-        const projectId = projectSelect?.value ? parseInt(projectSelect.value) : null;
-
-        const priorityEl = document.getElementById('taskPriority');
-        const priority = priorityEl ? parseInt(priorityEl.value) : 1;
-
-        const titleEl = document.getElementById('taskTitle');
-        const title = titleEl ? titleEl.value.trim() : "";
-        const titleVisible = titleEl && titleEl.closest('.mb-3') && titleEl.closest('.mb-3').style.display !== 'none';
-
-        if (titleVisible && !title) {
-            showToast("Title is required", "warning");
-            return;
-        }
-
-        const descEl = document.getElementById('taskDescription');
-        const description = descEl ? descEl.value.trim() : "";
-
-        const dueDateVal = document.getElementById('taskDueDate') ? document.getElementById('taskDueDate').value : null;
-
-        const data = {
-            columnId: parseInt(document.getElementById('taskColumnId').value),
-            title: title,
-            description: description,
-            projectId: projectId,
-            priority: priority,
-            dueDate: dueDateVal || null,
-            customFieldValues: (typeof collectCustomFieldValues === 'function') ? collectCustomFieldValues('customFieldsContainer') : {}
-        };
-
-        // Validate custom fields
-        if (typeof validateCustomFields === 'function' && !validateCustomFields('customFieldsContainer')) {
-            return;
-        }
-
-        fetch('/Tasks/CreateTask', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        })
-            .then(res => {
-                if (!res.ok) {
-                    return res.text().then(t => {
-                        throw new Error(t || 'Failed to create task');
-                    });
-                }
-
-                // ✅ SUCCESS (no JSON expected)
-                const modalEl = document.getElementById('createTaskModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-
-                // reload board
-                if (window.currentTeamName) {
-                    loadTeamBoard(window.currentTeamName, true);
-                }
-                showToast("✅ Task created successfully!", "success");
-            })
-            .catch(err => {
-                showToast(err.message || 'Failed to create task', "danger");
-            });
-    }
-</script>
 
 <script>
     function saveFocusedTask() {
@@ -3584,4 +3377,8 @@ async function clearColumnTasks(columnId) {
     </div>
 </div>
 
+<script src="~/js/tasks.js"></script>
+<script src="~/js/customFields.js"></script>
+<script src="~/js/taskHistory.js"></script>
 <script src="~/js/move-requests.js"></script>
+<script src="~/js/board-permissions.js"></script>

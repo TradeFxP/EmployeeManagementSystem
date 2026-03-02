@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace UserRoles.DTOs
 {
     public class BoardPermissionDto
@@ -23,6 +25,7 @@ namespace UserRoles.DTOs
         // 'Task' might mean 'Can Create Task' or 'Can Edit Task'.
         // 'History' might mean 'Can View History'.
         public bool CanViewHistory { get; set; }
+        public Dictionary<int, List<int>> AllowedTransitions { get; set; } = new();
 
         // Column Level
         public List<ColumnPermissionDto> ColumnPermissions { get; set; } = new List<ColumnPermissionDto>();

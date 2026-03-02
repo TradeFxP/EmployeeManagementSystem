@@ -358,14 +358,11 @@
             <i class="bi bi-pencil-square"></i>
         </button>
 
-        @if (!User.IsInRole("Admin"))
-        {
-            <button class="action-btn action-btn-primary action-btn-request-move" title="Request Task Move"
-                    style="display: @(!isCompletedCol ? "inline-flex" : "none")"
-                    onclick="openMoveRequestModal(@Model.Id, '@(Model.Title?.Replace("'", "\\'"))', @Model.ColumnId, '@(colName?.Replace("'", "\\'"))'); event.stopPropagation();">
-                <i class="bi bi-send-fill"></i>
-            </button>
-        }
+        <button class="action-btn action-btn-primary action-btn-request-move" title="Request Task Move"
+                style="display: @(!isCompletedCol ? "inline-flex" : "none")"
+                onclick="openMoveRequestModal(@Model.Id, '@(Model.Title?.Replace("'", "\\'"))', @Model.ColumnId, '@(colName?.Replace("'", "\\'"))'); event.stopPropagation();">
+            <i class="bi bi-send-fill"></i>
+        </button>
 
         @if (canAssign)
         {

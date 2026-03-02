@@ -51,6 +51,10 @@ builder.Services.Configure<EmailSettings>(
 builder.Services.AddHttpClient<IEmailService, EmailService>();
 builder.Services.AddScoped<ITaskHistoryService, TaskHistoryService>();
 
+// ================= FACEBOOK LEADS =================
+builder.Services.AddHttpClient<IFacebookLeadsService, FacebookLeadsService>();
+builder.Services.AddHostedService<FacebookLeadIngestionService>();
+
 // ================= COOKIE =================
 builder.Services.ConfigureApplicationCookie(options =>
 {

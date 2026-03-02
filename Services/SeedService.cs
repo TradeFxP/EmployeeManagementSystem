@@ -67,39 +67,37 @@ namespace UserRoles.Services
 
 
                 // -----------------------------
-                // Seed Team Columns
+                // Seed Team & Columns
                 // -----------------------------
-                logger.LogInformation("Seeding team columns.");
+                logger.LogInformation("Seeding teams and columns.");
 
-                if (!await context.TeamColumns.AnyAsync())
+                var teamsToSeed = new[]
                 {
-                    context.TeamColumns.AddRange(
+                    new { Name = "Development", Columns = new[] { "ToDo", "Doing", "Review", "Complete" } },
+                    new { Name = "Testing", Columns = new[] { "To Test", "Testing", "Bug Found", "Verified" } },
+                    new { Name = "Sales", Columns = new[] { "Leads", "Follow Up", "Negotiation", "Closed" } },
+                    new { Name = "Digi Leads", Columns = new[] { "To Do", "Doing", "Review", "Completed" } }
+                };
 
-                        // Development Team
-                        new TeamColumn { TeamName = "Development", ColumnName = "ToDo", Order = 1 },
-                        new TeamColumn { TeamName = "Development", ColumnName = "Doing", Order = 2 },
-                        new TeamColumn { TeamName = "Development", ColumnName = "Review", Order = 3 },
-                        new TeamColumn { TeamName = "Development", ColumnName = "Complete", Order = 4 },
-
-                        // Testing Team
-                        new TeamColumn { TeamName = "Testing", ColumnName = "To Test", Order = 1 },
-                        new TeamColumn { TeamName = "Testing", ColumnName = "Testing", Order = 2 },
-                        new TeamColumn { TeamName = "Testing", ColumnName = "Bug Found", Order = 3 },
-                        new TeamColumn { TeamName = "Testing", ColumnName = "Verified", Order = 4 },
-
-                        // Sales Team
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Leads", Order = 1 },
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Follow Up", Order = 2 },
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Negotiation", Order = 3 },
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Closed", Order = 4 }
-                    );
-
-                    await context.SaveChangesAsync();
-                    logger.LogInformation("Team columns seeded successfully.");
-                }
-                else
+                foreach (var teamData in teamsToSeed)
                 {
-                    logger.LogInformation("Team columns already exist. Skipping seeding.");
+                    if (!await context.Teams.AnyAsync(t => t.Name == teamData.Name))
+                    {
+                        context.Teams.Add(new Team { Name = teamData.Name });
+                        await context.SaveChangesAsync();
+
+                        for (int i = 0; i < teamData.Columns.Length; i++)
+                        {
+                            context.TeamColumns.Add(new TeamColumn
+                            {
+                                TeamName = teamData.Name,
+                                ColumnName = teamData.Columns[i],
+                                Order = i + 1
+                            });
+                        }
+                        await context.SaveChangesAsync();
+                        logger.LogInformation("Seeded team and columns for: {TeamName}", teamData.Name);
+                    }
                 }
 
 

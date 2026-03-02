@@ -415,8 +415,6 @@ public class TasksController : Controller
         // 2. Description
         if (task.Description != model.Description?.Trim())
         {
-            // Just logging that it changed, or the full value if needed. 
-            // _historyService.LogTaskUpdated(task.Id, user.Id, "Description", task.Description, model.Description?.Trim());
             await _historyService.LogTaskUpdated(task.Id, user.Id, "Description", "Old Description", "New Description");
             task.Description = model.Description?.Trim() ?? string.Empty;
         }
@@ -1963,11 +1961,9 @@ public class TasksController : Controller
                 CanDeleteTask = p?.CanDeleteTask ?? false,
                 CanReviewTask = p?.CanReviewTask ?? false,
                 CanImportExcel = p?.CanImportExcel ?? false,
-                CanAssignTask = p?.CanAssignTask ?? false,
                 AllowedTransitions = !string.IsNullOrEmpty(p?.AllowedTransitionsJson) 
                     ? JsonSerializer.Deserialize<Dictionary<int, List<int>>>(p.AllowedTransitionsJson) ?? new()
-                    : new()
-                CanAssignTask = p?.CanAssignTask ?? false,
+                    : new(),
                 CanViewHistory = p?.CanViewHistory ?? false,
 
                 // Populate Granular Column Permissions

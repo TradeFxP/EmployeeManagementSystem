@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -146,7 +146,7 @@ namespace UserRoles.Controllers
         }
 
         // ================= ORG CHART TREE BUILDER =================
-        // Builds unlimited depth hierarchy (Manager → Sub-Manager → Sub-Manager → User)
+        // Builds unlimited depth hierarchy (Manager ? Sub-Manager ? Sub-Manager ? User)
         private OrgTreeNodeViewModel BuildOrgTree(
             Users root,
             List<Users> allManagers,
@@ -157,7 +157,7 @@ namespace UserRoles.Controllers
                 User = root
             };
 
-            // 1️⃣ Find child MANAGERS (Sub-Managers)
+            // 1?? Find child MANAGERS (Sub-Managers)
             var childManagers = allManagers
                 .Where(m => m.ParentUserId == root.Id)
                 .ToList();
@@ -168,7 +168,7 @@ namespace UserRoles.Controllers
                 node.Children.Add(BuildOrgTree(manager, allManagers, allUsers));
             }
 
-            // 2️⃣ Find USERS under this manager / sub-manager
+            // 2?? Find USERS under this manager / sub-manager
             var childUsers = allUsers
                 .Where(u => u.ParentUserId == root.Id)
                 .ToList();
@@ -282,14 +282,14 @@ namespace UserRoles.Controllers
                 .Where(u => u.ParentUserId == managerId)
                 .ToListAsync();
 
-            // 🚨 BLOCK DELETE IF USERS EXIST AND NO TARGET
+            // ?? BLOCK DELETE IF USERS EXIST AND NO TARGET
             if (users.Any() && string.IsNullOrEmpty(targetManagerId))
             {
                 TempData["Error"] = "You must reassign users before deleting the manager.";
                 return RedirectToAction(nameof(ConfirmDeleteManager), new { managerId });
             }
 
-            // 🔁 SHIFT ALL USERS
+            // ?? SHIFT ALL USERS
             if (shiftAll)
             {
                 foreach (var user in users)
@@ -299,7 +299,7 @@ namespace UserRoles.Controllers
                     await _userManager.UpdateAsync(user);
                 }
             }
-            // 🔄 SHIFT SELECTED USERS
+            // ?? SHIFT SELECTED USERS
             else
             {
                 if (selectedUserIds == null || !selectedUserIds.Any())
@@ -316,7 +316,7 @@ namespace UserRoles.Controllers
                 }
             }
 
-            // 🔐 FINAL SAFETY CHECK
+            // ?? FINAL SAFETY CHECK
             bool stillAssigned = await _userManager.Users
                 .AnyAsync(u => u.ParentUserId == managerId || u.ManagerId == managerId);
 
@@ -326,7 +326,7 @@ namespace UserRoles.Controllers
                 return RedirectToAction(nameof(ConfirmDeleteManager), new { managerId });
             }
 
-            // ✅ CLEANUP TASK HISTORY (Set ChangedByUser to NULL)
+            // ? CLEANUP TASK HISTORY (Set ChangedByUser to NULL)
             var historyRecords = await _context.TaskHistories.Where(h => h.ChangedByUserId == managerId).ToListAsync();
             foreach (var record in historyRecords)
             {
@@ -337,7 +337,7 @@ namespace UserRoles.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // ✅ NOW SAFE TO HARD DELETE
+            // ? NOW SAFE TO HARD DELETE
             await PurgeUserReferences(manager.Id);
             var result = await _userManager.DeleteAsync(manager);
             if (!result.Succeeded)
@@ -385,7 +385,7 @@ namespace UserRoles.Controllers
             }
 
             // ---------------- MANAGER DATA ----------------
-            var allManagers = await GetAllManagersAsync(); // ✅ DEFINE IT FIRST
+            var allManagers = await GetAllManagersAsync(); // ? DEFINE IT FIRST
 
             // ================= ASSIGNABLE MANAGERS =================
             ViewBag.AssignableManagers = new List<Users>(); // always safe
@@ -412,7 +412,7 @@ namespace UserRoles.Controllers
             // ---------------- USERS QUERY ----------------
             IQueryable<Users> usersQuery = _userManager.Users
                 .AsNoTracking()
-                .Where(u => u.Id != currentUserId); // ✅ ONLY HERE
+                .Where(u => u.Id != currentUserId); // ? ONLY HERE
 
             // ================= MANAGER VISIBILITY =================
             if (isManager)
@@ -450,7 +450,7 @@ namespace UserRoles.Controllers
 
             foreach (var user in users)
             {
-                // 🚫 ABSOLUTE SAFETY: NEVER SHOW LOGGED-IN USER
+                // ?? ABSOLUTE SAFETY: NEVER SHOW LOGGED-IN USER
                 var roles = await _userManager.GetRolesAsync(user);
                 string role = roles.FirstOrDefault() ?? "User";
 
@@ -495,7 +495,7 @@ namespace UserRoles.Controllers
 
             IQueryable<Users> query = _userManager.Users
                 .AsNoTracking()
-                .Where(u => u.Id != currentUserId); // 🚫 never show self
+                .Where(u => u.Id != currentUserId); // ?? never show self
 
             // ---------------- MANAGER VISIBILITY ----------------
             if (isManager)
@@ -557,7 +557,7 @@ namespace UserRoles.Controllers
         //            string name,
         //            string email,
         //            string role,
-        //            string managerId) // 🔹      THIS
+        //            string managerId) // ??      THIS
         //        {
         //            /* ================= NAME VALIDATION ================= */
         //            if (string.IsNullOrWhiteSpace(name))
@@ -701,7 +701,7 @@ namespace UserRoles.Controllers
             string role,
             string managerId,
             string addType,
-            List<string> teams   // ✅ RECEIVES CHECKBOX VALUES
+            List<string> teams   // ? RECEIVES CHECKBOX VALUES
         )
         {
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(email))
@@ -773,7 +773,7 @@ namespace UserRoles.Controllers
                     return BadRequest(string.Join(", ", upd.Errors.Select(e => e.Description)));
 
                 /* ================================
-                   ✅ UPDATE USER TEAMS (EXISTING USER)
+                   ? UPDATE USER TEAMS (EXISTING USER)
                    ================================ */
                 var oldTeams = _context.UserTeams.Where(t => t.UserId == existing.Id);
                 _context.UserTeams.RemoveRange(oldTeams);
@@ -785,7 +785,7 @@ namespace UserRoles.Controllers
                         _context.UserTeams.Add(new UserTeam
                         {
                             UserId = existing.Id,
-                            TeamName = team   // ✅ USE LOOP VARIABLE
+                            TeamName = team   // ? USE LOOP VARIABLE
                         });
                     }
 
@@ -844,7 +844,7 @@ namespace UserRoles.Controllers
                 }
             }
 
-            // ✅ Assign next sequential numeric ID as the primary ID (Admin=100, others start at 101+)
+            // ? Assign next sequential numeric ID as the primary ID (Admin=100, others start at 101+)
             var allIds = await _context.Users
                 .IgnoreQueryFilters()
                 .Select(u => u.Id)
@@ -871,7 +871,7 @@ namespace UserRoles.Controllers
 
 
             /* ================================
-   ✅ SAVE USER TEAMS (NEW USER)
+   ? SAVE USER TEAMS (NEW USER)
    ================================ */
             if (teams != null && teams.Any())
             {
@@ -942,7 +942,7 @@ namespace UserRoles.Controllers
         // ================= EDIT USER / MANAGER =================
         [Authorize(Roles = "Admin,Manager")]
         [HttpPost]
-        [IgnoreAntiforgeryToken] // ✅ REQUIRED FOR AJAX
+        [IgnoreAntiforgeryToken] // ? REQUIRED FOR AJAX
         public async Task<IActionResult> EditInline(string id, string name, string email)
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -1066,11 +1066,11 @@ namespace UserRoles.Controllers
             if (newRole != "Manager" && newRole != "SubManager" && newRole != "User")
                 return BadRequest(new { success = false, message = "Invalid role specified." });
 
-            // ── 1. Remove all existing roles ──────────────────────────────
+            // -- 1. Remove all existing roles ------------------------------
             if (currentRoles.Any())
                 await _userManager.RemoveFromRolesAsync(user, currentRoles);
 
-            // ── 2. Assign new Identity role ───────────────────────────────
+            // -- 2. Assign new Identity role -------------------------------
             // SubManager uses Identity role "Manager" (same permissions level)
             string identityRole = (newRole == "SubManager") ? "Manager" : newRole;
 
@@ -1079,7 +1079,7 @@ namespace UserRoles.Controllers
 
             await _userManager.AddToRoleAsync(user, identityRole);
 
-            // ── 3. Update hierarchy fields ────────────────────────────────
+            // -- 3. Update hierarchy fields --------------------------------
             if (newRole == "Manager")
             {
                 // Promote to top-level Manager (directly under Admin)
@@ -1123,7 +1123,7 @@ namespace UserRoles.Controllers
                 return BadRequest(new { success = false, message = errors });
             }
 
-            // ── 4. Refresh security stamp so session tokens are invalidated ──
+            // -- 4. Refresh security stamp so session tokens are invalidated --
             await _userManager.UpdateSecurityStampAsync(user);
 
             string displayRole = newRole == "SubManager" ? "Sub-Manager" : newRole;
@@ -1153,7 +1153,7 @@ namespace UserRoles.Controllers
         //    if (user == null)
         //        return BadRequest("User not found");
 
-        //    // 🔥 ADMIN DROP (manager → admin)
+        //    // ?? ADMIN DROP (manager ? admin)
         //    if (managerId == "ADMIN")
         //    {
         //        user.ParentUserId = null;
@@ -1162,7 +1162,7 @@ namespace UserRoles.Controllers
         //        return Ok(new { success = true });
         //    }
 
-        //    // 🔽 Manager drop
+        //    // ?? Manager drop
         //    var manager = await _context.Users.FindAsync(managerId);
         //    if (manager == null)
         //        return BadRequest("Target manager not found");
@@ -1217,7 +1217,7 @@ namespace UserRoles.Controllers
             // ================= ADMIN DROP =================
             if (model.NewParentId == "ADMIN")
             {
-                user.ParentUserId = null;   // 🔥 Admin owns the user
+                user.ParentUserId = null;   // ?? Admin owns the user
                 user.ManagerId = null;      // optional (safe reset)
 
                 await _context.SaveChangesAsync();
@@ -1259,14 +1259,14 @@ namespace UserRoles.Controllers
 
             var roles = await _userManager.GetRolesAsync(user);
 
-            // 🚨 BLOCK MANAGER DIRECT DELETE
+            // ?? BLOCK MANAGER DIRECT DELETE
             if (roles.Contains("Manager"))
             {
                 TempData["Error"] = "Managers cannot be deleted directly. Please reassign users first.";
                 return RedirectToAction(nameof(Managers));
             }
 
-            // ✅ SAFE HARD DELETE FOR NORMAL USERS
+            // ? SAFE HARD DELETE FOR NORMAL USERS
             await PurgeUserReferences(user.Id);
             var result = await _userManager.DeleteAsync(user);
             if (!result.Succeeded)
@@ -1365,7 +1365,7 @@ namespace UserRoles.Controllers
                     if (!result.Contains(childId))
                     {
                         result.Add(childId);
-                        Traverse(childId); // 🔁 recursive
+                        Traverse(childId); // ?? recursive
                     }
                 }
             }
@@ -1380,7 +1380,7 @@ namespace UserRoles.Controllers
 
         // ======================= HIERARCHY HELPERS =======================
 
-        // 1️⃣ Get ALL managers (Admin only)
+        // 1?? Get ALL managers (Admin only)
         private async Task<List<Users>> GetAllManagersAsync()
         {
             var users = await _userManager.Users
@@ -1430,7 +1430,7 @@ namespace UserRoles.Controllers
                     .ToListAsync();
             }
 
-            // Sort by role hierarchy: Admin → Manager → Sub Manager → User
+            // Sort by role hierarchy: Admin ? Manager ? Sub Manager ? User
             var roleOrder = new Dictionary<string, int>
             {
                 { "Admin", 0 },

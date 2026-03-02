@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using UserRoles.Models;
 using UserRoles.Services;
@@ -88,7 +88,7 @@ namespace UserRoles.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> LoginByCode(string email, string code)
         {
-            // 1️⃣ Find user by pending email
+            // 1?? Find user by pending email
             var user = userManager.Users
                 .FirstOrDefault(u => u.PendingEmail == email.Trim());
 
@@ -100,21 +100,21 @@ namespace UserRoles.Controllers
                 return View();
             }
 
-            // 2️⃣ Commit email change (NOW it becomes permanent)
+            // 2?? Commit email change (NOW it becomes permanent)
             user.Email = user.PendingEmail;
             user.UserName = user.PendingEmail;
 
-            // 3️⃣ Clear pending data
+            // 3?? Clear pending data
             user.PendingEmail = null;
             user.EmailChangeLoginCode = null;
             user.EmailChangeCodeExpiry = null;
 
-            // 4️⃣ Invalidate all old sessions (SECURITY)
+            // 4?? Invalidate all old sessions (SECURITY)
             user.SecurityStamp = Guid.NewGuid().ToString();
 
             await userManager.UpdateAsync(user);
 
-            // 5️⃣ Sign in with NEW email
+            // 5?? Sign in with NEW email
             await signInManager.SignInAsync(user, isPersistent: false);
 
             return RedirectToAction("OrgChart", "Users");

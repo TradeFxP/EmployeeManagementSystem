@@ -100,30 +100,6 @@ namespace UserRoles.Data
 
             // Review workflow FK configs
             builder.Entity<TaskItem>()
-                .HasOne(t => t.ReviewedByUser)
-                .WithMany()
-                .HasForeignKey(t => t.ReviewedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<TaskItem>()
-                .HasOne(t => t.CompletedByUser)
-                .WithMany()
-                .HasForeignKey(t => t.CompletedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<AssignedTask>()
-                .HasOne(t => t.AssignedBy)
-                .WithMany()
-                .HasForeignKey(t => t.AssignedById)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<AssignedTask>()
-                .HasOne(t => t.AssignedTo)
-                .WithMany()
-                .HasForeignKey(t => t.AssignedToId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            builder.Entity<TaskItem>()
                 .HasOne(t => t.AssignedToUser)
                 .WithMany()
                 .HasForeignKey(t => t.AssignedToUserId)
@@ -140,6 +116,32 @@ namespace UserRoles.Data
                 .WithMany()
                 .HasForeignKey(t => t.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.ReviewedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<TaskItem>()
+                .HasOne(t => t.CompletedByUser)
+                .WithMany()
+                .HasForeignKey(t => t.CompletedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+
+            builder.Entity<AssignedTask>()
+                .HasOne(t => t.AssignedBy)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<AssignedTask>()
+                .HasOne(t => t.AssignedTo)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedToId)
+                .OnDelete(DeleteBehavior.Cascade);
+
 
             builder.Entity<TaskItem>()
                 .HasOne(t => t.PreviousColumn)
