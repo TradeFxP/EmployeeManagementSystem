@@ -59,13 +59,14 @@ async function loadBoardPermissions(teamName) {
 function onPermissionViewTypeChange() {
     const type = document.getElementById('permissionViewType').value;
     const colWrapper = document.getElementById('columnSelectWrapper');
+
     if (type === 'Column' || type === 'Task') {
         colWrapper.style.setProperty('display', 'flex', 'important');
     } else {
-        // Always show Managers, regardless of the selected filter role
-        const filtered = rawBoardPermissions.filter(p => p.role === filterValue || p.role === 'Manager');
-        renderBoardPermissionTable(filtered);
+        colWrapper.style.setProperty('display', 'none', 'important');
     }
+
+    renderPermissionTable();
 }
 
 function renderBoardPermissionTable(data) {
@@ -470,20 +471,23 @@ async function grantAllBoardPermissions(btn, userId, teamName) {
         dto.canReviewTask = targetState;
         dto.canImportExcel = targetState;
         dto.canAssignTask = targetState;
-    } else if (viewType === 'Task' || viewType === 'Column') {
+    } else if (viewType === 'Column') {
         const colId = parseInt(document.getElementById('permissionColumnFilter').value);
         const cp = dto.columnPermissions.find(x => x.columnId === colId);
         if (cp) {
-            if (viewType === 'Column') {
-                cp.canRename = targetState;
-                cp.canDelete = targetState;
-                cp.canAddTask = targetState;
-            } else {
-                cp.canAssignTask = targetState;
-                cp.canEditTask = targetState;
-                cp.canDeleteTask = targetState;
-                cp.canViewHistory = targetState;
-            }
+            cp.canRename = targetState;
+            cp.canDelete = targetState;
+            cp.canAddTask = targetState;
+            cp.canClearTasks = targetState;
+        }
+    } else if (viewType === 'Task') {
+        const colId = parseInt(document.getElementById('permissionColumnFilter').value);
+        const cp = dto.columnPermissions.find(x => x.columnId === colId);
+        if (cp) {
+            cp.canAssignTask = targetState;
+            cp.canEditTask = targetState;
+            cp.canDeleteTask = targetState;
+            cp.canViewHistory = targetState;
         }
     }
 

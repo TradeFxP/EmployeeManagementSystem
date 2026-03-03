@@ -108,8 +108,11 @@ function renderMoveRequests(requests) {
         const rowClass = r.isNew && r.status === 'Pending' ? 'table-primary fw-bold border-start border-4 border-primary' : '';
         const timeStr = r.requestedAtFormatted || new Date(r.requestedAt).toLocaleString();
 
+        // Admin enhancement: clickable row to preview task
+        const adminAttr = window.isAdmin ? `onclick="focusTask(${r.taskId})" style="cursor: pointer;"` : '';
+
         return `
-            <tr class="${rowClass}">
+            <tr class="${rowClass}" ${adminAttr}>
                 <td class="ps-3">
                     <div class="fw-bold text-dark">${escapeHtml(r.taskTitle)}</div>
                     <div class="text-muted" style="font-size: 0.75rem;">By <span class="text-primary fw-bold">${escapeHtml(r.requestedByUserName)}</span></div>
@@ -130,7 +133,7 @@ function renderMoveRequests(requests) {
                         </div>
                     ` : ''}
                 </td>
-                <td class="text-end pe-3">
+                <td class="text-end pe-3" onclick="event.stopPropagation()">
                     ${r.status === 'Pending' ? `
                         <div class="btn-group shadow-sm">
                             <button class="btn btn-sm btn-success" onclick="handleMoveRequest('${r.id}', true)" title="Approve">

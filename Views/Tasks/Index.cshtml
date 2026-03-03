@@ -604,57 +604,35 @@
                             </div>
                             <select id="editTaskAssignedTo" class="form-select">
                                 <option value="">-- Unassigned --</option>
-                                @if (Model != null && Model.AssignableUsers != null)
+                                @if (Model != null)
                                 {
-                                    var isViewerSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
-                                    var isViewerManager = User.IsInRole("Manager");
-                                    var isViewerAdmin = User.IsInRole("Admin");
-
-                                    var filteredManagement = Model.AssignableUsers.Where(u =>
+                                    @if (Model.ManagementUsers != null && Model.ManagementUsers.Any())
                                     {
-                                        if (!Model.UserRolesMap.ContainsKey(u.Id)) return false;
-                                        var r = Model.UserRolesMap[u.Id];
-                                        var isTargetAdmin = r == "Admin";
-                                        var isTargetManager = r == "Manager";
-                                        var isTargetSubManager = r == "Sub-Manager" || r == "SubManager";
-
-                                        if (!isTargetAdmin && !isTargetManager && !isTargetSubManager) return false;
-
-                                        if (isViewerSubManager) return isTargetSubManager;
-                                        if (isViewerManager) return isTargetManager || isTargetSubManager;
-                                        return true;
-                                    }).ToList();
-
-                                    var filteredRegular = Model.AssignableUsers.Where(u =>
-                                    {
-                                        if (Model.UserRolesMap.ContainsKey(u.Id))
-                                        {
-                                            var r = Model.UserRolesMap[u.Id];
-                                            if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
-                                        }
-                                        return true;
-                                    }).ToList();
-
-                                    @if (filteredManagement.Any())
-                                    {
-                                                <optgroup label="Management">
-                                            @foreach (var u in filteredManagement)
+                                        <optgroup label="MANAGEMENT">
+                                            @foreach (var u in Model.ManagementUsers)
                                             {
-                                                var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                                            <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                                <option value="@u.Id">[@u.RoleName] @u.Name</option>
                                             }
-                                                </optgroup>
+                                        </optgroup>
                                     }
 
-                                    @if (filteredRegular.Any())
+                                    @if (Model.TeamGroups != null)
                                     {
-                                                <optgroup label="Team Members">
-                                            @foreach (var u in filteredRegular)
-                                            {
-                                                var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                                            <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
-                                            }
-                                                </optgroup>
+                                        @foreach (var group in Model.TeamGroups)
+                                        {
+                                            <optgroup label="@group.TeamName.ToUpper()">
+                                                @foreach (var u in group.Users)
+                                                {
+                                                    <option value="@u.Id">
+                                                        @for (int i = 0; i < u.Level; i++)
+                                                        {
+                                                            @Html.Raw("&nbsp;&nbsp;")
+                                                        }
+                                                        [@u.RoleName] @u.Name
+                                                    </option>
+                                                }
+                                            </optgroup>
+                                        }
                                     }
                                 }
                             </select>
@@ -710,57 +688,35 @@
                     <label class="form-label">Assign to</label>
                     <select id="assignUserSelect" class="form-select">
                         <option value="">-- Select User --</option>
-                        @if (Model != null && Model.AssignableUsers != null && Model.AssignableUsers.Any())
+                        @if (Model != null)
                         {
-                            var isViewerSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
-                            var isViewerManager = User.IsInRole("Manager");
-                            var isViewerAdmin = User.IsInRole("Admin");
-
-                            var filteredManagement = Model.AssignableUsers.Where(u =>
+                            @if (Model.ManagementUsers != null && Model.ManagementUsers.Any())
                             {
-                                if (!Model.UserRolesMap.ContainsKey(u.Id)) return false;
-                                var r = Model.UserRolesMap[u.Id];
-                                var isTargetAdmin = r == "Admin";
-                                var isTargetManager = r == "Manager";
-                                var isTargetSubManager = r == "Sub-Manager" || r == "SubManager";
-
-                                if (!isTargetAdmin && !isTargetManager && !isTargetSubManager) return false;
-
-                                if (isViewerSubManager) return isTargetSubManager;
-                                if (isViewerManager) return isTargetManager || isTargetSubManager;
-                                return true;
-                            }).ToList();
-
-                            var filteredRegular = Model.AssignableUsers.Where(u =>
-                            {
-                                if (Model.UserRolesMap.ContainsKey(u.Id))
-                                {
-                                    var r = Model.UserRolesMap[u.Id];
-                                    if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
-                                }
-                                return true;
-                            }).ToList();
-
-                            @if (filteredManagement.Any())
-                            {
-                                        <optgroup label="Management">
-                                    @foreach (var u in filteredManagement)
+                                <optgroup label="MANAGEMENT">
+                                    @foreach (var u in Model.ManagementUsers)
                                     {
-                                        var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                                    <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                        <option value="@u.Id">[@u.RoleName] @u.Name</option>
                                     }
-                                        </optgroup>
+                                </optgroup>
                             }
 
-                            @if (filteredRegular.Any())
+                            @if (Model.TeamGroups != null)
                             {
-                                        <optgroup label="Team Members">
-                                    @foreach (var u in filteredRegular)
-                                    {
-                                        var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                                    <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
-                                    }
-                                        </optgroup>
+                                @foreach (var group in Model.TeamGroups)
+                                {
+                                    <optgroup label="@group.TeamName.ToUpper()">
+                                        @foreach (var u in group.Users)
+                                        {
+                                            <option value="@u.Id">
+                                                @for (int i = 0; i < u.Level; i++)
+                                                {
+                                                    @Html.Raw("&nbsp;&nbsp;")
+                                                }
+                                                [@u.RoleName] @u.Name
+                                            </option>
+                                        }
+                                    </optgroup>
+                                }
                             }
                         }
                         else
@@ -1345,7 +1301,7 @@
                     <div class="d-flex align-items-center gap-3 me-3">
                         <div class="d-flex align-items-center gap-2">
                             <label class="small text-white-50 mb-0">Role:</label>
-                            <select id="boardRoleFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="filterBoardPermissions()" style="width: auto; min-width: 120px;">
+                            <select id="boardRoleFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="filterBoardPermissions()" style="width: auto; min-width: 120px; padding-right: 2rem !important; background-position: right 0.75rem center !important;">
                                 <option value="All">All Members</option>
                                 <option value="Manager">Manager</option>
                                 <option value="Sub Manager">Sub Manager</option>
@@ -1354,7 +1310,7 @@
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <label class="small text-white-50 mb-0">Manage:</label>
-                            <select id="permissionViewType" class="form-select form-select-sm bg-secondary text-white border-0" onchange="onPermissionViewTypeChange()" style="width: auto; min-width: 140px;">
+                            <select id="permissionViewType" class="form-select form-select-sm bg-secondary text-white border-0" onchange="onPermissionViewTypeChange()" style="width: auto; min-width: 140px; padding-right: 2rem !important; background-position: right 0.75rem center !important;">
                                 <option value="Board">Board Level</option>
                                 <option value="Column">Show Columns</option>
                                 <option value="Task">Show Tasks</option>
@@ -1365,7 +1321,7 @@
                         </button>
                         <div id="columnSelectWrapper" class="d-flex align-items-center gap-2" style="display: none !important;">
                             <label class="small text-white-50 mb-0">Column:</label>
-                            <select id="permissionColumnFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="renderPermissionTable()" style="width: auto; min-width: 140px;">
+                            <select id="permissionColumnFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="renderPermissionTable()" style="width: auto; min-width: 140px; padding-right: 2rem !important; background-position: right 0.75rem center !important;">
                                 <!-- Populated dynamically -->
                             </select>
                         </div>
@@ -1847,6 +1803,13 @@
         updateColumnCounts();
         if (typeof filterBoardTasks === 'function') filterBoardTasks();
         if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
+
+        // ✅ NEW: Update View Data table status badge
+        const statusBadge = document.querySelector(`.status-badge[data-status-task-id="${data.taskId}"]`);
+        if (statusBadge) {
+            statusBadge.textContent = data.columnName;
+        }
+
         showToast(`Task #${data.taskId} moved to ${data.columnName}`, 'info');
     }
 
@@ -1942,6 +1905,30 @@
                 // Re-apply filters to correctly show/hide the updated card
                 if (typeof filterBoardTasks === 'function') filterBoardTasks();
                 if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
+
+                // ✅ NEW: Update View Data table assignee cell
+                const row = document.querySelector(`.task-data-row[data-task-id="${data.taskId}"]`);
+                if (row) {
+                    const assigneeCell = row.querySelector('.assignee-name')?.closest('td');
+                    if (assigneeCell) {
+                        const name = data.assignedTo || "Unassigned";
+                        const initials = name !== "Unassigned" ? name[0].toUpperCase() : "?";
+                        assigneeCell.innerHTML = `
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-table-xs me-2 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
+                                    ${initials}
+                                </div>
+                                <div class="d-flex flex-column">
+                                    <span class="assignee-name fw-bold">${name}</span>
+                                    <span class="text-muted" style="font-size: 0.65rem;">
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-1 me-1">${data.team || "N/A"}</span>
+                                        <span class="text-info">${data.role || "User"}</span>
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
 
                 showToast(`Task #${data.taskId} assigned to ${data.assignedTo}`, 'success');
             })
@@ -2067,7 +2054,26 @@
         body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
         if (headerActions) headerActions.innerHTML = '';
 
-        const modal = new bootstrap.Modal(document.getElementById('taskOverviewModal'));
+        const modalEl = document.getElementById('taskOverviewModal');
+        const modal = new bootstrap.Modal(modalEl);
+        
+        // Handle nested modal layering for Move Requests
+        modalEl.addEventListener('show.bs.modal', function() {
+            const moveReqModal = document.getElementById('moveRequestsModal');
+            if (moveReqModal && moveReqModal.classList.contains('show')) {
+                // Set higher z-index if move requests are open
+                modalEl.style.zIndex = '1065';
+                setTimeout(() => {
+                    const backdrop = document.querySelector('.modal-backdrop:last-child');
+                    if (backdrop) backdrop.style.zIndex = '1064';
+                }, 0);
+            }
+        }, { once: true });
+
+        modalEl.addEventListener('hidden.bs.modal', function() {
+            modalEl.style.zIndex = '';
+        }, { once: true });
+
         modal.show();
 
         fetch(`/Tasks/GetTaskDetail?id=${taskId}`)
