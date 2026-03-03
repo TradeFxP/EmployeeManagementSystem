@@ -1,8 +1,9 @@
 // column_filter.js
-// Handles per-column search and sort (Newest/Oldest)
+// Handles per-column search and sort (Time with Asc/Desc)
 
-// State to track sort order per column (default: desc/newest)
+// State: { columnId: { type: 'time', dir: 'asc'|'desc' } }
 const columnSortState = {};
+let clickTimer = null;
 
 function toggleColumnFilter(columnId) {
     const toolbar = document.getElementById(`column-toolbar-${columnId}`);
@@ -10,28 +11,56 @@ function toggleColumnFilter(columnId) {
 
     if (toolbar.style.display === 'none') {
         toolbar.style.display = 'block';
-        // Focus search input
         setTimeout(() => document.getElementById(`search-input-${columnId}`)?.focus(), 100);
     } else {
         toolbar.style.display = 'none';
     }
 }
 
-function setColumnSort(columnId, direction) {
-    columnSortState[columnId] = direction;
+/**
+ * Single Click: Newest First (Desc) - ▲
+ */
+function handleColumnSortClick(columnId, sortType) {
+    if (columnId === 'history') return; // History has its own sorting if needed, but we follow task pattern
 
-    // Update UI buttons
-    const btnDesc = document.getElementById(`sort-desc-${columnId}`);
-    const btnAsc = document.getElementById(`sort-asc-${columnId}`);
+    // Clear any existing double click timer
+    if (columnId in clickTimers) {
+        clearTimeout(clickTimers[columnId]);
+    }
 
-    if (btnDesc && btnAsc) {
-        if (direction === 'desc') {
-            btnDesc.classList.add('active', 'bg-secondary', 'text-white');
-            btnAsc.classList.remove('active', 'bg-secondary', 'text-white');
-        } else {
-            btnDesc.classList.remove('active', 'bg-secondary', 'text-white');
-            btnAsc.classList.add('active', 'bg-secondary', 'text-white');
+    // Set a timer for single click
+    clickTimers[columnId] = setTimeout(() => {
+        delete clickTimers[columnId];
+        // SINGLE CLICK -> Newest First (desc) -> ▲
+        setColumnSortState(columnId, 'time', 'desc');
+    }, 250);
+}
+
+function handleColumnSortDblClick(columnId, sortType) {
+    if (columnId === 'history') return;
+
+    // Clear the single click timer
+    if (columnId in clickTimers) {
+        clearTimeout(clickTimers[columnId]);
+        delete clickTimers[columnId];
+    }
+
+    // DOUBLE CLICK -> Oldest First (asc) -> ▼
+    setColumnSortState(columnId, 'time', 'asc');
+}
+
+function setColumnSortState(columnId, type, dir) {
+    columnSortState[columnId] = { type, dir };
+
+    // Update UI - Only Clock Icon
+    const timeBtn = document.getElementById(`sort-time-${columnId}`);
+    if (timeBtn) {
+        const indicator = timeBtn.querySelector('.sort-indicator');
+        if (indicator) {
+            indicator.textContent = dir === 'desc' ? '▲' : '▼';
         }
+        timeBtn.classList.add('active', 'btn-primary');
+        timeBtn.classList.remove('btn-outline-secondary');
     }
 
     applyColumnFilter(columnId);
@@ -40,23 +69,21 @@ function setColumnSort(columnId, direction) {
 function applyColumnFilter(columnId) {
     const searchInput = document.getElementById(`search-input-${columnId}`);
     const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
-    const sortDir = columnSortState[columnId] || 'desc'; // Default Newest
+
+    // Default: Time Desc (Newest)
+    const state = columnSortState[columnId] || { type: 'time', dir: 'desc' };
 
     const container = document.querySelector(`.kanban-tasks[data-column-id='${columnId}']`);
     if (!container) return;
 
-    // 1. Get all task cards
     const cards = Array.from(container.querySelectorAll('.task-card'));
 
-    // 2. Filter & Sort
-    const visibleCards = cards.filter(card => {
+    // 1. Filter
+    cards.forEach(card => {
         const title = card.querySelector('.task-title-text')?.textContent.toLowerCase() || '';
         const desc = card.querySelector('.task-desc-text')?.textContent.toLowerCase() || '';
-
-        // Simple text match
         const isMatch = title.includes(searchTerm) || desc.includes(searchTerm);
 
-        // Show/Hide based on match
         if (isMatch) {
             card.style.display = 'block';
             card.classList.remove('d-none');
@@ -64,42 +91,24 @@ function applyColumnFilter(columnId) {
             card.style.display = 'none';
             card.classList.add('d-none');
         }
-
-        return isMatch;
     });
 
-    // 3. Sort logic
-    visibleCards.sort((a, b) => {
-        const dateA = new Date(a.dataset.createdAt || 0);
-        const dateB = new Date(b.dataset.createdAt || 0);
-
-        if (sortDir === 'asc') {
-            return dateA - dateB; // Oldest first
-        } else {
-            return dateB - dateA; // Newest first
-        }
-    });
-
-    // 4. Re-append in new order (only visible ones need ordering, but we must append all to maintain DOM)
-    // Actually, we should re-append ALL cards, but sorted. 
-    // Hidden cards order doesn't matter much, but let's keep them sorted too for consistency if filter is cleared.
-
-    // Let's sort ALL cards based on current criteria, regardless of visibility
+    // 2. Sort
     cards.sort((a, b) => {
-        const dateA = new Date(a.dataset.createdAt || 0);
-        const dateB = new Date(b.dataset.createdAt || 0);
+        let valA, valB;
+        valA = new Date(a.dataset.createdAt || 0);
+        valB = new Date(b.dataset.createdAt || 0);
 
-        if (sortDir === 'asc') {
-            return dateA - dateB;
+        if (state.dir === 'asc') {
+            return valA - valB; // Oldest first
         } else {
-            return dateB - dateA;
+            return valB - valA; // Newest first
         }
     });
 
-    // Re-inject into DOM
+    // 3. Re-append
     cards.forEach(card => container.appendChild(card));
 
-    // ✅ Update the count badges for all columns
     if (typeof updateColumnCounts === 'function') {
         updateColumnCounts();
     }

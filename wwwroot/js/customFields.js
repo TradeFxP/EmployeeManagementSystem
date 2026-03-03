@@ -1,8 +1,8 @@
-// customFields.js - Custom field management for tasks
+﻿// customFields.js - Custom field management for tasks
 
 window.customFieldsCache = window.customFieldsCache || null;
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Bust the cache and re-render fields in whichever modals are currently open. */
 async function refreshOpenModals() {
@@ -59,10 +59,17 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
     // Always load fresh fields
     const fields = await loadCustomFields(team);
 
-    // Sort fields so 'List' (Column) type is always at the bottom
+    // Sort fields: Remarks at the very bottom, then List (Column)
     fields.sort((a, b) => {
-        if (a.fieldType === 'List' && b.fieldType !== 'List') return 1;
-        if (a.fieldType !== 'List' && b.fieldType === 'List') return -1;
+        const typeA = a.fieldType;
+        const typeB = b.fieldType;
+
+        if (typeA === 'Remarks' && typeB !== 'Remarks') return 1;
+        if (typeA !== 'Remarks' && typeB === 'Remarks') return -1;
+
+        if (typeA === 'List' && typeB !== 'List') return 1;
+        if (typeA !== 'List' && typeB === 'List') return -1;
+
         return a.order - b.order;
     });
 
@@ -90,8 +97,8 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         fieldGroup.className = 'field-group position-relative p-0';
 
         // Ensure some fields take full width if needed
-        if (field.fieldType === 'Image' || field.fieldName.toLowerCase().includes('description')) {
-            fieldGroup.style.gridColumn = 'span 2';
+        if (field.fieldType === 'Image' || field.fieldType === 'Remarks' || field.fieldName.toLowerCase().includes('description') || field.fieldName.toLowerCase().includes('overview')) {
+            fieldGroup.style.gridColumn = 'span 4';
         }
 
         // Header container for Label + Actions
@@ -99,8 +106,9 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         header.className = 'd-flex justify-content-between align-items-center mb-1 px-1';
 
         const label = document.createElement('label');
-        label.className = 'form-label mb-1 fw-bold text-secondary';
-        label.style.fontSize = '11px';
+        const isRemarks = field.fieldName.toLowerCase() === 'remarks';
+        label.className = `form-label mb-1 fw-bold text-secondary ${isRemarks ? 'field-label-highlight' : ''}`;
+        label.style.fontSize = isRemarks ? '13px' : '11px';
         label.style.letterSpacing = '0.3px';
         label.style.textTransform = 'uppercase';
         label.textContent = field.fieldName + (field.isRequired ? ' *' : '');
@@ -223,7 +231,7 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                         input = nestingContainer;
                     } else {
                         input = document.createElement('select');
-                        input.className = 'form-select';
+                        input.className = 'form-select shadow-sm border-light bg-light rounded-3';
                         input.id = `field_${field.id}`;
 
                         if (optionsArray.length > 0) {
@@ -232,10 +240,10 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                                 let prefix = "";
                                 if (isTaskType) {
                                     const lowOpt = opt.toLowerCase().trim();
-                                    if (lowOpt === 'story') prefix = "📔 ";
-                                    else if (lowOpt === 'bug') prefix = "🐞 ";
-                                    else if (lowOpt === 'feature') prefix = "⭐ ";
-                                    else if (lowOpt === 'enhancement') prefix = "🚀 ";
+                                    if (lowOpt === 'story') prefix = "ðŸ“” ";
+                                    else if (lowOpt === 'bug') prefix = "ðŸž ";
+                                    else if (lowOpt === 'feature') prefix = "â­ ";
+                                    else if (lowOpt === 'enhancement') prefix = "ðŸš€ ";
                                 }
                                 return `<option value="${opt}">${prefix}${opt}</option>`;
                             }).join('');
@@ -309,9 +317,6 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                     `;
                 }
                 break;
-                input.dataset.fieldId = field.id;
-                input.dataset.required = field.isRequired;
-                break;
             case 'List':
                 {
                     input = document.createElement('select');
@@ -336,6 +341,114 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                             });
                     } else {
                         input.innerHTML = '<option value="">Team not specified</option>';
+                    }
+                }
+                break;
+            case 'Remarks':
+                {
+                    const isRemarks = field.fieldName.toLowerCase() === 'remarks';
+                    input = document.createElement('div');
+                    input.className = 'remarks-field-wrapper w-100';
+                    input.id = `field_container_${field.id}`;
+
+                    const rawValues = Array.isArray(existingValues[field.id]) ? existingValues[field.id] : (existingValues[field.id] ? [existingValues[field.id]] : []);
+
+                    // Parse points and sort by date desc (Latest Above)
+                    const points = rawValues.map(v => {
+                        try { return typeof v === 'string' ? JSON.parse(v) : v; }
+                        catch (e) { return { t: v, d: new Date().toISOString(), u: 'System', r: 'Member' }; }
+                    }).sort((a, b) => new Date(b.d) - new Date(a.d));
+
+                    let pointsHtml = '';
+                    const isAdmin = window.isAdmin === true || window.currentUserRole === 'Admin';
+
+                    points.forEach((p, idx) => {
+                        const dateStr = p.d && !isNaN(Date.parse(p.d)) ? new Date(p.d).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Just now';
+
+                        // Only show edit/delete to admins
+                        const actionButtons = isAdmin ? `
+                            <button type="button" class="btn btn-link btn-xs text-primary p-0 border-0" 
+                                    style="font-size: 11px;" onclick="handleEditRemarkPoint(${field.id}, '${containerId}', ${idx})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button type="button" class="btn btn-link btn-xs text-danger p-0 border-0" 
+                                    style="font-size: 11px;" onclick="handleDeleteRemarkPoint(${field.id}, '${containerId}', ${idx})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        ` : '';
+
+                        pointsHtml += `
+                            <div class="remark-point mb-3 pb-2 border-bottom border-light-subtle animate__animated animate__fadeIn">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold text-primary" style="font-size: 0.75rem;">
+                                        <i class="bi bi-person-circle me-1"></i>${p.u || 'User'} 
+                                        <span class="badge bg-light text-muted fw-normal border ms-1" style="font-size: 0.6rem; vertical-align: middle;">${p.r || 'Member'}</span>
+                                    </span>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="text-muted" style="font-size: 0.65rem;">${dateStr}</span>
+                                        ${actionButtons}
+                                    </div>
+                                </div>
+                                <div id="remark_text_${field.id}_${idx}" class="remark-text ps-1 text-dark" style="font-size: 0.85rem; line-height: 1.4; word-break: break-word; white-space: pre-wrap;">${p.t}</div>
+                                <div id="remark_edit_container_${field.id}_${idx}" class="d-none mt-2">
+                                    <textarea class="form-control form-control-sm mb-2 shadow-sm" style="font-size: 0.8rem; min-height: 80px; word-break: break-word;">${p.t}</textarea>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-xs btn-primary px-3 shadow-sm" style="font-size: 9px;" onclick="saveInlineRemark(${field.id}, '${containerId}', ${idx})">Save</button>
+                                        <button class="btn btn-xs btn-light border px-3" style="font-size: 9px;" onclick="cancelInlineRemark(${field.id}, '${containerId}', ${idx})">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    // Points data storage for requirement validation and saving
+                    const hiddenValues = points.map(p => {
+                        const val = JSON.stringify(p).replace(/"/g, '&quot;');
+                        return `<input type="hidden" data-field-id="${field.id}" value="${val}" />`;
+                    }).join('');
+
+                    input.innerHTML = `
+                        <div class="remarks-split-container d-flex flex-column flex-md-row gap-3 p-3 bg-white border border-secondary-subtle rounded-3 shadow-sm" style="min-height: 250px;">
+                            <!-- Left: Input Area (40%) -->
+                            <div class="remarks-input-side" style="flex: 0 0 40%; border-right: 1px solid #f1f5f9; padding-right: 15px;">
+                                <div class="mb-2">
+                                    <label class="x-small fw-bold text-muted mb-1" style="font-size: 10px; text-transform: uppercase;">New Remark Point</label>
+                                    <textarea class="form-control border-light-subtle bg-light shadow-none" 
+                                              placeholder="Enter data here..." 
+                                              id="add_remark_input_${field.id}"
+                                              style="font-size: 0.85rem; min-height: 300px; resize: none;"
+                                              onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleAddRemarkPoint(${field.id}, '${containerId}'); }"></textarea>
+                                </div>
+                                <button class="btn btn-primary w-100 shadow-sm d-flex align-items-center justify-content-center gap-2 py-2" 
+                                        type="button" onclick="handleAddRemarkPoint(${field.id}, '${containerId}')"
+                                        style="font-size: 0.85rem; border-radius: 8px;">
+                                    <i class="bi bi-plus-circle-fill"></i> Add Point
+                                </button>
+                            </div>
+
+                            <!-- Right: History Area (60%) -->
+                            <div class="remarks-history-side flex-grow-1" style="max-height: 400px; overflow-y: auto;">
+                                <div class="d-flex align-items-center justify-content-between mb-2 position-sticky top-0 bg-white py-1 z-index-1">
+                                    <label class="x-small fw-bold text-muted mb-0" style="font-size: 10px; text-transform: uppercase;">Remark History</label>
+                                    <span class="badge bg-light text-muted border text-uppercase" style="font-size: 8px; letter-spacing: 0.5px;">${points.length} ENTRIES</span>
+                                </div>
+                                <div class="remarks-list">
+                                    ${pointsHtml || '<div class="text-center py-5 text-muted small italic opacity-50"><i class="bi bi-journal-text d-block fs-3 mb-2"></i>No entries found</div>'}
+                                </div>
+                            </div>
+
+                            <div class="hidden-remark-values d-none">
+                                ${hiddenValues}
+                            </div>
+                        </div>
+                    `;
+
+                    // Force the label highlight for this specific type
+                    if (isRemarks) {
+                        setTimeout(() => {
+                            const lbl = input.closest('.field-group')?.querySelector('label');
+                            if (lbl) lbl.classList.add('field-label-highlight');
+                        }, 0);
                     }
                 }
                 break;
@@ -654,9 +767,10 @@ async function loadFieldsList(team) {
                                     ${f.fieldType === 'DateTime' ? '<i class="bi bi-calendar-event text-primary" style="font-size: 11px;"></i>' :
                 f.fieldType === 'Date' ? '<i class="bi bi-calendar text-primary" style="font-size: 11px;"></i>' :
                     f.fieldType === 'Image' ? '<i class="bi bi-image text-primary" style="font-size: 11px;"></i>' :
-                        f.fieldType === 'Dropdown' ? '<i class="bi bi-list-nested text-primary" style="font-size: 11px;"></i>' :
-                            f.fieldType === 'Number' ? '<i class="bi bi-hash text-primary" style="font-size: 11px;"></i>' :
-                                f.fieldType === 'List' ? '<i class="bi bi-columns text-primary" style="font-size: 11px;"></i>' : '<i class="bi bi-fonts text-primary" style="font-size: 11px;"></i>'}
+                        f.fieldType === 'Remarks' ? '<i class="bi bi-chat-left-dots text-primary" style="font-size: 11px;"></i>' :
+                            f.fieldType === 'Dropdown' ? '<i class="bi bi-list-nested text-primary" style="font-size: 11px;"></i>' :
+                                f.fieldType === 'Number' ? '<i class="bi bi-hash text-primary" style="font-size: 11px;"></i>' :
+                                    f.fieldType === 'List' ? '<i class="bi bi-columns text-primary" style="font-size: 11px;"></i>' : '<i class="bi bi-fonts text-primary" style="font-size: 11px;"></i>'}
                                 </div>
                                 <div class="overflow-hidden">
                                     <h6 class="mb-0 text-dark fw-bold text-truncate" style="font-size: 0.75rem; letter-spacing: -0.1px;">${f.fieldName}</h6>
@@ -677,11 +791,11 @@ async function loadFieldsList(team) {
                             </div>
                         </div>
                         
-                        <div id="editor_${f.id}" class="p-2 px-3 border-top bg-light d-none animate__animated animate__fadeIn animate__faster">
-                            <div class="row g-2 align-items-center mb-2">
-                                <div class="col-6">
-                                    <label class="x-small fw-bold text-muted mb-1" style="font-size: 9px; display: block;">TYPE</label>
-                                    <select id="edit_type_${f.id}" class="form-select form-select-sm border-secondary-subtle py-0" style="font-size: 0.8rem; height: 28px;" onchange="toggleEditOptionsSection(${f.id})">
+                        <div id="editor_${f.id}" class="p-3 border-top bg-light d-none animate__animated animate__fadeIn animate__faster">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 10px; display: block; letter-spacing: 0.5px;">Field Type</label>
+                                    <select id="edit_type_${f.id}" class="form-select form-select-sm border-secondary-subtle" style="font-size: 0.85rem; height: 36px;" onchange="toggleEditOptionsSection(${f.id})">
                                         <option value="Text" ${f.fieldType === 'Text' ? 'selected' : ''}>Text</option>
                                         <option value="Number" ${f.fieldType === 'Number' ? 'selected' : ''}>Number</option>
                                         <option value="Date" ${f.fieldType === 'Date' ? 'selected' : ''}>Date</option>
@@ -690,20 +804,22 @@ async function loadFieldsList(team) {
                                         <option value="Dropdown" ${f.fieldType === 'Dropdown' ? 'selected' : ''}>Dropdown</option>
                                         <option value="List" ${f.fieldType === 'List' ? 'selected' : ''}>List (Column)</option>
                                         <option value="Image" ${f.fieldType === 'Image' ? 'selected' : ''}>Image</option>
+                                        <option value="Remarks" ${f.fieldType === 'Remarks' ? 'selected' : ''}>Remarks</option>
                                     </select>
                                 </div>
-                                <div class="col-6">
-                                    <label class="x-small fw-bold text-muted mb-1" style="font-size: 9px; display: block;">REQUIRED</label>
-                                    <div class="form-check form-switch mb-0">
-                                        <input class="form-check-input" style="transform: scale(0.7); margin-left: -1.8em;" type="checkbox" id="edit_required_${f.id}" ${f.isRequired ? 'checked' : ''}>
-                                    </div>
+                                <div class="col-md-6">
+                                    <label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 10px; display: block; letter-spacing: 0.5px;">Field Name</label>
+                                    <input type="text" id="edit_name_${f.id}" class="form-control form-control-sm border-secondary-subtle" style="font-size: 0.85rem; height: 36px;" value="${f.fieldName}">
                                 </div>
                             </div>
                             
-                            <div class="row g-2 align-items-center mb-2">
-                                <div class="col-12">
-                                    <label class="x-small fw-bold text-muted mb-1" style="font-size: 9px; display: block;">RENAME FIELD</label>
-                                    <input type="text" id="edit_name_${f.id}" class="form-control form-control-sm border-secondary-subtle py-0" style="font-size: 0.8rem; height: 28px;" value="${f.fieldName}">
+                            <div class="row g-3 mb-3">
+                                <div class="col-6">
+                                    <label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 10px; display: block; letter-spacing: 0.5px;">Is Required?</label>
+                                    <div class="form-check form-switch mt-1">
+                                        <input class="form-check-input" type="checkbox" id="edit_required_${f.id}" ${f.isRequired ? 'checked' : ''} style="transform: scale(1.2); cursor: pointer;">
+                                        <label class="form-check-label small text-muted ms-2" for="edit_required_${f.id}">Mandatory field</label>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -755,7 +871,7 @@ async function loadFieldsList(team) {
                                 body: JSON.stringify(ids)
                             });
                             if (response.ok) {
-                                if (typeof showToast === 'function') showToast('✅ Field order updated!', 'success');
+                                if (typeof showToast === 'function') showToast('âœ… Field order updated!', 'success');
                                 refreshOpenModals();
                             }
                         } catch (e) { console.error('Failed to reorder fields', e); }
@@ -851,13 +967,13 @@ async function createNewField() {
         const team = document.getElementById('kanbanBoard')?.dataset.teamName;
         await loadFieldsList(team);
 
-        // ✅ Re-render fields in task modals IMMEDIATELY (no page refresh needed)
+        // âœ… Re-render fields in task modals IMMEDIATELY (no page refresh needed)
         await refreshOpenModals();
 
         // Refresh board to show potential filter changes or display updates
         if (typeof loadTeamBoard === 'function' && team) loadTeamBoard(team);
 
-        if (typeof showToast === 'function') showToast(`✅ Field "${fieldName}" added!`, 'success');
+        if (typeof showToast === 'function') showToast(`âœ… Field "${fieldName}" added!`, 'success');
 
     } catch (error) {
         alert('Error creating field: ' + error.message);
@@ -887,7 +1003,7 @@ async function deleteField(fieldId) {
         // Refresh board
         if (typeof loadTeamBoard === 'function' && team) loadTeamBoard(team);
 
-        if (typeof showToast === 'function') showToast('🔒 Field deactivated (Data preserved)', 'info');
+        if (typeof showToast === 'function') showToast('ðŸ”’ Field deactivated (Data preserved)', 'info');
 
     } catch (error) {
         alert('Error deleting field: ' + error.message);
@@ -1052,13 +1168,172 @@ async function saveFieldChanges(fieldId) {
         // Refresh board to show potential display updates
         if (typeof loadTeamBoard === 'function' && teamName) loadTeamBoard(teamName);
 
-        if (typeof showToast === 'function') showToast("✅ Field updated successfully", "success");
+        if (typeof showToast === 'function') showToast("âœ… Field updated successfully", "success");
 
     } catch (error) {
         alert("Error updating field: " + error.message);
     }
 }
 
+
+
+function handleAddRemarkPoint(fieldId, containerId) {
+    const input = document.getElementById(`add_remark_input_${fieldId}`);
+    const text = input ? input.value.trim() : "";
+    if (!text) return;
+
+    const point = {
+        t: text,
+        u: window.currentUserName || 'User',
+        r: window.currentUserRole || 'Member',
+        d: new Date().toISOString()
+    };
+
+    // 1. Collect current values
+    const values = collectCustomFieldValues(containerId);
+
+    // 2. Add the new point (as JSON string) to the start of the array
+    if (!values[fieldId]) values[fieldId] = [];
+    if (!Array.isArray(values[fieldId])) {
+        // Handle case where it's a single JSON string
+        try {
+            const existing = JSON.parse(values[fieldId]);
+            values[fieldId] = Array.isArray(existing) ? existing.map(x => JSON.stringify(x)) : [values[fieldId]];
+        } catch (e) {
+            values[fieldId] = [values[fieldId]];
+        }
+    }
+
+    values[fieldId].unshift(JSON.stringify(point));
+
+    // 3. Clear input
+    input.value = "";
+
+    // 4. Re-render the UI
+    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+    renderCustomFieldInputs(containerId, values, team);
+
+    if (typeof showToast === 'function') showToast("Point added to remarks", "success");
+}
+
+/**
+ * Handles deleting a point from the remarks field
+ */
+function handleDeleteRemarkPoint(fieldId, containerId, index) {
+    if (!confirm('Are you sure you want to delete this remark?')) return;
+
+    // 1. Collect current values
+    const values = collectCustomFieldValues(containerId);
+
+    // 2. Remove the specific value at the given index
+    if (values[fieldId]) {
+        if (!Array.isArray(values[fieldId])) {
+            try {
+                const existing = JSON.parse(values[fieldId]);
+                values[fieldId] = Array.isArray(existing) ? existing.map(x => JSON.stringify(x)) : [values[fieldId]];
+            } catch (e) {
+                values[fieldId] = [values[fieldId]];
+            }
+        }
+
+        values[fieldId].splice(index, 1);
+
+        // 3. Re-render the UI
+        const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+        renderCustomFieldInputs(containerId, values, team);
+
+        if (typeof showToast === 'function') showToast("Remark deleted", "info");
+    }
+}
+
+/**
+ * Handles editing a point from the remarks field
+ */
+/**
+ * Handles toggling the inline editor for a remark point
+ */
+function handleEditRemarkPoint(fieldId, containerId, index) {
+    const textEl = document.getElementById(`remark_text_${fieldId}_${index}`);
+    const editContainer = document.getElementById(`remark_edit_container_${fieldId}_${index}`);
+
+    if (textEl && editContainer) {
+        textEl.classList.add('d-none');
+        editContainer.classList.remove('d-none');
+        // Focus textarea
+        const textarea = editContainer.querySelector('textarea');
+        if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        }
+    }
+}
+
+function cancelInlineRemark(fieldId, containerId, index) {
+    const textEl = document.getElementById(`remark_text_${fieldId}_${index}`);
+    const editContainer = document.getElementById(`remark_edit_container_${fieldId}_${index}`);
+    if (textEl && editContainer) {
+        textEl.classList.remove('d-none');
+        editContainer.classList.add('d-none');
+        // Reset textarea value
+        const textarea = editContainer.querySelector('textarea');
+        if (textarea) textarea.value = textEl.innerText.trim();
+    }
+}
+
+function saveInlineRemark(fieldId, containerId, index) {
+    const editContainer = document.getElementById(`remark_edit_container_${fieldId}_${index}`);
+    const textarea = editContainer?.querySelector('textarea');
+    const newText = textarea ? textarea.value.trim() : "";
+
+    if (newText === "") {
+        if (typeof showToast === 'function') showToast("Remark cannot be empty", "warning");
+        return;
+    }
+
+    // 1. Collect current values
+    const values = collectCustomFieldValues(containerId);
+
+    if (values[fieldId]) {
+        try {
+            const raw = values[fieldId];
+            console.log('Remark points raw data:', raw);
+            if (Array.isArray(raw)) {
+                points = raw.map(x => {
+                    if (typeof x === 'object') return x;
+                    try { return JSON.parse(x); }
+                    catch (e) { return { t: x, u: 'System', d: new Date().toISOString() }; }
+                });
+            } else {
+                points = [typeof raw === 'string' ? JSON.parse(raw) : raw];
+            }
+        } catch (e) {
+            console.error('Remark Parse error:', e, values[fieldId]);
+            // Fallback for non-JSON strings
+            if (typeof values[fieldId] === 'string') points = [{ t: values[fieldId], u: 'System', d: new Date().toISOString() }];
+            else return;
+        }
+
+        if (points[index]) {
+            points[index].t = newText;
+            points[index].u = window.currentUserName || 'User';
+            points[index].d = new Date().toISOString();
+
+            values[fieldId] = points.map(p => JSON.stringify(p));
+
+            // CLEAR hidden values before re-rendering to avoid duplicates
+            if (editContainer) {
+                const hiddenDiv = editContainer.closest('.remarks-split-container')?.querySelector('.hidden-remark-values');
+                if (hiddenDiv) hiddenDiv.innerHTML = '';
+            }
+
+            // Re-render
+            const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+            renderCustomFieldInputs(containerId, values, team);
+
+            if (typeof showToast === 'function') showToast("Remark updated", "success");
+        }
+    }
+}
 
 async function uploadFieldImage(input, fieldId, containerId) {
     if (!input.files || !input.files[0]) return;
@@ -1169,7 +1444,7 @@ async function updateTeamSettings() {
 
     if (!teamName) return;
 
-    // 🔥 Optimistic UI Update: Apply visibility IMMEDIATELY to board dataset
+    // ðŸ”¥ Optimistic UI Update: Apply visibility IMMEDIATELY to board dataset
     if (board) {
         board.dataset.priorityVisible = showOther && isPriorityVisible ? 'true' : 'false';
         board.dataset.dueDateVisible = showOther && isDueDateVisible ? 'true' : 'false';
@@ -1177,7 +1452,7 @@ async function updateTeamSettings() {
         board.dataset.descriptionVisible = showOther && isDescriptionVisible ? 'true' : 'false';
     }
 
-    // ✅ Apply to currently open modals immediately
+    // âœ… Apply to currently open modals immediately
     applySystemFieldVisibilityToModals();
 
     try {
@@ -1195,7 +1470,7 @@ async function updateTeamSettings() {
 
         if (!response.ok) throw new Error('Failed to update team settings');
 
-        if (typeof showToast === 'function') showToast('✅ Team settings updated!', 'success');
+        if (typeof showToast === 'function') showToast('âœ… Team settings updated!', 'success');
 
     } catch (error) {
         console.error('Error updating settings:', error);

@@ -62,9 +62,7 @@ function onPermissionViewTypeChange() {
     if (type === 'Column' || type === 'Task') {
         colWrapper.style.setProperty('display', 'flex', 'important');
     } else {
-        // Always show Managers, regardless of the selected filter role
-        const filtered = rawBoardPermissions.filter(p => p.role === filterValue || p.role === 'Manager');
-        renderBoardPermissionTable(filtered);
+        renderPermissionTable();
     }
 }
 
@@ -225,7 +223,7 @@ async function updateTransition(checkbox) {
     } finally {
         checkbox.disabled = false;
     }
-    renderPermissionTable();
+    // REMOVED renderPermissionTable() to prevent closing the dropdown
 }
 
 function populateColumnFilter(data) {
@@ -293,7 +291,7 @@ function renderPermissionTable() {
     // 2. Filter Data
     let data = rawBoardPermissions;
     if (roleFilter !== 'All') {
-        data = data.filter(p => p.role === roleFilter || p.role === 'Manager');
+        data = data.filter(p => p.role === roleFilter || p.role === 'Manager' || p.role === 'Sub Manager');
     }
 
     // 3. Render Rows

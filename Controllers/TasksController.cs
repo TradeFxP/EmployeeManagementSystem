@@ -16,6 +16,21 @@ using System.Text.Json;
 using TaskStatusEnum = UserRoles.Models.Enums.TaskStatus;
 
 
+    public class LeadConversionDto
+    {
+        public string? id { get; set; } // Always string for safety
+        public string? name { get; set; }
+        public string? email { get; set; }
+        public string? phone { get; set; }
+        public string? formId { get; set; }
+        public int? columnId { get; set; }
+        public string? campaignName { get; set; }
+        public string? adsetName { get; set; }
+        public string? adName { get; set; }
+        public string? metaCreatedAt { get; set; }
+        public JsonElement? fields { get; set; } 
+    }
+
 [Authorize]
 public class TasksController : Controller
 {
@@ -23,13 +38,15 @@ public class TasksController : Controller
     private readonly UserManager<Users> _userManager;
     private readonly ITaskHistoryService _historyService;
     private readonly IHubContext<TaskHub> _hubContext;
+    private readonly IFacebookLeadsService _leadsService;
 
-    public TasksController(AppDbContext context, UserManager<Users> userManager, ITaskHistoryService historyService, IHubContext<TaskHub> hubContext)
+    public TasksController(AppDbContext context, UserManager<Users> userManager, ITaskHistoryService historyService, IHubContext<TaskHub> hubContext, IFacebookLeadsService leadsService)
     {
         _context = context;
         _userManager = userManager;
         _historyService = historyService;
         _hubContext = hubContext;
+        _leadsService = leadsService;
     }
 
     // Loads page
@@ -60,7 +77,98 @@ public class TasksController : Controller
         return View();
     }
 
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetVirtualLeads()
+    {
+        if (!User.IsInRole("Admin"))
+        {
+            return Unauthorized("Only admins can view virtual leads.");
+        }
 
+        try
+        {
+            var leads = await _leadsService.FetchLeadsAsync();
+            return Json(new { success = true, leads });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> ConvertLeadToTask([FromBody] LeadConversionDto dto)
+    {
+        if (dto == null || string.IsNullOrEmpty(dto.id))
+            return BadRequest("Invalid lead data: ID is required.");
+
+        string leadId = dto.id;
+
+        // 1. Check if already exists
+        var existing = await _context.TaskItems
+            .FirstOrDefaultAsync(t => t.ExternalLeadId == leadId);
+
+        if (existing != null)
+        {
+            return Json(new { success = true, taskId = existing.Id, alreadyExists = true });
+        }
+
+        // 2. Create new TaskItem (Stub Model)
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null) return Unauthorized();
+
+        int targetColumnId = dto.columnId ?? 0;
+        if (targetColumnId <= 0) return BadRequest("Column ID is required.");
+
+        var column = await _context.TeamColumns.FindAsync(targetColumnId);
+        if (column == null) return BadRequest("Column not found");
+
+        var task = new TaskItem
+        {
+            ExternalLeadId = leadId,
+            Title = dto.name ?? "API Lead",
+            Description = $"Facebook Lead: {leadId}", // Minimum data stored
+            ColumnId = targetColumnId,
+            TeamName = column.TeamName,
+            Priority = UserRoles.Models.Enums.TaskPriority.Medium,
+            Status = UserRoles.Models.Enums.TaskStatus.ToDo,
+            CreatedByUserId = user.Id,
+            CreatedAt = DateTime.UtcNow,
+            AssignedToUserId = user.Id, 
+            AssignedByUserId = user.Id,
+            AssignedAt = DateTime.UtcNow,
+            CurrentColumnEntryAt = DateTime.UtcNow
+        };
+
+        _context.TaskItems.Add(task);
+        await _context.SaveChangesAsync();
+
+        await _historyService.LogTaskCreated(task.Id, user.Id);
+
+        return Json(new { success = true, taskId = task.Id, alreadyExists = false });
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> GetLeadLiveDetails(string leadId)
+    {
+        if (string.IsNullOrEmpty(leadId)) return BadRequest("Lead ID is missing");
+
+        try
+        {
+            var leads = await _leadsService.FetchLeadsAsync();
+            var lead = leads.FirstOrDefault(l => l.Id == leadId);
+            if (lead == null) return NotFound("Lead not found in API pool");
+
+            return Json(new { success = true, lead });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = ex.Message });
+        }
+    }
 
 
     [HttpPost]

@@ -65,6 +65,7 @@
      data-assigned-by-role="@(ViewData["UserRolesMap"] is Dictionary<string, string> rm && Model.AssignedByUserId != null && rm.ContainsKey(Model.AssignedByUserId) ? rm[Model.AssignedByUserId] : "")"
      data-assigned-by-admin="@(Model.AssignedByUser?.Email != null && Model.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
      data-review-status="@reviewStatusInt"
+     data-external-lead-id="@Model.ExternalLeadId"
      onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@Model.Id)">
 
     <!-- TOP ROW: Due Date & Priority (left) + Task ID & Review Status (right) -->
@@ -203,6 +204,38 @@
                                     <span>@fv.Value</span>
                     }
                         </div>
+            }
+            @* Display latest remark point if exists *@
+            @{
+                var remarksField = Model.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldType == "Remarks");
+                if (remarksField != null && !string.IsNullOrEmpty(remarksField.Value))
+                {
+                    try
+                    {
+                        var points = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonDocument>>(remarksField.Value);
+                        if (points != null && points.Any())
+                        {
+                            // Points are already stored latest-first in JS, but let's be safe and sort by date if needed
+                            // Or just take the first one since we push to start of array in JS
+                            var latest = points.FirstOrDefault();
+                            if (latest != null)
+                            {
+                                var text = latest.RootElement.GetProperty("t").GetString();
+                                var user = latest.RootElement.GetProperty("u").GetString();
+                                var dateString = latest.RootElement.GetProperty("d").GetString();
+                                
+                                <div class="latest-remark-card mt-2 p-2 rounded" style="background: #f8fafc; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                                    <div class="d-flex justify-content-between mb-1 opacity-75">
+                                        <span class="fw-bold text-primary"><i class="bi bi-chat-left-text-fill me-1"></i>@user</span>
+                                        <span>@dateString</span>
+                                    </div>
+                                    <div class="text-dark text-truncate" style="max-width: 100%;">@text</div>
+                                </div>
+                            }
+                        }
+                    }
+                    catch { /* Ignore parsing errors */ }
+                }
             }
             </div>
     }

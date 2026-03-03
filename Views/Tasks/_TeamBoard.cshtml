@@ -217,7 +217,7 @@
                             {
                                 <i class="bi bi-layout-three-columns col-icon"></i>
                             }
-                            @column.ColumnName (@taskCount)
+                            @column.ColumnName (<span class="task-count-badge">@taskCount</span>)
                         </span>
 
                         <!-- RENAME MODE -->
@@ -284,13 +284,11 @@
                 <input type="text" id="search-input-@column.Id" class="form-control form-control-sm mb-2"
                     placeholder="Search tasks..." oninput="applyColumnFilter(@column.Id)" />
                 <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort(@column.Id, 'desc')"
-                        id="sort-desc-@column.Id" title="Newest First">
-                        <i class="bi bi-sort-down"></i> Newest
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort(@column.Id, 'asc')"
-                        id="sort-asc-@column.Id" title="Oldest First">
-                        <i class="bi bi-sort-up"></i> Oldest
+                    <button class="btn btn-sm btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-1" 
+                            onclick="handleColumnSortClick(@column.Id, 'time')" 
+                            ondblclick="handleColumnSortDblClick(@column.Id, 'time')" 
+                            id="sort-time-@column.Id" title="Single-click: Newest First | Double-click: Oldest First">
+                        <i class="bi bi-clock"></i> <span class="sort-indicator" style="font-size: 0.7rem; font-weight: bold;"></span>
                     </button>
                 </div>
             </div>
@@ -334,13 +332,11 @@
             <input type="text" id="search-input-history" class="form-control form-control-sm mb-2"
                 placeholder="Search history..." oninput="applyColumnFilter('history')" />
             <div class="d-flex gap-1">
-                <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort('history', 'desc')"
-                    id="sort-desc-history" title="Newest First">
-                    <i class="bi bi-sort-down"></i> Newest
-                </button>
-                <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="setColumnSort('history', 'asc')"
-                    id="sort-asc-history" title="Oldest First">
-                    <i class="bi bi-sort-up"></i> Oldest
+                <button class="btn btn-sm btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-1" 
+                        onclick="handleColumnSortClick('history', 'time')" 
+                        ondblclick="handleColumnSortDblClick('history', 'time')" 
+                        id="sort-time-history" title="Single-click: Newest First | Double-click: Oldest First">
+                    <i class="bi bi-clock"></i> <span class="sort-indicator" style="font-size: 0.7rem; font-weight: bold;"></span>
                 </button>
             </div>
         </div>

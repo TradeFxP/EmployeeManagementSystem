@@ -19,6 +19,7 @@ namespace UserRoles.Services
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<FacebookLeadIngestionService> _logger;
         private readonly TimeSpan _pollingInterval = TimeSpan.FromMinutes(1);
+        private readonly HashSet<string> _seenLeadIds = new HashSet<string>();
 
         public FacebookLeadIngestionService(IServiceScopeFactory scopeFactory, ILogger<FacebookLeadIngestionService> logger)
         {
@@ -28,26 +29,26 @@ namespace UserRoles.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Facebook Lead Ingestion Service is starting.");
+            _logger.LogInformation("Facebook Lead Ingestion Service (Virtual) is starting.");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await IngestLeads(stoppingToken);
+                    await IngestLeadsVirtual(stoppingToken);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error occurred during Facebook lead ingestion.");
+                    _logger.LogError(ex, "Error occurred during virtual Facebook lead ingestion.");
                 }
 
                 await Task.Delay(_pollingInterval, stoppingToken);
             }
 
-            _logger.LogInformation("Facebook Lead Ingestion Service is stopping.");
+            _logger.LogInformation("Facebook Lead Ingestion Service (Virtual) is stopping.");
         }
 
-        private async Task IngestLeads(CancellationToken stoppingToken)
+        private async Task IngestLeadsVirtual(CancellationToken stoppingToken)
         {
             using var scope = _scopeFactory.CreateScope();
             var leadsService = scope.ServiceProvider.GetRequiredService<IFacebookLeadsService>();
@@ -55,97 +56,45 @@ namespace UserRoles.Services
             var hubContext = scope.ServiceProvider.GetRequiredService<IHubContext<TaskHub>>();
 
             var leads = await leadsService.FetchLeadsAsync();
-            if (!leads.Any()) return;
+            if (leads == null || !leads.Any()) return;
 
-            // Find Digi Leads team
-            var team = await dbContext.Teams
-                .FirstOrDefaultAsync(t => t.Name == "Digi Leads", stoppingToken);
-
-            if (team == null)
-            {
-                _logger.LogWarning("'Digi Leads' team not found. Skipping ingestion.");
-                return;
-            }
-
-            // Find 'To Do' column or the first column
+            // We still need the ColumnId to tell the frontend where to put these leads
+            // Find Digi Leads team column 'To Do'
             var column = await dbContext.TeamColumns
                 .Where(c => c.TeamName == "Digi Leads")
                 .OrderBy(c => c.Order)
-                .FirstOrDefaultAsync(c => c.ColumnName.ToLower() == "to do", stoppingToken)
-                ?? await dbContext.TeamColumns
-                    .Where(c => c.TeamName == "Digi Leads")
-                    .OrderBy(c => c.Order)
-                    .FirstOrDefaultAsync(stoppingToken);
+                .FirstOrDefaultAsync(c => c.ColumnName.ToLower() == "to do", stoppingToken);
 
             if (column == null)
             {
-                _logger.LogWarning("No columns found for team 'Digi Leads'. Skipping ingestion.");
+                _logger.LogWarning("No 'To Do' column found for team 'Digi Leads'. Cannot broadcast virtual leads.");
                 return;
             }
 
-            _logger.LogInformation("Found target column: {ColumnName} (Id: {ColumnId}) for team 'Digi Leads'", column.ColumnName, column.Id);
+            var newLeads = leads.Where(l => !_seenLeadIds.Contains(l.Id.ToString())).ToList();
 
-            // Find Admin user
-            var adminUser = await dbContext.Users
-                .FirstOrDefaultAsync(u => u.Email == "admin@gmail.com", stoppingToken);
+            if (!newLeads.Any()) return;
 
-            if (adminUser == null)
+            _logger.LogInformation("Detected {Count} new leads. Broadcasting via SignalR.", newLeads.Count);
+
+            foreach (var lead in newLeads)
             {
-                _logger.LogWarning("Admin user 'admin@gmail.com' not found. Skipping ingestion.");
-                return;
+                _seenLeadIds.Add(lead.Id.ToString());
             }
 
-            foreach (var lead in leads)
+            // Broadcast to the "Digi Leads" group
+            try
             {
-                if (stoppingToken.IsCancellationRequested) break;
-
-                string leadIdStr = lead.Id.ToString();
-                _logger.LogInformation("Processing lead: {LeadId} (Name: {Name})", leadIdStr, lead.Name);
-
-                // Deduplication
-                var exists = await dbContext.TaskItems
-                    .AnyAsync(t => t.ExternalLeadId == leadIdStr, stoppingToken);
-
-                if (exists)
+                // We send the list of new leads and the target columnId
+                await hubContext.Clients.Group("Digi Leads").SendAsync("NewLeadsDetected", new
                 {
-                    _logger.LogInformation("Lead {LeadId} already exists. Skipping.", leadIdStr);
-                    continue;
-                }
-
-                // Map Lead to TaskItem
-                var task = new TaskItem
-                {
-                    Title = $"New Lead: {lead.Name}",
-                    Description = $"Email: {lead.Email}\nPhone: {lead.Phone}\nForm ID: {lead.FormId}",
-                    CreatedAt = DateTime.UtcNow,
-                    Status = UserRoles.Models.Enums.TaskStatus.ToDo,
-                    ColumnId = column.Id,
-                    TeamName = team.Name,
-                    Priority = TaskPriority.Medium,
-                    ExternalLeadId = leadIdStr,
-                    CreatedByUserId = adminUser.Id,
-                    AssignedToUserId = adminUser.Id
-                };
-
-                dbContext.TaskItems.Add(task);
-                await dbContext.SaveChangesAsync(stoppingToken);
-
-                _logger.LogInformation("Ingested new lead: {LeadId} for {Name}", lead.Id, lead.Name);
-
-                // Broadcast via SignalR
-                try
-                {
-                    await hubContext.Clients.Group(team.Name).SendAsync("TaskAdded", new
-                    {
-                        taskId = task.Id,
-                        columnId = column.Id,
-                        teamName = team.Name
-                    }, stoppingToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to broadcast TaskAdded for lead {LeadId}", lead.Id);
-                }
+                    leads = newLeads,
+                    columnId = column.Id
+                }, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to broadcast NewLeadsDetected.");
             }
         }
     }

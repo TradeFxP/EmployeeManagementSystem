@@ -14,6 +14,10 @@
 }
 
 <script>
+    window.currentUserName = "@(User.Identity?.Name ?? "User")";
+    window.currentUserRole = "@(isAdmin ? "Admin" : isManager ? "Manager" : isSubManager ? "Sub-Manager" : "Member")";
+    window.isAdmin = @(isAdmin ? "true" : "false");
+
     function toggleSidebarWide() {
         document.querySelector('.app-wrapper').classList.toggle('sidebar-retracted');
         const icon = document.querySelector('[onclick="toggleSidebarWide()"] i');
@@ -136,14 +140,43 @@
         background: #f8fafc;
     }
 
-    .edit-options-list {
-        max-height: 250px;
-        overflow-y: auto;
-        padding: 8px;
-        background: #fdfdfd;
-        border: 1px dashed #cbd5e1;
-        border-radius: 8px;
-        margin-bottom: 10px;
+    .field-label-highlight {
+        color: #4f46e5 !important;
+        background: #eef2ff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    .remarks-split-container {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        scrollbar-width: thin;
+    }
+
+    .remarks-history-side::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .remarks-history-side::-webkit-scrollbar-thumb {
+        background-color: #e2e8f0;
+        border-radius: 20px;
+    }
+
+    .remark-point {
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+        padding-left: 10px !important;
+    }
+
+    .remark-point:hover {
+        background: #f8fafc;
+        border-left-color: #6366f1;
+    }
+
+    .remark-text {
+        white-space: pre-wrap;
+        word-break: break-word;
     }
 
     .btn-xs {
@@ -185,6 +218,83 @@
     .edit-options-list::-webkit-scrollbar-thumb {
         background: #cbd5e1;
         border-radius: 10px;
+    }
+
+    /* ---- TIMELINE UI (REMARKS) ---- */
+    .timeline-container {
+        border: 2px solid #eef2ff;
+        background: #fcfdff;
+        border-radius: 14px;
+        padding: 12px;
+        max-height: 400px;
+        overflow-y: auto;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    
+    .timeline-add-section {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 8px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.05);
+    }
+
+    .timeline-point {
+        position: relative;
+        padding-left: 20px;
+        margin-bottom: 12px;
+        border-left: 2px solid #cbd5e1;
+        padding-bottom: 8px;
+    }
+
+    .timeline-point:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .timeline-point::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        background: white;
+        border: 2px solid #6366f1;
+        border-radius: 50%;
+    }
+
+    .timeline-meta {
+        font-size: 0.7rem;
+        color: #64748b;
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .timeline-text {
+        font-size: 0.85rem;
+        color: #1e293b;
+        line-height: 1.4;
+        background: white;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid #f1f5f9;
+        display: inline-block;
+        max-width: 100%;
+        word-wrap: break-word;
+    }
+
+    .field-label-highlight {
+        color: #4f46e5;
+        font-weight: 800 !important;
+        letter-spacing: 0.5px;
+        background: #eef2ff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: inline-block;
     }
 </style>
 
@@ -353,9 +463,11 @@
         var isManager = @((User.IsInRole("Manager") || User.IsInRole("Sub-Manager")) ? "true" : "false");
         window.isAdmin = isAdmin;
         window.isManager = isManager;
+        window.currentUserName = '@(UserManager.GetUserName(User))';
+        window.currentUserRole = currentUserRole;
     </script>
 
-    <!-- ═══════ REVIEW TASK MODAL (ADMIN ONLY) ═══════ -->
+    <!-- ------- REVIEW TASK MODAL (ADMIN ONLY) ------- -->
     <div class="modal fade" id="reviewTaskModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -413,7 +525,7 @@
         </div>
     </div>
 
-    <!-- ═══════ ARCHIVED TASK DETAIL MODAL ═══════ -->
+    <!-- ------- ARCHIVED TASK DETAIL MODAL ------- -->
     <div class="modal fade" id="archivedTaskModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -433,7 +545,7 @@
         </div>
     </div>
 
-    <!-- ═══════ TASK OVERVIEW MODAL ═══════ -->
+    <!-- ------- TASK OVERVIEW MODAL ------- -->
     <div class="modal fade" id="taskOverviewModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -484,7 +596,7 @@
 
 
     <div class="modal fade" id="createTaskModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">
                     <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>Create Task</h5>
@@ -556,7 +668,7 @@
 
     <!-- EDIT TASK MODAL -->
     <div class="modal fade" id="editTaskModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff;">
                     <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Task</h5>
@@ -812,7 +924,7 @@
 
     <!-- MANAGE CUSTOM FIELDS MODAL (Admin Only) -->
     <div class="modal fade" id="manageFieldsModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff;">
                     <h5 class="modal-title fw-bold"><i class="bi bi-sliders me-2"></i>Manage Custom Fields</h5>
@@ -884,6 +996,7 @@
                                     <option value="Dropdown">▼ Dropdown</option>
                                     <option value="List">📋 List (Columns)</option>
                                     <option value="Image">🖼️ Image</option>
+                                    <option value="Remarks"> Remarks</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -921,7 +1034,7 @@
         </div>
     </div>
 
-    <!-- ═══════ EXCEL IMPORT MODAL ═══════ -->
+    <!-- ------- EXCEL IMPORT MODAL ------- -->
     <div class="modal fade" id="excelImportModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -1134,7 +1247,7 @@
     </div>
 
     <style>
-        /* ═══════ PREMIUM UI/UX ENHANCEMENTS ═══════ */
+        /* ------- PREMIUM UI/UX ENHANCEMENTS ------- */
         .modal-content { border-radius: 16px; overflow: hidden; }
         .modal-header { border-bottom: none !important; padding: 1.5rem 2rem; }
         .modal-body { padding: 2rem; }
@@ -1185,7 +1298,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
         }
         
-        /* ═══════ EXCEL IMPORT MODAL STYLES ═══════ */
+        /* ------- EXCEL IMPORT MODAL STYLES ------- */
         .excel-drop-zone {
             border: 2px dashed #0d9488;
             border-radius: 16px;
@@ -1331,7 +1444,7 @@
 </div>
 
 
-    <!-- ═══════ BOARD PERMISSION MODAL (Admin Only) ═══════ -->
+    <!-- ------- BOARD PERMISSION MODAL (Admin Only) ------- -->
     <div class="modal fade" id="boardPermissionModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -1342,10 +1455,15 @@
                     <h5 class="modal-title">
                         <i class="bi bi-shield-lock me-2 text-info"></i>Board Permissions
                     </h5>
+
+                     <button id="toggleDragDropMode" class="btn btn-sm btn-outline-info" onclick="toggleBoardPermissionMode()" title="Toggle Drag & Drop Permission View">
+                            <i class="bi bi-arrows-move me-1"></i>Drag & Drop
+                        </button>
+
                     <div class="d-flex align-items-center gap-3 me-3">
                         <div class="d-flex align-items-center gap-2">
                             <label class="small text-white-50 mb-0">Role:</label>
-                            <select id="boardRoleFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="filterBoardPermissions()" style="width: auto; min-width: 120px;">
+                            <select id="boardRoleFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="filterBoardPermissions()" style="width: auto; min-width: 150px;">
                                 <option value="All">All Members</option>
                                 <option value="Manager">Manager</option>
                                 <option value="Sub Manager">Sub Manager</option>
@@ -1354,15 +1472,13 @@
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <label class="small text-white-50 mb-0">Manage:</label>
-                            <select id="permissionViewType" class="form-select form-select-sm bg-secondary text-white border-0" onchange="onPermissionViewTypeChange()" style="width: auto; min-width: 140px;">
+                            <select id="permissionViewType" class="form-select form-select-sm bg-secondary text-white border-0" onchange="onPermissionViewTypeChange()" style="width: auto; min-width: 160px;">
                                 <option value="Board">Board Level</option>
                                 <option value="Column">Show Columns</option>
                                 <option value="Task">Show Tasks</option>
                             </select>
                         </div>
-                        <button id="toggleDragDropMode" class="btn btn-sm btn-outline-info" onclick="toggleBoardPermissionMode()" title="Toggle Drag & Drop Permission View">
-                            <i class="bi bi-arrows-move me-1"></i>Drag & Drop
-                        </button>
+                       
                         <div id="columnSelectWrapper" class="d-flex align-items-center gap-2" style="display: none !important;">
                             <label class="small text-white-50 mb-0">Column:</label>
                             <select id="permissionColumnFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="renderPermissionTable()" style="width: auto; min-width: 140px;">
@@ -1638,7 +1754,7 @@
             return;
         }
 
-        // 🔥 SAFETY: remove old sortable safely
+        // ?? SAFETY: remove old sortable safely
         if (board._sortableInstance) {
             board._sortableInstance.destroy();
             board._sortableInstance = null;
@@ -1719,7 +1835,7 @@
 </script>
 
 <script>
-    // ════════ SignalR Real-Time Logic ════════
+    // -------- SignalR Real-Time Logic --------
     var taskHubConnection = new signalR.HubConnectionBuilder()
         .withUrl("/taskHub")
         .withAutomaticReconnect()
@@ -1762,32 +1878,21 @@
         }
     });
 
-    taskHubConnection.on("MoveRequestHandled", function (data) {
-        console.log("Move request handled received:", data);
-        if (typeof showToast === 'function') {
-            const status = data.approved ? '✅ Approved' : '❌ Rejected';
-            showToast(`Move Request ${status}: ${data.reply || ''}`, data.approved ? 'success' : 'warning', 10000);
-        }
-    });
-
     taskHubConnection.on("PermissionsUpdated", function (userId, teamName) {
-        console.log("Permissions updated received for:", userId, teamName);
-        const currentUserId = '@UserManager.GetUserId(User)';
-        if (userId === currentUserId && window.currentTeamName && window.currentTeamName.toLowerCase().trim() === teamName.toLowerCase().trim()) {
-            if (typeof loadTeamBoard === "function") {
-                loadTeamBoard(window.currentTeamName);
-            }
-            if (typeof showToast === "function") {
-                showToast("✅ Board permissions sync complete.", "success");
+        console.log("Permissions updated for user:", userId, "on team:", teamName);
+        // If current user is the one whose permissions changed, reload the board
+        if (userId === window.currentUserId && teamName === window.currentTeamName) {
+            console.log("Refreshing board due to permission update...");
+            if (typeof window.loadTeamBoard === 'function') {
+                window.loadTeamBoard(teamName, true);
             }
         }
     });
 
-    taskHubConnection.on("ProjectAccessUpdated", function () {
-        console.log("Project access updated received");
-        if (typeof loadProjectList === "function") {
-            loadProjectList();
-            showToast("📁 A new project has been assigned to you.", "success");
+    taskHubConnection.on("NewLeadsDetected", function (data) {
+        console.log("New leads detected received:", data);
+        if (typeof handleNewLeadsUpdate === 'function') {
+            handleNewLeadsUpdate(data);
         }
     });
 
@@ -1810,13 +1915,9 @@
         const taskList = targetColumn.querySelector('.kanban-tasks');
         if (!taskList) return;
 
-        // Move the element
         taskList.appendChild(card);
-
-        // Update attributes
         card.dataset.columnId = data.newColumnId;
 
-        // UI Adjustments (Buttons / Badges)
         const colName = data.columnName.toLowerCase().trim();
         const isReview = colName === 'review';
         const isCompleted = colName === 'completed';
@@ -1867,7 +1968,6 @@
         }
         if (pendingBadge) pendingBadge.style.display = 'none';
 
-        // If moved columns due to review
         if (data.newColumnId) {
             const currentColumnId = parseInt(card.dataset.columnId);
             if (currentColumnId !== data.newColumnId) {
@@ -1892,13 +1992,8 @@
     }
 
     function handleTaskAddedUpdate(data) {
-        // Prevent duplicates
         if (document.querySelector(`.task-card[data-task-id="${data.taskId}"]`)) return;
-
-        // Ensure we are on the same team
-        if (window.currentTeamName && data.teamName && window.currentTeamName.toLowerCase() !== data.teamName.toLowerCase()) {
-            return; 
-        }
+        if (window.currentTeamName && data.teamName && window.currentTeamName.toLowerCase() !== data.teamName.toLowerCase()) return;
 
         fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
             .then(res => {
@@ -1908,12 +2003,9 @@
             .then(html => {
                 const targetColumn = document.querySelector(`.kanban-column[data-column-id="${data.columnId}"]`);
                 if (!targetColumn) {
-                    // If column not found, maybe board needs full reload or it's a dynamic column
-                    console.warn("Target column not found for TaskAdded event, reloading board...");
                     if (window.currentTeamName) loadTeamBoard(window.currentTeamName, true);
                     return;
                 }
-
                 const taskList = targetColumn.querySelector('.kanban-tasks');
                 if (!taskList) return;
 
@@ -1933,16 +2025,12 @@
         fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
             .then(res => res.text())
             .then(html => {
-                // Replace entire card to ensure all UI elements are correct
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = html;
                 const newCard = tempDiv.firstElementChild;
                 card.parentNode.replaceChild(newCard, card);
-
-                // Re-apply filters to correctly show/hide the updated card
                 if (typeof filterBoardTasks === 'function') filterBoardTasks();
                 if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
-
                 showToast(`Task #${data.taskId} assigned to ${data.assignedTo}`, 'success');
             })
             .catch(err => console.error("Error updating assigned task:", err));
@@ -1953,7 +2041,7 @@
             console.error("loadTeamBoard called with empty team name");
             return;
         }
-        // ✅ JOIN GROUP
+        // ? JOIN GROUP
         if (taskHubConnection.state === signalR.HubConnectionState.Connected) {
             if (window.currentTeamName) {
                 taskHubConnection.invoke("LeaveTeamGroup", window.currentTeamName);
@@ -1985,6 +2073,11 @@
                     if (b.dataset.team === team) b.classList.add('active');
                 });
 
+                // FETCH VIRTUAL LEADS IF TEAM IS DIGI LEADS
+                if (team === 'Digi Leads' && typeof fetchVirtualLeads === 'function') {
+                    fetchVirtualLeads();
+                }
+
                 // Execute scripts from the dynamically loaded content
                 const scripts = container.querySelectorAll('script');
                 scripts.forEach(script => {
@@ -1995,23 +2088,16 @@
                         newScript.textContent = script.textContent;
                     }
                     document.body.appendChild(newScript);
-                    // Remove after execution to avoid duplicates if re-rendered
                     setTimeout(() => newScript.remove(), 100);
                 });
 
-                if (typeof syncBoardPermissions === "function") {
-                    syncBoardPermissions();
-                }
-                if (typeof enableColumnDrag === "function") {
-                    enableColumnDrag();
-                }
-                if (typeof enableTaskDragDrop === "function") {
-                    enableTaskDragDrop();
-                }
+                if (typeof syncBoardPermissions === "function") syncBoardPermissions();
+                if (typeof enableColumnDrag === "function") enableColumnDrag();
+                if (typeof enableTaskDragDrop === "function") enableTaskDragDrop();
             })
             .catch(err => {
-                container.innerHTML = "<div class='text-danger p-4'>Error loading board. Please try again.</div>";
                 console.error(err);
+                container.innerHTML = `<div class='alert alert-danger'>${err.message}</div>`;
             });
     }
 
@@ -2169,17 +2255,29 @@
                         </div>
                     </div>
 
+                    <!-- Lead Identity Banner (if stub) -->
+                    ${t.externalLeadId ? `
+                    <div id="leadIdentityBanner" class="alert alert-success d-flex align-items-center justify-content-between gap-3 mb-3 p-2 px-3 border-0 shadow-sm" style="background: #ecfdf5; color: #065f46; border-radius: 10px;">
+                        <div class="d-flex align-items-center gap-2">
+                             <i class="bi bi-lightning-charge-fill"></i>
+                             <span style="font-size: 0.85rem; font-weight: 700;">CONNECTED FACEBOOK LEAD</span>
+                        </div>
+                        <span id="leadSyncStatus" class="badge bg-success-subtle text-success border border-success-subtle fw-normal">LIVE</span>
+                    </div>
+                    <div id="leadLiveDetailsArea" class="mb-3 text-center py-2"><div class="spinner-border spinner-border-sm text-success"></div> <span class="ms-1 small text-muted">Hydrating fields...</span></div>
+                    ` : ''}
+
                     <!-- Description -->
                     ${t.description ? `
                     <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 6px;"><i class="bi bi-text-paragraph me-1"></i>Description</div>
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 6px;"><i class="bi bi-text-paragraph me-1"></i>Description/Notes</div>
                         <p style="margin: 0; color: #475569; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(t.description)}</p>
                     </div>` : ''}
 
                     <!-- Custom Fields -->
                     ${t.customFields && t.customFields.length > 0 ? `
                     <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 8px;"><i class="bi bi-grid-3x3-gap me-1"></i>Details</div>
+                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 8px;"><i class="bi bi-grid-3x3-gap me-1"></i>System Fields</div>
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
                             ${t.customFields.map(f => {
                                 const isImage = f.value && (f.value.startsWith('data:image/') || f.value.includes('/Tasks/GetFieldImage/') || f.value.includes('/Tasks/GetFieldImageById/') || f.value.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/));
@@ -2246,6 +2344,46 @@
                         </div>
                     </div>
                 `;
+
+                // Hydrate Lead Details if externalLeadId exists
+                if (t.externalLeadId) {
+                    fetch(`/Tasks/GetLeadLiveDetails?leadId=${t.externalLeadId}`)
+                        .then(res => res.json())
+                        .then(ld => {
+                            const detailArea = document.getElementById('leadLiveDetailsArea');
+                            if (!detailArea) return;
+                            if (ld.success && ld.lead) {
+                                let tableRows = '';
+                                const lead = ld.lead;
+                                const addRow = (label, val) => {
+                                    tableRows += `<tr><td class="fw-bold text-muted border-end" style="width: 35%; background: #f8fafc; font-size: 0.8rem;">${escapeHtml(label)}</td><td class="ps-3 fw-semibold text-dark small">${escapeHtml(val || '—')}</td></tr>`;
+                                };
+                                addRow('Campaign', lead.campaignName);
+                                addRow('Form ID', lead.formId);
+                                if (lead.fields) {
+                                    for (const [key, value] of Object.entries(lead.fields)) {
+                                        if (['name', 'email', 'phone', 'full_name', 'formid'].includes(key.toLowerCase()) || !value) continue;
+                                        addRow(key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), value);
+                                    }
+                                }
+                                detailArea.innerHTML = `
+                                    <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px; border: 1px solid #e2e8f0;">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover table-sm mb-0 align-middle">
+                                                <tbody>${tableRows}</tbody>
+                                            </table>
+                                        </div>
+                                    </div>`;
+                            } else {
+                                detailArea.innerHTML = '<div class="text-warning small"><i class="bi bi-exclamation-triangle"></i> Live data unavailable</div>';
+                            }
+                        })
+                        .catch(e => {
+                            console.error("Hydration error:", e);
+                            const detailArea = document.getElementById('leadLiveDetailsArea');
+                            if (detailArea) detailArea.innerHTML = '<div class="text-danger small">Sync failed</div>';
+                        });
+                }
             })
             .catch(() => {
                 body.innerHTML = '<div class="text-danger text-center">Failed to load task details</div>';
@@ -2933,7 +3071,7 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    // ─── Preview ───
+    // --- Preview ---
     async function previewExcelFile() {
         if (!_excelFile) return;
 
@@ -3035,7 +3173,7 @@
         return div.innerHTML;
     }
 
-    // ─── Import ───
+    // --- Import ---
     async function startExcelImport() {
         if (!_excelFile || !_previewData) return;
 
@@ -3148,7 +3286,7 @@
         }
     }
 
-    // ─── Import History ───
+    // --- Import History ---
     async function loadImportHistory() {
         const teamName = document.getElementById('importTeamName').value;
         const container = document.getElementById('importHistoryContent');
@@ -3260,7 +3398,7 @@ async function clearColumnTasks(columnId) {
 
         const res = await resp.json();
         if (typeof showToast === 'function') {
-            showToast(`✅ Successfully deleted ${res.count} tasks`, 'success');
+            showToast(`? Successfully deleted ${res.count} tasks`, 'success');
         }
 
         // Refresh board
