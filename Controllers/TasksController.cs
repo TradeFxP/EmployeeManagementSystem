@@ -66,7 +66,7 @@ public class TasksController : Controller
 
         // ================= USER / MANAGER =================
         var userTeams = await _context.UserTeams
-            .Where(t => t.UserId == user.Id)
+            .Where(t => t.UserId == user.Id && t.TeamName != "Development")
             .Select(t => t.TeamName)
             .Distinct()
             .ToListAsync();

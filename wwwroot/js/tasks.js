@@ -322,11 +322,113 @@ async function openEditTaskModal(taskId) {
         if (modalEl) {
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
+
+            // Load Communication Buttons for sales1 team
+            loadSalesCommunicationButtons(team, task);
         }
 
     } catch (err) {
         console.error(err);
         if (typeof showToast === 'function') showToast(err.message, 'danger');
+    }
+}
+
+async function loadSalesCommunicationButtons(team, task) {
+    const container = document.getElementById('communicationButtonsContainer');
+    if (!container) return;
+    container.innerHTML = ''; // Clear previous
+
+    if (team !== 'sales1' && team !== 'Sales1') return;
+
+    try {
+        // Load partials
+        const [wsRes, emRes] = await Promise.all([
+            fetch('/Communication/GetWhatsAppButton'),
+            fetch('/Communication/GetEmailButton')
+        ]);
+
+        if (wsRes.ok) container.innerHTML += await wsRes.text();
+        if (emRes.ok) container.innerHTML += await emRes.text();
+
+        // Setup handlers
+        const wsBtn = document.getElementById('whatsappBtn');
+
+        if (wsBtn) {
+            wsBtn.onclick = (e) => {
+                e.preventDefault();
+                // Extract phone - look for field named "Phone" or similar
+                let phoneValue = "";
+                const fieldValues = task.customFieldValues || {};
+
+                // Try to find phone in custom fields
+                for (const fieldId in fieldValues) {
+                    const fieldInput = document.querySelector(`#editCustomFieldsContainer [data-field-id="${fieldId}"]`);
+                    const label = fieldInput?.closest('.field-group')?.querySelector('label')?.textContent?.toLowerCase();
+                    if (label && (label.includes('phone') || label.includes('mobile'))) {
+                        phoneValue = fieldValues[fieldId][0] || "";
+                        break;
+                    }
+                }
+
+                if (!phoneValue) {
+                    showToast("Phone number not found in custom fields.", "warning");
+                    return;
+                }
+
+                // Clean phone number
+                const cleanPhone = phoneValue.replace(/\D/g, '');
+                window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}`, '_blank');
+            };
+        }
+
+        const emBtn = document.getElementById('emailDropdown');
+
+        if (emBtn) {
+            const getEmail = () => {
+                let emailValue = "";
+                const fieldValues = task.customFieldValues || {};
+                for (const fieldId in fieldValues) {
+                    const fieldInput = document.querySelector(`#editCustomFieldsContainer [data-field-id="${fieldId}"]`);
+                    const label = fieldInput?.closest('.field-group')?.querySelector('label')?.textContent?.toLowerCase();
+                    if (label && label.includes('email')) {
+                        emailValue = fieldValues[fieldId][0] || "";
+                        break;
+                    }
+                }
+                return emailValue;
+            };
+
+            const gmailOpt = document.getElementById('gmailOption');
+            const outlookOpt = document.getElementById('outlookOption');
+            const defaultOpt = document.getElementById('defaultMailOption');
+
+            if (gmailOpt) {
+                gmailOpt.onclick = (e) => {
+                    const email = getEmail();
+                    if (!email) return showToast("Email not found", "warning");
+                    window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}`, '_blank');
+                };
+            }
+
+            if (outlookOpt) {
+                outlookOpt.onclick = (e) => {
+                    const email = getEmail();
+                    if (!email) return showToast("Email not found", "warning");
+                    window.open(`https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(email)}`, '_blank');
+                };
+            }
+
+            if (defaultOpt) {
+                defaultOpt.onclick = (e) => {
+                    const email = getEmail();
+                    if (!email) return showToast("Email not found", "warning");
+                    window.location.href = `mailto:${email}`;
+                };
+            }
+        }
+
+    } catch (err) {
+        console.error("Failed to load communication buttons:", err);
     }
 }
 

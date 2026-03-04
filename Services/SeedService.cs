@@ -73,7 +73,6 @@ namespace UserRoles.Services
 
                 var teamsToSeed = new[]
                 {
-                    new { Name = "Development", Columns = new[] { "ToDo", "Doing", "Review", "Complete" } },
                     new { Name = "Testing", Columns = new[] { "To Test", "Testing", "Bug Found", "Verified" } },
                     new { Name = "Sales", Columns = new[] { "Leads", "Follow Up", "Negotiation", "Closed" } },
                     new { Name = "Digi Leads", Columns = new[] { "To Do", "Doing", "Review", "Completed" } }

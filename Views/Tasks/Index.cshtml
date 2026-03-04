@@ -765,7 +765,7 @@
                 <div class="modal-footer bg-light border-0 py-3">
                     @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                     {
-                        <div class="me-auto d-flex gap-2">
+                        <div class="me-auto d-flex gap-2 align-items-center">
                             <button class="btn btn-sm btn-outline-secondary px-3 fw-bold" style="border-radius: 8px;"
                                 onclick="openManageFieldsModal(); event.preventDefault();">
                                 <i class="bi bi-gear me-1"></i> Manage Fields
@@ -774,6 +774,9 @@
                                 onclick="addNewCustomField(); event.preventDefault();">
                                 <i class="bi bi-plus-lg me-1"></i> Add Field
                             </button> 
+                            
+                            <!-- Sales Communication Buttons -->
+                            <div id="communicationButtonsContainer" class="d-flex gap-2 ms-2 ps-2 border-start"></div>
                         </div>
                     }
                     <button class="btn btn-secondary px-4 fw-bold" style="border-radius: 8px;" data-bs-dismiss="modal">Cancel</button>

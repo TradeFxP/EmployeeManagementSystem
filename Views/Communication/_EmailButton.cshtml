@@ -1,0 +1,27 @@
+<div class="dropdown d-inline-block">
+    <button class="btn btn-primary d-flex align-items-center gap-2 shadow-sm rounded-pill px-3 dropdown-toggle" type="button" id="emailDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 13px; font-weight: 600; background-color: #007bff; border-color: #007bff; transition: all 0.2s ease;">
+        <i class="bi bi-envelope-at" style="font-size: 16px;"></i>
+        Email
+    </button>
+    <ul class="dropdown-menu shadow border-0 rounded-3 mt-2" aria-labelledby="emailDropdown" style="font-size: 13px;">
+        <li><a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:void(0)" id="gmailOption"><i class="bi bi-google text-danger"></i> Gmail</a></li>
+        <li><a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:void(0)" id="outlookOption"><i class="bi bi-microsoft text-primary"></i> Outlook</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:void(0)" id="defaultMailOption"><i class="bi bi-envelope"></i> Default App</a></li>
+    </ul>
+</div>
+
+<style>
+    #emailDropdown:hover {
+        background-color: #0069d9;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    #emailDropdown:active {
+        transform: translateY(0);
+    }
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+        color: #007bff;
+    }
+</style>
