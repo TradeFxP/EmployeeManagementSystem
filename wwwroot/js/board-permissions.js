@@ -1,5 +1,8 @@
 // board-permissions.js - Management of board permissions for administrators
 
+let rawBoardPermissions = []; // Store raw data for filtering
+let currentTeamName = "";
+
 async function openBoardPermissionModal(teamName) {
     const modalEl = document.getElementById('boardPermissionModal');
     if (!modalEl) return;
@@ -16,35 +19,16 @@ async function openBoardPermissionModal(teamName) {
     await loadBoardPermissions(teamName);
 }
 
-let rawBoardPermissions = []; // Store raw data for filtering
-let currentTeamName = "";
-let isDragDropMode = false;
-
-function toggleBoardPermissionMode() {
-    isDragDropMode = !isDragDropMode;
-    const btn = document.getElementById('toggleDragDropMode');
-    if (btn) {
-        btn.classList.toggle('btn-outline-info');
-        btn.classList.toggle('btn-info');
-        btn.innerHTML = isDragDropMode
-            ? '<i class="bi bi-person-lines-fill me-1"></i>Normal Mode'
-            : '<i class="bi bi-arrows-move me-1"></i>Drag & Drop';
-    }
-
-    // Refresh headers and body
-    renderBoardPermissionTable(rawBoardPermissions);
-}
-
 async function loadBoardPermissions(teamName) {
     const tbody = document.getElementById('permissionTableBody');
-    tbody.innerHTML = '<tr><td colspan="12" class="text-center py-5"><div class="spinner-border text-info mb-2"></div><div class="text-muted">Loading team members...</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="text-center py-1"><div class="spinner-border text-info mb-2"></div><div class="text-muted">Loading team members...</div></td></tr>';
 
     try {
         const resp = await fetch(`/Tasks/GetBoardPermissions?team=${encodeURIComponent(teamName)}`);
         if (!resp.ok) throw new Error('Failed to fetch permissions');
         rawBoardPermissions = await resp.json();
 
-        // Populate column filter if it exists
+        // Populate column filter
         populateColumnFilter(rawBoardPermissions);
 
         renderPermissionTable();
@@ -64,188 +48,9 @@ function onPermissionViewTypeChange() {
         colWrapper.style.setProperty('display', 'flex', 'important');
     } else {
         colWrapper.style.setProperty('display', 'none', 'important');
-        const filtered = rawBoardPermissions.filter(p => p.role === filterValue || p.role === 'Manager');
-        renderBoardPermissionTable(filtered);
     }
 
     renderPermissionTable();
-}
-
-function renderBoardPermissionTable(data) {
-    const table = document.querySelector('#boardPermissionModal table');
-    const thead = table.querySelector('thead');
-    const tbody = document.getElementById('permissionTableBody');
-
-    if (isDragDropMode) {
-        renderDragDropMode(thead, tbody, data);
-    } else {
-        renderNormalMode(thead, tbody, data);
-    }
-}
-
-function renderNormalMode(thead, tbody, data) {
-    thead.innerHTML = `
-        <tr>
-            <th class="ps-4 py-3">Member</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Add Col</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Rename</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Reorder</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Del Col</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Edit All</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Delete Task</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Review</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Import Excel</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Assign</th>
-            <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">All</th>
-        </tr>
-    `;
-
-    renderBoardPermissionRows(data);
-}
-
-function renderDragDropMode(thead, tbody, data) {
-    const columns = Array.from(document.querySelectorAll('.kanban-column'))
-        .filter(c => c.dataset.columnName.toLowerCase() !== 'history')
-        .map(c => ({ id: parseInt(c.dataset.columnId), name: c.dataset.columnName }));
-
-    let headersHtml = '<th class="ps-4 py-3">Member</th>';
-    columns.forEach(col => {
-        headersHtml += `<th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem; min-width: 100px;">FROM ${col.name}</th>`;
-    });
-
-    thead.innerHTML = `<tr>${headersHtml}</tr>`;
-    tbody.innerHTML = '';
-
-    if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${columns.length + 1}" class="text-center py-5 text-muted">No users found.</td></tr>`;
-        return;
-    }
-
-    data.forEach(p => {
-        const tr = document.createElement('tr');
-        tr.className = 'border-bottom';
-        let cellsHtml = `
-            <td class="ps-4 py-3">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-sm me-3 bg-soft-${getRoleColor(p.role)} text-${getRoleColor(p.role)} rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; background: rgba(0,0,0,0.05);">
-                        ${p.userName.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                        <div class="fw-bold text-dark" style="font-size: 0.85rem;">${p.userName}</div>
-                    </div>
-                </div>
-            </td>
-        `;
-
-        columns.forEach(sourceCol => {
-            cellsHtml += `<td class="text-center py-2">${renderTransitionCell(p, sourceCol, columns)}</td>`;
-        });
-
-        tr.innerHTML = cellsHtml;
-        tbody.appendChild(tr);
-    });
-
-    // Wire up transition clicks
-    tbody.querySelectorAll('.transition-check').forEach(chk => {
-        chk.onchange = (e) => updateTransition(e.target);
-    });
-}
-
-function renderTransitionCell(user, sourceCol, allCols) {
-    const allowedTargets = user.allowedTransitions[sourceCol.id] || [];
-    const otherCols = allCols.filter(c => c.id !== sourceCol.id);
-
-    if (otherCols.length === 0) return '<span class="text-muted small">N/A</span>';
-
-    // We'll use a small multi-select UI
-    let dropdownHtml = `
-        <div class="dropdown d-inline-block">
-            <button id="btn_allowed_${user.userId}_${sourceCol.id}" class="btn btn-sm btn-light border p-1 px-2" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="font-size: 0.7rem;">
-                ${allowedTargets.length} Allowed <i class="bi bi-chevron-down ms-1"></i>
-            </button>
-            <div class="dropdown-menu p-2 shadow-sm" style="min-width: 180px;">
-                <h6 class="dropdown-header px-0 mb-1" style="font-size: 0.7rem;">Allowed Destinations:</h6>
-                ${otherCols.map(target => `
-                    <div class="form-check small mb-1">
-                        <input class="form-check-input transition-check" type="checkbox" 
-                               id="tr_${user.userId}_${sourceCol.id}_${target.id}"
-                               data-user-id="${user.userId}" 
-                               data-source-id="${sourceCol.id}" 
-                               data-target-id="${target.id}"
-                               ${allowedTargets.includes(target.id) ? 'checked' : ''}>
-                        <label class="form-check-label" for="tr_${user.userId}_${sourceCol.id}_${target.id}">
-                            ${target.name}
-                        </label>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-    return dropdownHtml;
-}
-
-async function updateTransition(checkbox) {
-    const userId = checkbox.dataset.userId;
-    const sourceId = parseInt(checkbox.dataset.sourceId);
-    const targetId = parseInt(checkbox.dataset.targetId);
-    const isChecked = checkbox.checked;
-
-    // Find the user in raw data to update their local set
-    const user = rawBoardPermissions.find(u => u.userId === userId);
-    if (!user) return;
-
-    if (!user.allowedTransitions[sourceId]) user.allowedTransitions[sourceId] = [];
-
-    if (isChecked) {
-        if (!user.allowedTransitions[sourceId].includes(targetId)) {
-            user.allowedTransitions[sourceId].push(targetId);
-        }
-    } else {
-        user.allowedTransitions[sourceId] = user.allowedTransitions[sourceId].filter(id => id !== targetId);
-    }
-
-    // UPDATE UI IMMEDIATELY
-    const btn = document.getElementById(`btn_allowed_${userId}_${sourceId}`);
-    if (btn) {
-        const count = user.allowedTransitions[sourceId].length;
-        btn.innerHTML = `${count} Allowed <i class="bi bi-chevron-down ms-1"></i>`;
-    }
-
-    // Call update API
-    checkbox.disabled = true;
-    try {
-        const resp = await fetch('/Tasks/UpdateBoardPermission', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(user) // rawBoardPermissions contains the full dto
-        });
-        if (!resp.ok) throw new Error('Failed to update transitions');
-
-        if (typeof showToast === 'function') showToast('Transitions updated', 'success');
-    } catch (err) {
-        alert(err.message);
-        checkbox.checked = !isChecked; // revert
-    } finally {
-        checkbox.disabled = false;
-    }
-    // REMOVED renderPermissionTable() to prevent closing the dropdown
-}
-
-function populateColumnFilter(data) {
-    const select = document.getElementById('permissionColumnFilter');
-    if (!select || data.length === 0) return;
-
-    // Clear existing
-    select.innerHTML = '';
-
-    // Get unique columns from first user (all users in team have same columns list in DTO)
-    const columns = data[0].columnPermissions || [];
-    columns.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.columnId;
-        opt.textContent = c.columnName;
-        select.appendChild(opt);
-    });
 }
 
 function filterBoardPermissions() {
@@ -256,53 +61,70 @@ function renderPermissionTable() {
     const type = document.getElementById('permissionViewType').value;
     const roleFilter = document.getElementById('boardRoleFilter').value;
     const tbody = document.getElementById('permissionTableBody');
-    const thead = document.querySelector('#boardPermissionModal table thead tr');
+    const table = document.querySelector('#boardPermissionModal table');
+    const thead = table.querySelector('thead');
 
-    // 1. Update Headers
+    // Filter Data
+    let data = rawBoardPermissions;
+    if (roleFilter !== 'All') {
+        data = data.filter(p => p.role === roleFilter);
+    }
+
+    if (type === 'DragDrop') {
+        renderDragDropMode(thead, tbody, data);
+        return;
+    }
+
+    // Update Headers for Board/Column/Task
     if (type === 'Board') {
         thead.innerHTML = `
-            <th class="ps-4 py-3">Member</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Add Col</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Rename</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Reorder</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Del Col</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Edit All</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Del Task</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Review</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Excel</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Assign</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">All</th>
+            <tr>
+                <th class="ps-1 py-1">Member</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Add Col</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Rename</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Reorder</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Del Col</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Edit All</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Del Task</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Review</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Excel</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Assign</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">All</th>
+            </tr>
         `;
     } else if (type === 'Column') {
         thead.innerHTML = `
-            <th class="ps-4 py-3">Member</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Rename</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Del Col</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Add Task</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Clr Task</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">All</th>
+            <tr>
+                <th class="ps-1 py-1">Member</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Rename</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Del Col</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Add Task</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Clr Task</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">All</th>
+            </tr>
         `;
     } else if (type === 'Task') {
         thead.innerHTML = `
-            <th class="ps-4 py-3">Member</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Assign</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Create/Edit</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">Del Task</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">TaskHistory</th>
-            <th class="text-center small text-uppercase fw-bold text-muted">All</th>
+            <tr>
+                <th class="ps-1 py-1">Member</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Assign</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Create/Edit</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Del Task</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">TaskHistory</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">All</th>
+            </tr>
         `;
     }
 
-    // 2. Filter Data
-    let data = rawBoardPermissions;
-    if (roleFilter !== 'All') {
-        data = data.filter(p => p.role === roleFilter || p.role === 'Manager' || p.role === 'Sub Manager');
-    }
+    renderBoardPermissionRows(data, type);
+}
 
-    // 3. Render Rows
+function renderBoardPermissionRows(data, type) {
+    const tbody = document.getElementById('permissionTableBody');
     tbody.innerHTML = '';
+
     if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-5 text-muted"><i class="bi bi-person-x fs-2 d-block mb-2"></i>No users found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" class="text-center py-1 text-muted"><i class="bi bi-person-x fs-2 d-block mb-2"></i>No users found.</td></tr>`;
         return;
     }
 
@@ -311,7 +133,7 @@ function renderPermissionTable() {
         tr.className = 'border-bottom';
 
         let cells = `
-            <td class="ps-4 py-3">
+            <td class="ps-1 py-1">
                 <div class="d-flex align-items-center">
                     <div class="avatar-sm me-3 bg-soft-${getRoleColor(p.role)} text-${getRoleColor(p.role)} rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; background: rgba(0,0,0,0.05);">
                         ${p.userName.charAt(0).toUpperCase()}
@@ -374,6 +196,130 @@ function renderPermissionTable() {
     });
 }
 
+function renderDragDropMode(thead, tbody, data) {
+    const columns = Array.from(document.querySelectorAll('.kanban-column'))
+        .filter(c => c.dataset.columnName.toLowerCase() !== 'history')
+        .map(c => ({ id: parseInt(c.dataset.columnId), name: c.dataset.columnName }));
+
+    let headersHtml = '<th class="ps-1 py-1">Member</th>';
+    columns.forEach(col => {
+        headersHtml += `<th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem; min-width: 100px;">FROM ${col.name}</th>`;
+    });
+
+    thead.innerHTML = `<tr>${headersHtml}</tr>`;
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${columns.length + 1}" class="text-center py-5 text-muted">No users found.</td></tr>`;
+        return;
+    }
+
+    data.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-bottom';
+        let cellsHtml = `
+            <td class="ps-1 py-1">
+                <div class="d-flex align-items-center">
+                    <div class="avatar-sm me-3 bg-soft-${getRoleColor(p.role)} text-${getRoleColor(p.role)} rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; background: rgba(0,0,0,0.05);">
+                        ${p.userName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark" style="font-size: 0.85rem;">${p.userName}</div>
+                         <div class="badge bg-light text-muted border small p-1 px-2" style="font-size: 0.7rem;">${p.role}</div>
+                    </div>
+                </div>
+            </td>
+        `;
+
+        columns.forEach(sourceCol => {
+            cellsHtml += `<td class="text-center py-2">${renderTransitionCell(p, sourceCol, columns)}</td>`;
+        });
+
+        tr.innerHTML = cellsHtml;
+        tbody.appendChild(tr);
+    });
+
+    // Wire up transition clicks
+    tbody.querySelectorAll('.transition-check').forEach(chk => {
+        chk.onchange = (e) => updateTransition(e.target);
+    });
+}
+
+function renderTransitionCell(user, sourceCol, allCols) {
+    const allowedTargets = user.allowedTransitions[sourceCol.id] || [];
+    const otherCols = allCols.filter(c => c.id !== sourceCol.id);
+
+    if (otherCols.length === 0) return '<span class="text-muted small">N/A</span>';
+
+    let dropdownHtml = `
+        <div class="dropdown d-inline-block">
+            <button id="btn_allowed_${user.userId}_${sourceCol.id}" class="btn btn-sm btn-light border p-1 px-2" data-bs-toggle="dropdown" data-bs-auto-close="outside" style="font-size: 0.7rem;">
+                ${allowedTargets.length} Allowed <i class="bi bi-chevron-down ms-1"></i>
+            </button>
+            <div class="dropdown-menu p-2 shadow-sm" style="min-width: 180px;">
+                <h6 class="dropdown-header px-0 mb-1" style="font-size: 0.7rem;">Allowed Destinations:</h6>
+                ${otherCols.map(target => `
+                    <div class="form-check small mb-1">
+                        <input class="form-check-input transition-check" type="checkbox" 
+                               id="tr_${user.userId}_${sourceCol.id}_${target.id}"
+                                data-user-id="${user.userId}" 
+                                data-source-id="${sourceCol.id}" 
+                                data-target-id="${target.id}"
+                                ${allowedTargets.includes(target.id) ? 'checked' : ''}>
+                        <label class="form-check-label" for="tr_${user.userId}_${sourceCol.id}_${target.id}">
+                            ${target.name}
+                        </label>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    return dropdownHtml;
+}
+
+async function updateTransition(checkbox) {
+    const userId = checkbox.dataset.userId;
+    const sourceId = parseInt(checkbox.dataset.sourceId);
+    const targetId = parseInt(checkbox.dataset.targetId);
+    const isChecked = checkbox.checked;
+
+    const user = rawBoardPermissions.find(u => u.userId === userId);
+    if (!user) return;
+
+    if (!user.allowedTransitions[sourceId]) user.allowedTransitions[sourceId] = [];
+
+    if (isChecked) {
+        if (!user.allowedTransitions[sourceId].includes(targetId)) {
+            user.allowedTransitions[sourceId].push(targetId);
+        }
+    } else {
+        user.allowedTransitions[sourceId] = user.allowedTransitions[sourceId].filter(id => id !== targetId);
+    }
+
+    // UPDATE UI IMMEDIATELY
+    const btn = document.getElementById(`btn_allowed_${userId}_${sourceId}`);
+    if (btn) {
+        const count = user.allowedTransitions[sourceId].length;
+        btn.innerHTML = `${count} Allowed <i class="bi bi-chevron-down ms-1"></i>`;
+    }
+
+    checkbox.disabled = true;
+    try {
+        const resp = await fetch('/Tasks/UpdateBoardPermission', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(user)
+        });
+        if (!resp.ok) throw new Error('Failed to update transitions');
+
+        if (typeof showToast === 'function') showToast('Transitions updated', 'success');
+    } catch (err) {
+        if (typeof showToast === 'function') showToast(err.message, 'danger');
+        checkbox.checked = !isChecked; // revert
+    } finally {
+        checkbox.disabled = false;
+    }
+}
 
 function renderSwitch(userId, field, checked, columnId = null) {
     const id = `sw_${userId}_${field}_${columnId || 'board'}`;
@@ -400,11 +346,9 @@ async function updatePermission(checkbox, teamName) {
     const val = checkbox.checked;
     const viewType = document.getElementById('permissionViewType').value;
 
-    // Fetch existing data for the user from our local cache
     const userLocal = rawBoardPermissions.find(u => u.userId === userId);
     if (!userLocal) return;
 
-    // Build the DTO based on current state + new checked value
     const dto = JSON.parse(JSON.stringify(userLocal));
     dto.teamName = teamName;
 
@@ -427,18 +371,13 @@ async function updatePermission(checkbox, teamName) {
         });
         if (!resp.ok) throw new Error('Update failed');
 
-        // Update local cache
         Object.assign(userLocal, dto);
 
         if (typeof showToast === 'function') {
             showToast('Permission updated successfully', 'success');
         }
     } catch (err) {
-        if (typeof showToast === 'function') {
-            showToast(err.message, 'danger');
-        } else {
-            alert(err.message);
-        }
+        if (typeof showToast === 'function') showToast(err.message, 'danger');
         checkbox.checked = !val; // revert
     } finally {
         checkbox.disabled = false;
@@ -502,7 +441,6 @@ async function grantAllBoardPermissions(btn, userId, teamName) {
         });
         if (!resp.ok) throw new Error('Update failed');
 
-        // Update local cache and UI
         Object.assign(userLocal, dto);
         switches.forEach(s => s.checked = targetState);
 
@@ -510,12 +448,22 @@ async function grantAllBoardPermissions(btn, userId, teamName) {
             showToast('Permissions updated', 'success');
         }
     } catch (err) {
-        if (typeof showToast === 'function') {
-            showToast(err.message, 'danger');
-        } else {
-            alert(err.message);
-        }
+        if (typeof showToast === 'function') showToast(err.message, 'danger');
     } finally {
         btn.disabled = false;
     }
+}
+
+function populateColumnFilter(data) {
+    const select = document.getElementById('permissionColumnFilter');
+    if (!select || data.length === 0) return;
+
+    select.innerHTML = '';
+    const columns = data[0].columnPermissions || [];
+    columns.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.columnId;
+        opt.textContent = c.columnName;
+        select.appendChild(opt);
+    });
 }
