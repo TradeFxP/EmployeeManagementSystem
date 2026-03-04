@@ -20,27 +20,39 @@ namespace UserRoles.ViewModels
         // ✅ Optional (already used in some views)
         public string? TeamName { get; set; }
 
-        // ✅ ADD THIS
-        public List<Users> AssignableUsers { get; set; } = new();
-
         // Custom field definitions
         public List<TaskCustomField> CustomFields { get; set; } = new();
 
         // ✅ User's permissions for this board
         public BoardPermission? UserPermissions { get; set; }
 
-        // Users who can appear in the "Filter By Assignor" dropdown
-        public List<Users> Assignors { get; set; } = new();
-
-        // Users filtered by hierarchy for the top-level board filter
-        public List<Users> FilteredAssignees { get; set; } = new();
-
         public Team? TeamSettings { get; set; }
 
         // Map of UserId to their primary role (used for frontend filtering)
         public Dictionary<string, string> UserRolesMap { get; set; } = new();
+        public Dictionary<string, string> UserTeamsMap { get; set; } = new();
 
         // User's column-specific permissions for this board
         public List<ColumnPermission> ColumnPermissions { get; set; } = new();
+
+        // Grouped users for assignment dropdown
+        public List<TeamGroupViewModel> TeamGroups { get; set; } = new();
+
+        // Top-level management (Admins/Managers) - not repeated per team
+        public List<UserHierarchyItem> ManagementUsers { get; set; } = new();
+    }
+
+    public class UserHierarchyItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string RoleName { get; set; } = string.Empty;
+        public int Level { get; set; } // 0: Admin/Manager/Top-level SM, 1: Users under SM
+    }
+
+    public class TeamGroupViewModel
+    {
+        public string TeamName { get; set; } = string.Empty;
+        public List<UserHierarchyItem> Users { get; set; } = new();
     }
 }
