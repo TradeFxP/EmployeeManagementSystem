@@ -4,7 +4,7 @@
     var members = ViewBag.Members as IEnumerable<dynamic>;
 }
 
-<div class="assigned-overview-container p-4">
+<div class="assigned-overview-container p-1">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center">
             <h4 class="mb-0 me-3">
@@ -92,11 +92,11 @@
             <table class="table table-hover align-middle mb-0 custom-overview-table">
                 <thead style="background: #f8fafc;">
                     <tr>
-                        <th class="ps-4" style="width: 40%;">Title</th>
-                        <th style="width: 15%;">Status</th>
-                        <th style="width: 20%;">Assigned To</th>
-                        <th style="width: 20%;">Assigned By</th>
-                        <th style="width: 15%;">Due Date</th>
+                        <th class="ps-4" style="width: 50%;">Title</th>
+                        <th style="width: 10%;">Status</th>
+                        <th style="width: 15%;">Assigned To</th>
+                        <th style="width: 15%;">Assigned By</th>
+                        <th style="width: 10%;">Due Date</th>
                     </tr>
                 </thead>
                 <tbody id="assignedTasksTableBody">
@@ -166,7 +166,7 @@
                                             </div>
                                         </td>
                                         <td>
-                                            <span class="badge rounded-pill bg-light text-dark border px-3 py-1 fw-semibold">@task.Status</span>
+                                            <span class="badge rounded-pill bg-light text-dark border px-3 py-1 fw-semibold status-badge-pill">@(task.Column?.ColumnName ?? "ToDo")</span>
                                         </td>
                                         <td>
                                     @if (task.AssignedToUser != null)
@@ -175,7 +175,7 @@
                                                         <div class="avatar-circle-sm" style="background: linear-gradient(135deg, #06b6d4, #0891b2);">
                                                 @(task.AssignedToUser.UserName?.Substring(0, 1).ToUpper() ?? "?")
                                                         </div>
-                                                        <span class="text-truncate" style="max-width: 150px;">@task.AssignedToUser.UserName</span>
+                                                        <span class="text-truncate text-dark fw-bold" style="max-width: 150px;">@(task.AssignedToUser.Name ?? task.AssignedToUser.UserName?.Split('@')[0])</span>
                                                     </div>
                                     }
                                     else
@@ -190,7 +190,7 @@
                                                         <div class="avatar-circle-sm" style="background: linear-gradient(135deg, #64748b, #475569);">
                                                 @(task.AssignedByUser.UserName?.Substring(0, 1).ToUpper() ?? "?")
                                                         </div>
-                                                        <span class="text-truncate" style="max-width: 150px;">@task.AssignedByUser.UserName</span>
+                                                        <span class="text-truncate text-dark fw-bold" style="max-width: 150px;">@(task.AssignedByUser.Name ?? task.AssignedByUser.UserName?.Split('@')[0])</span>
                                                     </div>
                                     }
                                     else
@@ -231,15 +231,15 @@
         letter-spacing: 0.08em;
         font-weight: 800;
         color: #475569;
-        border-bottom: 2px solid #e2e8f0;
-        padding-top: 1.25rem;
-        padding-bottom: 1.25rem;
+        border-bottom: 0.2px solid #e2e8f0;
+        padding-top: 0.2rem;
+        padding-bottom: 0.1rem;
     }
 
     .custom-overview-table tbody td {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid #f1f5f9;
+        padding-top: 0.2rem;
+        padding-bottom: 0.1rem;
+        border-bottom: 0.2px solid #f1f5f9;
         transition: background 0.2s;
     }
 
@@ -295,30 +295,57 @@
 </style>
 
 <script>
-    function dropdownFilterSearch(input, listId) {
+    window.dropdownFilterSearch = function(input, listId) {
         const filter = input.value.toLowerCase().trim();
         const container = document.getElementById(listId);
+        if (!container) return;
         const items = container.querySelectorAll('.filter-member-item');
         
         items.forEach(item => {
             const name = item.dataset.name || "";
             if (name.includes(filter)) {
-                item.style.display = 'flex';
+                item.classList.remove('d-none');
             } else {
-                item.style.display = 'none';
+                item.classList.add('d-none');
             }
         });
-    }
 
-    function selectFilterMember(type, value, displayName) {
-        document.getElementById(`filterValue${type}`).value = value;
-        document.getElementById(`label${type}`).innerText = displayName;
-        filterAssignedTasks();
-    }
+        // IMMEDIATELY FILTER THE TABLE BELOW
+        const type = listId.replace('assignedToList', ''); // 'To' or 'By'
+        const filterInput = document.getElementById(`filterValue${type}`);
+        if (filterInput) {
+            filterInput.value = filter;
+            window.filterAssignedTasks();
+        }
+    };
 
-    function filterAssignedTasks() {
-        const toFilter = document.getElementById('filterValueTo').value.toLowerCase().trim();
-        const byFilter = document.getElementById('filterValueBy').value.toLowerCase().trim();
+    window.selectFilterMember = function(type, value, displayName) {
+        const valueInput = document.getElementById(`filterValue${type}`);
+        const labelEl = document.getElementById(`label${type}`);
+        if (valueInput) valueInput.value = value;
+        if (labelEl) labelEl.innerText = displayName;
+
+        // Reset the dropdown search input and list visibility
+        const listId = `assignedToList${type}`;
+        const dropdownMenu = document.querySelector(`#filter${type}Dropdown .dropdown-menu`);
+        if (dropdownMenu) {
+            const searchInput = dropdownMenu.querySelector('input[type="text"]');
+            if (searchInput) {
+                searchInput.value = '';
+                window.dropdownFilterSearch(searchInput, listId);
+            }
+        }
+
+        window.filterAssignedTasks();
+    };
+
+    window.filterAssignedTasks = function() {
+        const toVal = document.getElementById('filterValueTo');
+        const byVal = document.getElementById('filterValueBy');
+        if (!toVal || !byVal) return;
+
+        const toFilter = toVal.value.toLowerCase().trim();
+        const byFilter = byVal.value.toLowerCase().trim();
         const rows = document.querySelectorAll('.task-row');
 
         rows.forEach(row => {
@@ -334,32 +361,32 @@
                 row.style.display = 'none';
             }
         });
-    }
+    };
 
-    function handleRowSingleClick(row) {
+    window.handleRowSingleClick = function(row) {
         document.querySelectorAll('.task-row').forEach(r => r.classList.remove('active-row'));
         row.classList.add('active-row');
-    }
+    };
 
     // Real-time status updates via SignalR
     if (typeof taskHubConnection !== 'undefined') {
-        taskHubConnection.on("TaskMoved", function (data) {
+        taskHubConnection.off("TaskMoved").on("TaskMoved", function (data) {
             console.log("Assigned Overview: Received TaskMoved", data);
             const row = document.querySelector(`.task-row[data-task-id="${data.taskId}"]`);
             if (row) {
-                const statusBadge = row.querySelector('td:nth-child(2) .badge');
+                const statusBadge = row.querySelector('.status-badge-pill');
                 if (statusBadge) {
                     statusBadge.textContent = data.columnName;
                 }
             }
         });
 
-        // Also handle deletions
-        taskHubConnection.on("TaskRemoved", function (data) {
+        taskHubConnection.off("TaskRemoved").on("TaskRemoved", function (data) {
             const row = document.querySelector(`.task-row[data-task-id="${data.taskId}"]`);
             if (row) {
                 row.remove();
             }
         });
     }
+    
 </script>

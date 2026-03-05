@@ -50,6 +50,8 @@ builder.Services.Configure<EmailSettings>(
 
 builder.Services.AddHttpClient<IEmailService, EmailService>();
 builder.Services.AddScoped<ITaskHistoryService, TaskHistoryService>();
+builder.Services.AddScoped<ITaskPermissionService, TaskPermissionService>();
+builder.Services.AddScoped<IUserHierarchyService, UserHierarchyService>();
 
 // ================= FACEBOOK LEADS =================
 builder.Services.AddHttpClient<IFacebookLeadsService, FacebookLeadsService>();

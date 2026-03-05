@@ -72,11 +72,11 @@ namespace UserRoles.Controllers
 
             // Admin -> OrgChart
             if (roles.Contains("Admin"))
-                return RedirectToAction("OrgChart", "Users");
+                return RedirectToAction("Index", "OrgChart");
 
             // Manager -> OrgChart (scoped)
             if (roles.Contains("Manager"))
-                return RedirectToAction("OrgChart", "Users");
+                return RedirectToAction("Index", "OrgChart");
 
             // Regular User -> Reports
             if (roles.Contains("User"))

@@ -94,7 +94,7 @@ window.drop = function (event, newParentId) {
         targetName = dropTarget.querySelector(".node-name")?.innerText?.trim() || "Unknown";
     }
 
-    fetch('/Users/MoveOrgNode', {
+    fetch('/OrgChart/MoveNode', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

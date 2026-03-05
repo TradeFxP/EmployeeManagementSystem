@@ -16,21 +16,6 @@ using System.Text.Json;
 using TaskStatusEnum = UserRoles.Models.Enums.TaskStatus;
 
 
-    public class LeadConversionDto
-    {
-        public string? id { get; set; } // Always string for safety
-        public string? name { get; set; }
-        public string? email { get; set; }
-        public string? phone { get; set; }
-        public string? formId { get; set; }
-        public int? columnId { get; set; }
-        public string? campaignName { get; set; }
-        public string? adsetName { get; set; }
-        public string? adName { get; set; }
-        public string? metaCreatedAt { get; set; }
-        public JsonElement? fields { get; set; } 
-    }
-
 [Authorize]
 public class TasksController : Controller
 {
@@ -40,13 +25,16 @@ public class TasksController : Controller
     private readonly IHubContext<TaskHub> _hubContext;
     private readonly IFacebookLeadsService _leadsService;
 
-    public TasksController(AppDbContext context, UserManager<Users> userManager, ITaskHistoryService historyService, IHubContext<TaskHub> hubContext, IFacebookLeadsService leadsService)
+    private readonly ITaskPermissionService _permissions;
+
+    public TasksController(AppDbContext context, UserManager<Users> userManager, ITaskHistoryService historyService, IHubContext<TaskHub> hubContext, IFacebookLeadsService leadsService, ITaskPermissionService permissions)
     {
         _context = context;
         _userManager = userManager;
         _historyService = historyService;
         _hubContext = hubContext;
         _leadsService = leadsService;
+        _permissions = permissions;
     }
 
     // Loads page
@@ -385,7 +373,7 @@ public class TasksController : Controller
         if (taskToUpdate == null) return NotFound();
 
         // Check permission: Admin or granted CanAssignTask
-        if (!User.IsInRole("Admin") && !await AuthorizeBoardAction(taskToUpdate.TeamName, "AssignTask"))
+        if (!User.IsInRole("Admin") && !await _permissions.AuthorizeBoardAction(User, taskToUpdate.TeamName, "AssignTask"))
         {
             return Forbid();
         }
@@ -500,7 +488,7 @@ public class TasksController : Controller
         foreach (var task in tasks)
         {
             // Check permission per team (optimization: cache team permission check)
-            if (!User.IsInRole("Admin") && !await AuthorizeBoardAction(task.TeamName, "AssignTask"))
+            if (!User.IsInRole("Admin") && !await _permissions.AuthorizeBoardAction(User, task.TeamName, "AssignTask"))
                 continue;
 
             task.AssignedToUserId = assignToUser.Id;
@@ -537,11 +525,6 @@ public class TasksController : Controller
         return Ok(new { success = true, count = tasks.Count });
     }
 
-    public class BulkAssignRequest
-    {
-        public List<int> TaskIds { get; set; }
-        public string UserId { get; set; }
-    }
 
 
 
@@ -580,7 +563,7 @@ public class TasksController : Controller
         // Check permission if not Admin
         if (!User.IsInRole("Admin") && task.AssignedToUserId != user.Id)
         {
-            if (!await AuthorizeBoardAction(task.TeamName, "EditAllFields"))
+            if (!await _permissions.AuthorizeBoardAction(User, task.TeamName, "EditAllFields"))
                 return Forbid();
         }
 
@@ -623,7 +606,7 @@ public class TasksController : Controller
 
         if (!string.IsNullOrEmpty(model.AssignedToUserId))
         {
-            if (User.IsInRole("Admin") || await AuthorizeBoardAction(task.TeamName, "AssignTask"))
+            if (User.IsInRole("Admin") || await _permissions.AuthorizeBoardAction(User, task.TeamName, "AssignTask"))
             {
                 if (task.AssignedToUserId != model.AssignedToUserId)
                 {
@@ -846,7 +829,7 @@ public class TasksController : Controller
         if (task == null)
             return NotFound();
 
-        if (!await AuthorizeBoardAction(task.TeamName, "DeleteTask"))
+        if (!await _permissions.AuthorizeBoardAction(User, task.TeamName, "DeleteTask"))
             return Forbid();
 
         _context.TaskItems.Remove(task);
@@ -868,6 +851,7 @@ public class TasksController : Controller
             .AsNoTracking()
             .Include(t => t.AssignedByUser)
             .Include(t => t.AssignedToUser)
+            .Include(t => t.Column)
             .Where(t => t.TeamName == team && !t.IsArchived && t.AssignedToUserId != null)
             .OrderByDescending(t => t.AssignedAt)
             .ToListAsync();
@@ -954,8 +938,8 @@ public class TasksController : Controller
                 return Forbid();
         }
 
-        // ✅ AUTO-ARCHIVE logic: Move tasks from "Completed" to "History" if they were finished before today
-        await AutoArchiveOldTasks(team);
+        // Auto-archiving removed from controller to improve performance. 
+        // This should be handled by a background service or the TaskReviewController.
 
         // Load columns — enforce order: normal columns → Review → Completed
         var columnsRaw = await _context.TeamColumns
@@ -1201,143 +1185,6 @@ public class TasksController : Controller
 
 
 
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> AddColumn([FromBody] AddColumnRequest model)
-    {
-        if (!await AuthorizeBoardAction(model.Team, "AddColumn"))
-            return Forbid();
-
-        // Validate input
-        if (string.IsNullOrWhiteSpace(model.ColumnName))
-            return BadRequest("Column name is required");
-
-        // Get next column order for the team
-        var maxOrder = _context.TeamColumns
-            .Where(c => c.TeamName == model.Team)
-            .Max(c => (int?)c.Order) ?? 0;
-
-        // Create new column
-        var column = new TeamColumn
-        {
-            TeamName = model.Team,
-            ColumnName = model.ColumnName,
-            Order = maxOrder + 1
-        };
-
-        _context.TeamColumns.Add(column);
-        _context.SaveChanges();
-
-        return Ok();
-    }
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> ReorderColumns([FromBody] List<int> columnIds)
-    {
-        // 🔒 Safety check
-        if (columnIds == null || columnIds.Count == 0)
-            return BadRequest("No columns received");
-
-        var firstCol = await _context.TeamColumns.FindAsync(columnIds[0]);
-        if (firstCol == null || !await AuthorizeBoardAction(firstCol.TeamName, "ReorderColumns"))
-            return Forbid();
-
-        // Load only affected columns
-        var columns = _context.TeamColumns
-            .Where(c => columnIds.Contains(c.Id))
-            .ToList();
-
-        // Save order exactly as UI order
-        for (int i = 0; i < columnIds.Count; i++)
-        {
-            var column = columns.FirstOrDefault(c => c.Id == columnIds[i]);
-            if (column != null)
-            {
-                column.Order = i + 1; // 1-based order
-            }
-        }
-
-        _context.SaveChanges();
-        return Ok();
-    }
-
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> RenameColumn([FromBody] RenameColumnRequest model)
-    {
-        if (model == null || model.ColumnId <= 0 || string.IsNullOrWhiteSpace(model.Name))
-            return BadRequest("Invalid request");
-
-        var col = await _context.TeamColumns.FindAsync(model.ColumnId);
-        if (col == null) return NotFound("Column not found");
-
-        if (!await AuthorizeBoardAction(col.TeamName, "RenameColumn"))
-            return Forbid();
-
-        if (col == null)
-            return NotFound("Column not found");
-
-        col.ColumnName = model.Name.Trim();
-        _context.SaveChanges();
-
-        return Ok();
-    }
-
-    public class DeleteColumnRequest
-    {
-        public int columnId { get; set; } // Match JS casing precisely or use [JsonPropertyName]
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> DeleteColumn([FromBody] DeleteColumnRequest model)
-    {
-        if (model == null || model.columnId <= 0)
-            return BadRequest("Invalid request");
-
-        var hasAnyTasks = await _context.TaskItems.AnyAsync(t => t.ColumnId == model.columnId);
-        if (hasAnyTasks)
-            return BadRequest("Move all tasks (including archived) before deleting column");
-
-        var col = await _context.TeamColumns.FindAsync(model.columnId);
-        if (col == null)
-            return NotFound();
-
-        _context.TeamColumns.Remove(col);
-        await _context.SaveChangesAsync();
-
-        return Ok();
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> DeleteAllTasksInColumn([FromBody] int columnId)
-    {
-        if (columnId <= 0) return BadRequest();
-
-        var column = await _context.TeamColumns.FindAsync(columnId);
-        if (column == null) return NotFound();
-
-        // Check permission
-        if (!User.IsInRole("Admin"))
-        {
-            if (!await AuthorizeBoardAction(column.TeamName, "DeleteColumn")) // Reusing delete column permission for bulk delete
-                return Forbid();
-        }
-
-        var tasks = await _context.TaskItems
-            .Where(t => t.ColumnId == columnId)
-            .ToListAsync();
-
-        if (tasks.Any())
-        {
-            _context.TaskItems.RemoveRange(tasks);
-            await _context.SaveChangesAsync();
-        }
-
-        return Ok(new { success = true, count = tasks.Count });
-    }
 
     private bool CanUserSeeTaskOptimized(TaskItem task, string currentUserId, IList<string> viewerRoles, Dictionary<string, IList<string>> userRolesMap, Dictionary<string, string?> hierarchyMap)
     {
@@ -1401,21 +1248,6 @@ public class TasksController : Controller
     }
 
 
-    [HttpGet]
-    [Authorize]
-    public async Task<IActionResult> GetColumns(string team)
-    {
-        if (string.IsNullOrEmpty(team))
-            return BadRequest("Team name is required");
-
-        var columns = await _context.TeamColumns
-            .Where(c => c.TeamName == team)
-            .OrderBy(c => c.Order)
-            .Select(c => new { c.Id, c.ColumnName })
-            .ToListAsync();
-
-        return Ok(columns);
-    }
 
     [HttpPost]
     [Authorize]
@@ -1476,7 +1308,7 @@ public class TasksController : Controller
         // 1. COMPLETED column: ONLY Admin OR users with ReviewTask permission can move tasks here
         if (targetColName == "completed")
         {
-            if (!isAdmin && !await AuthorizeBoardAction(task.TeamName, "ReviewTask"))
+            if (!isAdmin && !await _permissions.AuthorizeBoardAction(User, task.TeamName, "ReviewTask"))
                 return new MoveResult { Success = false, Message = "Only Admin or authorized reviewers can move tasks to Completed.", StatusCode = 403 };
 
             // Task must have passed review first
@@ -1616,242 +1448,7 @@ public class TasksController : Controller
         return isOwner || isHierarchyAuthorized;
     }
 
-    // ═══════ ADMIN REVIEW ENDPOINT ═══════
-    public class ReviewTaskRequest
-    {
-        public int TaskId { get; set; }
-        public bool Passed { get; set; }
-        public string? ReviewNote { get; set; }
-    }
 
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> ReviewTask([FromBody] ReviewTaskRequest model)
-    {
-        if (model == null) return BadRequest();
-
-        var task = await _context.TaskItems
-            .Include(t => t.Column)
-            .Include(t => t.PreviousColumn)
-            .FirstOrDefaultAsync(t => t.Id == model.TaskId);
-
-        if (task == null) return NotFound("Task not found");
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-
-        if (!await AuthorizeBoardAction(task.TeamName, "ReviewTask"))
-            return Forbid();
-
-        task.ReviewedByUserId = user.Id;
-        task.ReviewedAt = DateTime.UtcNow;
-        task.ReviewNote = model.ReviewNote;
-
-        if (model.Passed)
-        {
-            // ✅ PASSED
-            task.ReviewStatus = UserRoles.Models.Enums.ReviewStatus.Passed;
-            await _historyService.LogReviewPassed(task.Id, user.Id, model.ReviewNote);
-
-            // ✅ AUTO-MOVE TO COMPLETED: Find the designated "Completed" column for this team
-            var completedCol = await _context.TeamColumns
-                .FirstOrDefaultAsync(c => c.TeamName == task.TeamName && c.ColumnName.ToLower().Trim() == "completed");
-
-            if (completedCol != null)
-            {
-                await _historyService.LogColumnMove(task.Id, task.ColumnId, completedCol.Id, user.Id);
-                task.ColumnId = completedCol.Id;
-                task.Status = TaskStatusEnum.Complete;
-                task.CompletedByUserId = task.AssignedToUserId;
-                task.CompletedAt = DateTime.UtcNow;
-                task.CurrentColumnEntryAt = DateTime.UtcNow;
-
-                await _context.SaveChangesAsync();
-
-                // 🚀 BROADCAST UPDATE (Review Result)
-                await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskReviewed", new
-                {
-                    taskId = task.Id,
-                    passed = true,
-                    newColumnId = task.ColumnId,
-                    columnName = "Completed",
-                    reviewNote = task.ReviewNote,
-                    reviewedBy = user.UserName
-                });
-
-                return Ok(new { success = true, passed = true, message = "Review passed! Task automatically moved to Completed." });
-            }
-
-            // Normal pass without auto-move (edge case)
-            await _context.SaveChangesAsync();
-            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskReviewed", new
-            {
-                taskId = task.Id,
-                passed = true,
-                newColumnId = task.ColumnId,
-                columnName = task.Column?.ColumnName,
-                reviewNote = task.ReviewNote,
-                reviewedBy = user.UserName
-            });
-
-            return Ok(new { success = true, passed = true, message = "Review passed. Task can now be moved to Completed." });
-        }
-        else
-        {
-            // ❌ FAILED — move back to previous column
-            task.ReviewStatus = UserRoles.Models.Enums.ReviewStatus.Failed;
-            await _historyService.LogReviewFailed(task.Id, user.Id, model.ReviewNote);
-
-            // Move back to previous column
-            if (task.PreviousColumnId.HasValue)
-            {
-                var prevCol = task.PreviousColumn ?? await _context.TeamColumns.FindAsync(task.PreviousColumnId);
-                if (prevCol != null)
-                {
-                    await _historyService.LogColumnMove(task.Id, task.ColumnId, prevCol.Id, user.Id);
-                    task.ColumnId = prevCol.Id;
-                    task.CurrentColumnEntryAt = DateTime.UtcNow;
-                }
-            }
-
-            task.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            // 🚀 BROADCAST UPDATE (Review Result)
-            await _hubContext.Clients.Group(task.TeamName).SendAsync("TaskReviewed", new
-            {
-                taskId = task.Id,
-                passed = model.Passed,
-                newColumnId = task.ColumnId,
-                columnName = task.Column?.ColumnName ?? "Completed",
-                reviewNote = task.ReviewNote,
-                reviewedBy = user.UserName
-            });
-
-            return Ok(new { success = true, passed = false, message = "Review failed. Task returned to previous column." });
-        }
-    }
-
-    // ═══════ ARCHIVE TO HISTORY ═══════
-    public class ArchiveRequest
-    {
-        public string TeamName { get; set; } = string.Empty;
-    }
-
-    [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> ArchiveCompletedTasks([FromBody] ArchiveRequest model)
-    {
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-
-        var completedTasks = await _context.TaskItems
-            .Where(t => t.TeamName == model.TeamName
-                     && !t.IsArchived
-                     && t.ReviewStatus == UserRoles.Models.Enums.ReviewStatus.Passed
-                     && t.CompletedAt != null)
-            .ToListAsync();
-
-        foreach (var task in completedTasks)
-        {
-            task.IsArchived = true;
-            task.ArchivedAt = DateTime.UtcNow;
-            await _historyService.LogArchivedToHistory(task.Id, user.Id);
-        }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { success = true, archivedCount = completedTasks.Count });
-    }
-
-    [HttpPost]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> ArchiveSingleTask([FromBody] int taskId)
-    {
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-
-        var task = await _context.TaskItems.FindAsync(taskId);
-        if (task == null) return NotFound();
-
-        task.IsArchived = true;
-        task.ArchivedAt = DateTime.UtcNow;
-        await _historyService.LogArchivedToHistory(task.Id, user.Id);
-        await _context.SaveChangesAsync();
-
-        return Ok(new { success = true });
-    }
-
-    [HttpGet]
-    [Authorize]
-    public async Task<IActionResult> GetArchivedTasks(string team)
-    {
-        if (string.IsNullOrWhiteSpace(team))
-            return BadRequest();
-
-        var archivedTasks = await _context.TaskItems
-            .Where(t => t.TeamName == team && t.IsArchived)
-            .Include(t => t.AssignedToUser)
-            .Include(t => t.CompletedByUser)
-            .OrderByDescending(t => t.ArchivedAt)
-            .Select(t => new
-            {
-                t.Id,
-                t.Title,
-                t.Description,
-                CompletedBy = t.CompletedByUser != null ? t.CompletedByUser.UserName : (t.AssignedToUser != null ? t.AssignedToUser.UserName : "Unknown"),
-                CompletedAt = t.CompletedAt,
-                ArchivedAt = t.ArchivedAt,
-                Priority = (int)t.Priority,
-                ReviewStatus = t.ReviewStatus.ToString()
-            })
-            .ToListAsync();
-
-        return Ok(archivedTasks);
-    }
-
-    [HttpGet]
-    [Authorize]
-    public async Task<IActionResult> GetArchivedTaskDetail(int id)
-    {
-        var task = await _context.TaskItems
-            .Include(t => t.CreatedByUser)
-            .Include(t => t.AssignedToUser)
-            .Include(t => t.AssignedByUser)
-            .Include(t => t.ReviewedByUser)
-            .Include(t => t.CompletedByUser)
-            .Include(t => t.CustomFieldValues.Where(cv => cv.Field.IsActive))
-                .ThenInclude(v => v.Field)
-            .FirstOrDefaultAsync(t => t.Id == id && t.IsArchived);
-
-        if (task == null) return NotFound();
-
-        return Ok(new
-        {
-            task.Id,
-            task.Title,
-            task.Description,
-            Priority = task.Priority.ToString(),
-            Status = task.Status.ToString(),
-            ReviewStatus = task.ReviewStatus.ToString(),
-            task.ReviewNote,
-            CreatedBy = task.CreatedByUser?.UserName,
-            AssignedTo = task.AssignedToUser?.UserName,
-            AssignedBy = task.AssignedByUser?.UserName,
-            ReviewedBy = task.ReviewedByUser?.UserName,
-            CompletedBy = task.CompletedByUser?.UserName ?? task.AssignedToUser?.UserName,
-            task.CreatedAt,
-            task.AssignedAt,
-            task.ReviewedAt,
-            task.CompletedAt,
-            task.ArchivedAt,
-            CustomFields = task.CustomFieldValues?.Select(fv => new
-            {
-                FieldName = fv.Field?.FieldName,
-                fv.Value
-            }).ToList()
-        });
-    }
 
     [HttpGet]
     [Authorize]
@@ -1866,11 +1463,6 @@ public class TasksController : Controller
         return Ok(teams);
     }
 
-    public class AssignTaskToTeamRequest
-    {
-        public int TaskId { get; set; }
-        public string TeamName { get; set; }
-    }
 
     [HttpPost]
     [Authorize]
@@ -1890,7 +1482,7 @@ public class TasksController : Controller
         // Check permission if not Admin
         if (!User.IsInRole("Admin"))
         {
-            if (!await AuthorizeBoardAction(task.TeamName, "AssignTask"))
+            if (!await _permissions.AuthorizeBoardAction(User, task.TeamName, "AssignTask"))
                 return Forbid();
         }
 
@@ -1947,157 +1539,7 @@ public class TasksController : Controller
 
         await _context.SaveChangesAsync();
 
-        return Ok(new
-        {
-            success = true,
-            message = $"Task moved to {model.TeamName} ({targetColumn.ColumnName})"
-        });
-    }
-
-    // ========== CUSTOM FIELD MANAGEMENT ENDPOINTS ==========
-
-    [HttpGet]
-    [Authorize]
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public async Task<IActionResult> GetCustomFields(string? team)
-    {
-        var fields = await _context.TaskCustomFields
-.Where(f => f.IsActive && f.TeamName == team)
-.OrderBy(f => f.Order)
-.Select(f => new
-{
-    f.Id,
-    f.FieldName,
-    f.FieldType,
-    f.IsRequired,
-    f.DropdownOptions,
-    f.Order,
-    f.TeamName
-})
-.ToListAsync();
-
-        return Ok(fields);
-    }
-
-    public class CreateFieldRequest
-    {
-        public string FieldName { get; set; } = string.Empty;
-        public string FieldType { get; set; } = "Text";
-        public bool IsRequired { get; set; } = false;
-        public string? DropdownOptions { get; set; }
-        public string? TeamName { get; set; }
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> CreateCustomField([FromBody] CreateFieldRequest model)
-    {
-        if (string.IsNullOrWhiteSpace(model.FieldName))
-            return BadRequest("Field name is required");
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-            return Unauthorized();
-
-        // Get max order
-        var maxOrder = await _context.TaskCustomFields
-            .MaxAsync(f => (int?)f.Order) ?? 0;
-
-        var field = new TaskCustomField
-        {
-            FieldName = model.FieldName.Trim(),
-            FieldType = model.FieldType,
-            IsRequired = model.IsRequired,
-            DropdownOptions = model.DropdownOptions,
-            IsActive = true,
-            Order = maxOrder + 1,
-            CreatedByUserId = user.Id,
-            CreatedAt = DateTime.UtcNow,
-            TeamName = model.TeamName
-        };
-
-        _context.TaskCustomFields.Add(field);
-        await _context.SaveChangesAsync();
-
-        return Ok(new { success = true, fieldId = field.Id });
-    }
-
-    public class UpdateFieldRequest
-    {
-        public int FieldId { get; set; }
-        public string? FieldName { get; set; }
-        public string? FieldType { get; set; }
-        public bool? IsRequired { get; set; }
-        public string? DropdownOptions { get; set; }
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> UpdateCustomField([FromBody] UpdateFieldRequest model)
-    {
-        var field = await _context.TaskCustomFields.FindAsync(model.FieldId);
-        if (field == null)
-            return NotFound("Field not found");
-
-        if (!string.IsNullOrWhiteSpace(model.FieldName))
-            field.FieldName = model.FieldName.Trim();
-
-        if (!string.IsNullOrWhiteSpace(model.FieldType))
-            field.FieldType = model.FieldType;
-
-        if (model.IsRequired.HasValue)
-            field.IsRequired = model.IsRequired.Value;
-
-        if (model.DropdownOptions != null)
-            field.DropdownOptions = model.DropdownOptions;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { success = true });
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> DeleteCustomField([FromBody] int fieldId)
-    {
-        var field = await _context.TaskCustomFields.FindAsync(fieldId);
-        if (field == null)
-            return NotFound("Field not found");
-
-        // Soft delete - set IsActive to false
-        field.IsActive = false;
-        await _context.SaveChangesAsync();
-
-        // Or hard delete (this will cascade delete all field values)
-        // _context.TaskCustomFields.Remove(field);
-        // await _context.SaveChangesAsync();
-
-        return Ok(new { success = true });
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> ReorderCustomFields([FromBody] List<int> fieldIds)
-    {
-        if (fieldIds == null || !fieldIds.Any())
-            return BadRequest("No field IDs provided");
-
-        var fields = await _context.TaskCustomFields
-            .Where(f => fieldIds.Contains(f.Id))
-            .ToListAsync();
-
-        for (int i = 0; i < fieldIds.Count; i++)
-        {
-            var field = fields.FirstOrDefault(f => f.Id == fieldIds[i]);
-            if (field != null)
-            {
-                field.Order = i + 1;
-            }
-        }
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { success = true });
+        return Ok(new { success = true, message = $"Task moved to {model.TeamName} ({targetColumn.ColumnName})" });
     }
 
     // ========== TASK HISTORY ==========
@@ -2110,568 +1552,5 @@ public class TasksController : Controller
         return Ok(history);
     }
 
-    [HttpGet]
-    [Authorize]
-    public async Task<IActionResult> GetTaskCustomFields(int taskId)
-    {
-        if (taskId <= 0) return BadRequest("Invalid task id");
 
-        var values = await _context.TaskFieldValues
-            .Where(v => v.TaskId == taskId && v.Field.IsActive)
-            .Select(v => new { v.FieldId, v.Value })
-            .ToListAsync();
-
-        var dict = values.ToDictionary(v => v.FieldId, v => v.Value ?? string.Empty);
-
-        return Ok(dict);
-    }
-
-    [Authorize(Roles = "Admin")]
-    [HttpGet]
-    public async Task<IActionResult> GetBoardPermissions(string team)
-    {
-        if (string.IsNullOrWhiteSpace(team)) return BadRequest();
-
-        var users = await _userManager.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
-        var perms = await _context.BoardPermissions
-            .AsNoTracking()
-            .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
-            .ToListAsync();
-
-        // 🔥 PERFORMANCE: Bulk-fetch roles
-        var userRolesData = await (from ur in _context.UserRoles
-                                   join r in _context.Roles on ur.RoleId equals r.Id
-                                   select new { ur.UserId, RoleName = r.Name })
-                                  .AsNoTracking()
-                                  .ToListAsync();
-
-        var userRolesMap = userRolesData
-            .GroupBy(ur => ur.UserId)
-            .ToDictionary(g => g.Key, g => g.Select(ur => ur.RoleName).ToList());
-
-        var teamColumns = await _context.TeamColumns
-            .Where(c => c.TeamName.ToLower().Trim() == team.ToLower().Trim())
-            .OrderBy(c => c.Order)
-            .ToListAsync();
-
-        var columnIds = teamColumns.Select(c => c.Id).ToList();
-        var colPerms = await _context.ColumnPermissions
-            .Where(cp => columnIds.Contains(cp.ColumnId))
-            .ToListAsync();
-
-        // Get the set of user IDs that belong to this specific team
-        var teamUserIds = await _context.UserTeams
-            .AsNoTracking()
-            .Where(ut => ut.TeamName == team)
-            .Select(ut => ut.UserId)
-            .ToHashSetAsync();
-
-        var result = new List<BoardPermissionDto>();
-
-        foreach (var u in users)
-        {
-            var rawRoles = userRolesMap.GetValueOrDefault(u.Id, new List<string>());
-            if (rawRoles.Contains("Admin")) continue; // 🚫 Hide Admins from permissions dashboard
-
-            string primaryRole = rawRoles.FirstOrDefault() ?? "User";
-            // Distinguish Sub Manager: role is "Manager" + has ParentUserId
-            if (primaryRole == "Manager" && !string.IsNullOrEmpty(u.ParentUserId))
-            {
-                primaryRole = "Sub Manager";
-            }
-
-            // 🔒 Scoping rule:
-            // - Manager (no ParentUserId): always show — they oversee all teams
-            // - Sub Manager / User: only show if they belong to this team
-            bool isTopLevelManager = primaryRole == "Manager";
-            if (!isTopLevelManager && !teamUserIds.Contains(u.Id))
-                continue;
-
-            var p = perms.FirstOrDefault(x => x.UserId == u.Id);
-
-            var userColPerms = colPerms.Where(cp => cp.UserId == u.Id).ToList();
-
-            result.Add(new BoardPermissionDto
-            {
-                UserId = u.Id,
-                UserName = u.UserName ?? "Unknown",
-                Role = primaryRole,
-                TeamName = team,
-                CanAddColumn = p?.CanAddColumn ?? false,
-                CanRenameColumn = p?.CanRenameColumn ?? false,
-                CanReorderColumns = p?.CanReorderColumns ?? false,
-                CanDeleteColumn = p?.CanDeleteColumn ?? false,
-                CanEditAllFields = p?.CanEditAllFields ?? false,
-                CanDeleteTask = p?.CanDeleteTask ?? false,
-                CanReviewTask = p?.CanReviewTask ?? false,
-                CanImportExcel = p?.CanImportExcel ?? false,
-                AllowedTransitions = !string.IsNullOrEmpty(p?.AllowedTransitionsJson)
-                    ? JsonSerializer.Deserialize<Dictionary<int, List<int>>>(p.AllowedTransitionsJson) ?? new()
-                    : new(),
-                CanViewHistory = p?.CanViewHistory ?? false,
-
-                // Populate Granular Column Permissions
-                ColumnPermissions = teamColumns.Select(tc =>
-                {
-                    var ucp = userColPerms.FirstOrDefault(ucp => ucp.ColumnId == tc.Id);
-                    return new ColumnPermissionDto
-                    {
-                        ColumnId = tc.Id,
-                        ColumnName = tc.ColumnName,
-                        CanRename = ucp?.CanRename ?? false,
-                        CanDelete = ucp?.CanDelete ?? false,
-                        CanAddTask = ucp?.CanAddTask ?? false,
-                        CanAssignTask = ucp?.CanAssignTask ?? false,
-                        CanEditTask = ucp?.CanEditTask ?? false,
-                        CanDeleteTask = ucp?.CanDeleteTask ?? false,
-                        CanViewHistory = ucp?.CanViewHistory ?? false
-                    };
-                }).ToList()
-            });
-        }
-
-        // Sort: Manager (1) -> Sub Manager (2) -> User (3)
-        var rolePriority = new Dictionary<string, int>
-        {
-            { "Manager", 1 },
-            { "Sub Manager", 2 },
-            { "User", 3 }
-        };
-
-        var sortedResult = result
-            .OrderBy(r => rolePriority.GetValueOrDefault(r.Role, 99))
-            .ThenBy(r => r.UserName)
-            .ToList();
-
-        return Ok(sortedResult);
-    }
-
-    [Authorize(Roles = "Admin")]
-    [HttpPost]
-    public async Task<IActionResult> UpdateBoardPermission([FromBody] BoardPermissionDto dto)
-    {
-        if (dto == null || string.IsNullOrWhiteSpace(dto.UserId) || string.IsNullOrWhiteSpace(dto.TeamName))
-            return BadRequest();
-
-        // Get all records for this user/team robustly
-        var allExisting = await _context.BoardPermissions
-            .Where(p => p.UserId == dto.UserId && p.TeamName.ToLower().Trim() == dto.TeamName.ToLower().Trim())
-            .ToListAsync();
-
-        var existing = allExisting.OrderByDescending(p => p.Id).FirstOrDefault();
-
-        if (existing == null)
-        {
-            existing = new BoardPermission
-            {
-                UserId = dto.UserId,
-                TeamName = dto.TeamName.Trim() // Sanitize on save
-            };
-            _context.BoardPermissions.Add(existing);
-        }
-        else
-        {
-            // Cleanup duplicates if they exist
-            if (allExisting.Count > 1)
-            {
-                var duplicates = allExisting.Where(p => p.Id != existing.Id).ToList();
-                _context.BoardPermissions.RemoveRange(duplicates);
-            }
-
-            // Ensure team name is sanitized/standardized on the one we keep
-            existing.TeamName = dto.TeamName.Trim();
-        }
-
-        existing.CanAddColumn = dto.CanAddColumn;
-        existing.CanRenameColumn = dto.CanRenameColumn;
-        existing.CanReorderColumns = dto.CanReorderColumns;
-        existing.CanDeleteColumn = dto.CanDeleteColumn;
-        existing.CanEditAllFields = dto.CanEditAllFields;
-        existing.CanDeleteTask = dto.CanDeleteTask;
-        existing.CanReviewTask = dto.CanReviewTask;
-        existing.CanImportExcel = dto.CanImportExcel;
-        existing.CanAssignTask = dto.CanAssignTask;
-        existing.AllowedTransitionsJson = JsonSerializer.Serialize(dto.AllowedTransitions ?? new());
-        existing.CanViewHistory = dto.CanViewHistory;
-
-        // --- NEW: Update Granular Column Permissions ---
-        if (dto.ColumnPermissions != null && dto.ColumnPermissions.Any())
-        {
-            var userColPerms = await _context.ColumnPermissions
-                .Where(cp => cp.UserId == dto.UserId)
-                .ToListAsync();
-
-            foreach (var cpDto in dto.ColumnPermissions)
-            {
-                var colPerm = userColPerms.FirstOrDefault(x => x.ColumnId == cpDto.ColumnId);
-                if (colPerm == null)
-                {
-                    colPerm = new ColumnPermission
-                    {
-                        UserId = dto.UserId,
-                        ColumnId = cpDto.ColumnId
-                    };
-                    _context.ColumnPermissions.Add(colPerm);
-                }
-
-                colPerm.CanRename = cpDto.CanRename;
-                colPerm.CanDelete = cpDto.CanDelete;
-                colPerm.CanClearTasks = cpDto.CanClearTasks;
-                colPerm.CanAddTask = cpDto.CanAddTask;
-                colPerm.CanAssignTask = cpDto.CanAssignTask;
-                colPerm.CanEditTask = cpDto.CanEditTask;
-                colPerm.CanDeleteTask = cpDto.CanDeleteTask;
-                colPerm.CanViewHistory = cpDto.CanViewHistory;
-            }
-        }
-
-        await _context.SaveChangesAsync();
-
-        // Broadcast permission update to the user
-        await _hubContext.Clients.All.SendAsync("PermissionsUpdated", dto.UserId, dto.TeamName);
-
-        return Ok(new { success = true });
-    }
-
-    private async Task<bool> AuthorizeBoardAction(string teamName, string action)
-    {
-        if (User.IsInRole("Admin")) return true;
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null) return false;
-
-        var perms = await _context.BoardPermissions
-            .Where(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == teamName.ToLower().Trim())
-            .OrderByDescending(p => p.Id)
-            .FirstOrDefaultAsync();
-
-        if (perms == null) return false;
-
-        return action switch
-        {
-            "AddColumn" => perms.CanAddColumn,
-            "RenameColumn" => perms.CanRenameColumn,
-            "ReorderColumns" => perms.CanReorderColumns,
-            "DeleteColumn" => perms.CanDeleteColumn,
-            "EditAllFields" => perms.CanEditAllFields,
-            "DeleteTask" => perms.CanDeleteTask,
-            "ReviewTask" => perms.CanReviewTask,
-            "ImportExcel" => perms.CanImportExcel,
-            "AssignTask" => perms.CanAssignTask,
-            _ => false
-        };
-    }
-
-    private async Task AutoArchiveOldTasks(string teamName)
-    {
-        // Find tasks in "Completed" column that were completed before today (UTC)
-        var today = DateTime.UtcNow.Date;
-
-        var oldTasks = await _context.TaskItems
-            .Include(t => t.Column)
-            .Where(t => t.TeamName == teamName
-                     && !t.IsArchived
-                     && t.Column.ColumnName.ToLower().Trim() == "completed"
-                     && t.CompletedAt.HasValue
-                     && t.CompletedAt.Value < today)
-            .ToListAsync();
-
-        if (oldTasks.Any())
-        {
-            foreach (var task in oldTasks)
-            {
-                task.IsArchived = true;
-                task.ArchivedAt = DateTime.UtcNow;
-                // Log archival (system user or null if we don't have a specific trigger user context here)
-                await _historyService.LogArchivedToHistory(task.Id, "System");
-            }
-            await _context.SaveChangesAsync();
-        }
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> UpdateTeamSettings([FromBody] UpdateTeamSettingsRequest model)
-    {
-        if (model == null || string.IsNullOrWhiteSpace(model.TeamName))
-            return BadRequest();
-
-        var team = await _context.Teams.FirstOrDefaultAsync(t => t.Name == model.TeamName);
-        if (team == null)
-        {
-            // Create if missing (lazy initialization)
-            team = new Team { Name = model.TeamName };
-            _context.Teams.Add(team);
-        }
-
-        team.IsPriorityVisible = model.IsPriorityVisible;
-        team.IsDueDateVisible = model.IsDueDateVisible;
-        team.IsTitleVisible = model.IsTitleVisible;
-        team.IsDescriptionVisible = model.IsDescriptionVisible;
-
-        await _context.SaveChangesAsync();
-        return Ok(new { success = true });
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> UploadCustomFieldImage(IFormFile file)
-    {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file uploaded");
-
-        // Enforce 2MB limit (user request)
-        if (file.Length > 2 * 1024 * 1024)
-            return BadRequest("File size exceeds 2MB limit");
-
-        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-        var extension = Path.GetExtension(file.FileName).ToLower();
-        if (!allowedExtensions.Contains(extension))
-            return BadRequest("Invalid file type");
-
-        // Instead of saving to disk, convert to Base64 for the frontend to send back during Task creation/update
-        using (var ms = new MemoryStream())
-        {
-            await file.CopyToAsync(ms);
-            var fileBytes = ms.ToArray();
-            var base64String = Convert.ToBase64String(fileBytes);
-            var contentType = file.ContentType;
-            var dataUrl = $"data:{contentType};base64,{base64String}";
-
-            return Ok(new { success = true, url = dataUrl });
-        }
-    }
-
-    [HttpGet]
-    [Route("Tasks/GetFieldImage/{taskId}/{fieldId}")]
-    [Route("Tasks/GetFieldImageById/{id}")]
-    [AllowAnonymous]
-    public async Task<IActionResult> GetFieldImage(int? taskId, int? fieldId, int? id)
-    {
-        TaskFieldValue fieldValue = null;
-
-        if (id.HasValue)
-        {
-            fieldValue = await _context.TaskFieldValues.FindAsync(id.Value);
-        }
-        else if (taskId.HasValue && fieldId.HasValue)
-        {
-            fieldValue = await _context.TaskFieldValues
-                .OrderByDescending(v => v.Id)
-                .FirstOrDefaultAsync(v => v.TaskId == taskId.Value && v.FieldId == fieldId.Value);
-        }
-
-        if (fieldValue == null || fieldValue.ImageData == null)
-            return NotFound();
-
-        return File(fieldValue.ImageData, fieldValue.ImageMimeType ?? "image/jpeg", fieldValue.FileName ?? "image.jpg");
-    }
-
-    public class UpdateTeamSettingsRequest
-    {
-        public string TeamName { get; set; }
-        public bool IsPriorityVisible { get; set; }
-        public bool IsDueDateVisible { get; set; }
-        public bool IsTitleVisible { get; set; }
-        public bool IsDescriptionVisible { get; set; }
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> SubmitMoveRequest([FromBody] MoveRequestSubmitModel model)
-    {
-        if (model == null || model.TaskId <= 0 || model.ToColumnId <= 0)
-            return BadRequest("Invalid request data.");
-
-        var task = await _context.TaskItems.FindAsync(model.TaskId);
-        if (task == null) return NotFound("Task not found.");
-
-        var toColumn = await _context.TeamColumns.FindAsync(model.ToColumnId);
-        if (toColumn == null) return NotFound("Target column not found.");
-
-        var fromColumn = await _context.TeamColumns.FindAsync(task.ColumnId);
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-
-        // Get board permissions for this user to save the request
-        var boardPerm = await _context.BoardPermissions
-            .FirstOrDefaultAsync(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == task.TeamName.ToLower().Trim());
-
-        if (boardPerm == null)
-        {
-            // Create a basic permission record if it doesn't exist
-            boardPerm = new BoardPermission { UserId = user.Id, TeamName = task.TeamName };
-            _context.BoardPermissions.Add(boardPerm);
-        }
-
-        var requests = string.IsNullOrEmpty(boardPerm.MoveRequestsJson)
-            ? new List<MoveRequest>()
-            : JsonSerializer.Deserialize<List<MoveRequest>>(boardPerm.MoveRequestsJson) ?? new List<MoveRequest>();
-
-        var newRequest = new MoveRequest
-        {
-            TaskId = task.Id,
-            TaskTitle = task.Title,
-            FromColumnId = task.ColumnId,
-            FromColumnName = fromColumn?.ColumnName ?? "Unknown",
-            ToColumnId = toColumn.Id,
-            ToColumnName = toColumn.ColumnName,
-            RequestedByUserId = user.Id,
-            RequestedByUserName = user.UserName ?? "User",
-            RequestedAt = DateTime.UtcNow,
-            Status = "Pending"
-        };
-
-        requests.Insert(0, newRequest);
-        boardPerm.MoveRequestsJson = JsonSerializer.Serialize(requests);
-        await _context.SaveChangesAsync();
-
-        await _hubContext.Clients.Group(task.TeamName).SendAsync("NewMoveRequest", new
-        {
-            teamName = task.TeamName,
-            requestedBy = newRequest.RequestedByUserName,
-            taskTitle = newRequest.TaskTitle
-        });
-
-        return Ok(new { success = true, message = "Move request submitted successfully." });
-    }
-
-    [HttpGet]
-    [Authorize]
-    public async Task<IActionResult> GetBoardMoveRequests(string teamName)
-    {
-        if (string.IsNullOrEmpty(teamName)) return BadRequest();
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-
-        bool isAdmin = await _userManager.IsInRoleAsync(user, "Admin");
-        bool isManager = await _userManager.IsInRoleAsync(user, "Manager") || await _userManager.IsInRoleAsync(user, "Sub-Manager");
-
-        if (!isAdmin && !isManager) return Forbid();
-
-        var allPerms = await _context.BoardPermissions
-            .Where(p => p.TeamName.ToLower().Trim() == teamName.ToLower().Trim() && !string.IsNullOrEmpty(p.MoveRequestsJson))
-            .ToListAsync();
-
-        var allRequests = new List<object>();
-        foreach (var p in allPerms)
-        {
-            var reqs = JsonSerializer.Deserialize<List<MoveRequest>>(p.MoveRequestsJson);
-            if (reqs != null)
-            {
-                foreach (var r in reqs)
-                {
-                    allRequests.Add(new
-                    {
-                        r.Id,
-                        r.TaskId,
-                        r.TaskTitle,
-                        r.FromColumnId,
-                        r.FromColumnName,
-                        r.ToColumnId,
-                        r.ToColumnName,
-                        r.RequestedByUserId,
-                        r.RequestedByUserName,
-                        r.RequestedAt,
-                        RequestedAtFormatted = r.RequestedAt.ToString("dd MMM, hh:mm tt"),
-                        r.Status,
-                        r.AdminReply,
-                        r.HandledAt,
-                        HandledAtFormatted = r.HandledAt?.ToString("dd MMM, hh:mm tt"),
-                        r.HandledByUserName,
-                        r.IsNew
-                    });
-                }
-            }
-        }
-
-        return Ok(allRequests.OrderByDescending(r => ((dynamic)r).RequestedAt).ToList());
-    }
-
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> HandleMoveRequest([FromBody] HandleMoveRequestModel model)
-    {
-        if (model == null || string.IsNullOrEmpty(model.RequestId))
-            return BadRequest();
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-
-        var boardPerm = await _context.BoardPermissions
-            .FirstOrDefaultAsync(p => p.MoveRequestsJson != null && p.MoveRequestsJson.Contains(model.RequestId));
-
-        if (boardPerm == null) return NotFound("Request not found.");
-
-        var requests = JsonSerializer.Deserialize<List<MoveRequest>>(boardPerm.MoveRequestsJson);
-        var request = requests?.FirstOrDefault(r => r.Id.ToString() == model.RequestId);
-        if (request == null) return NotFound("Request data not found.");
-
-        if (request.Status != "Pending") return BadRequest("Request already handled.");
-
-        request.Status = model.Approved ? "Approved" : "Rejected";
-        request.AdminReply = model.AdminReply;
-        request.HandledAt = DateTime.UtcNow;
-        request.HandledByUserName = user.UserName;
-        request.IsNew = false;
-
-        if (model.Approved)
-        {
-            var task = await _context.TaskItems.FindAsync(request.TaskId);
-            if (task != null)
-            {
-                await _historyService.LogColumnMove(task.Id, task.ColumnId, request.ToColumnId, user.Id);
-                task.ColumnId = request.ToColumnId;
-                task.CurrentColumnEntryAt = DateTime.UtcNow;
-
-                var toCol = await _context.TeamColumns.FindAsync(request.ToColumnId);
-                if (toCol != null && (toCol.ColumnName.ToLower().Trim() == "completed" || toCol.ColumnName.ToLower().Trim() == "done"))
-                {
-                    task.Status = TaskStatusEnum.Complete;
-                    task.CompletedByUserId = request.RequestedByUserId;
-                    task.CompletedAt = DateTime.UtcNow;
-                }
-
-                await _context.SaveChangesAsync();
-
-                await _hubContext.Clients.Group(boardPerm.TeamName).SendAsync("TaskMoved", new
-                {
-                    taskId = task.Id,
-                    newColumnId = task.ColumnId,
-                    movedBy = user.UserName,
-                    columnName = toCol?.ColumnName ?? "Unknown"
-                });
-            }
-        }
-
-        boardPerm.MoveRequestsJson = JsonSerializer.Serialize(requests);
-        await _context.SaveChangesAsync();
-
-        await _hubContext.Clients.User(request.RequestedByUserId).SendAsync("MoveRequestHandled", new
-        {
-            taskId = request.TaskId,
-            approved = model.Approved,
-            reply = model.AdminReply
-        });
-
-        return Ok(new { success = true });
-    }
-
-    public class MoveRequestSubmitModel
-    {
-        public int TaskId { get; set; }
-        public int ToColumnId { get; set; }
-    }
-
-    public class HandleMoveRequestModel
-    {
-        public string RequestId { get; set; } = string.Empty;
-        public bool Approved { get; set; }
-        public string? AdminReply { get; set; }
-    }
 }
-
-
-

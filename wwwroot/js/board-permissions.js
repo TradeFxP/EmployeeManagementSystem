@@ -24,7 +24,7 @@ async function loadBoardPermissions(teamName) {
     tbody.innerHTML = '<tr><td colspan="12" class="text-center py-1"><div class="spinner-border text-info mb-2"></div><div class="text-muted">Loading team members...</div></td></tr>';
 
     try {
-        const resp = await fetch(`/Tasks/GetBoardPermissions?team=${encodeURIComponent(teamName)}`);
+        const resp = await fetch(`/TaskPermissions/GetBoardPermissions?team=${encodeURIComponent(teamName)}`);
         if (!resp.ok) throw new Error('Failed to fetch permissions');
         rawBoardPermissions = await resp.json();
 
@@ -305,7 +305,7 @@ async function updateTransition(checkbox) {
 
     checkbox.disabled = true;
     try {
-        const resp = await fetch('/Tasks/UpdateBoardPermission', {
+        const resp = await fetch('/TaskPermissions/UpdateBoardPermission', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(user)
@@ -364,7 +364,7 @@ async function updatePermission(checkbox, teamName) {
 
     checkbox.disabled = true;
     try {
-        const resp = await fetch('/Tasks/UpdateBoardPermission', {
+        const resp = await fetch('/TaskPermissions/UpdateBoardPermission', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dto)
@@ -434,7 +434,7 @@ async function grantAllBoardPermissions(btn, userId, teamName) {
 
     btn.disabled = true;
     try {
-        const resp = await fetch('/Tasks/UpdateBoardPermission', {
+        const resp = await fetch('/TaskPermissions/UpdateBoardPermission', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dto)

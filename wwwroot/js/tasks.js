@@ -576,7 +576,7 @@ function submitReview() {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
 
     $.ajax({
-        url: '/Tasks/ReviewTask',
+        url: '/TaskReview/ReviewTask',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({
@@ -624,7 +624,7 @@ function archiveCompletedTasks(teamName) {
     if (!confirm('Archive all completed & passed tasks to the history column?')) return;
 
     $.ajax({
-        url: '/Tasks/ArchiveCompletedTasks',
+        url: '/TaskReview/ArchiveCompletedTasks',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ TeamName: teamName }),
@@ -644,7 +644,7 @@ function archiveSingleTask(taskId) {
     if (!confirm('Archive this task to the history column?')) return;
 
     $.ajax({
-        url: '/Tasks/ArchiveSingleTask',
+        url: '/TaskReview/ArchiveSingleTask',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(taskId),
@@ -674,7 +674,7 @@ function loadArchivedTasks(teamName) {
     }
 
     $.ajax({
-        url: '/Tasks/GetArchivedTasks',
+        url: '/TaskReview/GetArchivedTasks',
         method: 'GET',
         data: { team: teamName },
         success: function (tasks) {
@@ -746,7 +746,7 @@ function openArchivedTaskDetail(taskId) {
     modal.show();
 
     $.ajax({
-        url: '/Tasks/GetArchivedTaskDetail',
+        url: '/TaskReview/GetArchivedTaskDetail',
         method: 'GET',
         data: { id: taskId },
         success: function (t) {

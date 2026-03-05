@@ -1460,6 +1460,8 @@
     function sortTableData(direction) {
         const body = document.getElementById('viewDataTableBody');
         const rows = Array.from(body.querySelectorAll('.task-data-row'));
+        const headerUnassigned = document.getElementById('headerUnassigned');
+        const headerAssigned = document.getElementById('headerAssigned');
 
         // Update button states
         document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active', 'btn-primary'));
@@ -1472,10 +1474,29 @@
             return direction === 'desc' ? timeB - timeA : timeA - timeB;
         });
 
-        rows.forEach(row => body.appendChild(row));
+        // Re-append in grouped order: Unassigned Header -> Unassigned Rows -> Assigned Header -> Assigned Rows
+        if (headerUnassigned) body.appendChild(headerUnassigned);
+        rows.filter(r => r.dataset.isUnassigned === 'true').forEach(row => body.appendChild(row));
+
+        if (headerAssigned) body.appendChild(headerAssigned);
+        rows.filter(r => r.dataset.isUnassigned === 'false').forEach(row => body.appendChild(row));
     }
 
-    let selectedCountries = new Set();
+    function showFieldDetail(cell) {
+        const fullText = cell.getAttribute('data-full-text') || cell.innerText;
+        const fieldName = cell.getAttribute('data-field-name') || 'Field Detail';
+        
+        document.getElementById('fieldDetailModalTitle').innerText = fieldName.toUpperCase();
+        document.getElementById('fieldDetailModalContent').innerText = fullText;
+        
+        const modal = new bootstrap.Modal(document.getElementById('fieldDetailModal'));
+        modal.show();
+    }
+
+    if (typeof window.selectedCountries === 'undefined') {
+        window.selectedCountries = new Set();
+    }
+    var selectedCountries = window.selectedCountries;
 
     function prepareCountryFilter() {
         const countries = new Set();
@@ -1527,6 +1548,16 @@
         const bulkContainer = document.getElementById('bulkAssignContainer');
         const filterBadge = document.getElementById('filteredCountBadge');
         const resetBtn = document.getElementById('resetFilterBtn');
+
+        // Update group header visibility
+        const unassignedVisible = Array.from(document.querySelectorAll('.task-data-row[data-is-unassigned="true"]')).some(r => r.style.display !== 'none');
+        const assignedVisible = Array.from(document.querySelectorAll('.task-data-row[data-is-unassigned="false"]')).some(r => r.style.display !== 'none');
+        
+        const hUnassigned = document.getElementById('headerUnassigned');
+        const hAssigned = document.getElementById('headerAssigned');
+        
+        if (hUnassigned) hUnassigned.style.display = unassignedVisible ? '' : 'none';
+        if (hAssigned) hAssigned.style.display = assignedVisible ? '' : 'none';
 
         if (selectedCountries.size > 0) {
             bulkContainer.classList.remove('d-none');
@@ -1696,7 +1727,7 @@
 
                             int totalCols = 1 /* ID */ + activeFields.Count
                                 + (hasTitle ? 1 : 0) + (hasDesc ? 1 : 0) + 1 /* Priority */ + (hasDueDate ? 1 : 0)
-                                + 1 /* Status */ + (hasAssigned ? 1 : 0) + (hasCreatedBy ? 1 : 0) + 1 /* Created At */;
+                                + (hasAssigned ? 1 : 0) + (hasCreatedBy ? 1 : 0) + 1 /* Created At */ + 1 /* CURRENT STAGE */;
                         }
                         <thead class="sticky-top shadow-sm">
                             <tr class="header-row">
@@ -1740,9 +1771,9 @@
                                 @* ── Standard fields after ── *@
                                 @if (hasTitle) { <th>TITLE</th> }
                                 @if (hasDesc)  { <th style="min-width: 200px;">DESCRIPTION</th> }
+                                <th style="width: 150px;">CURRENT STAGE</th>
                                 <th style="width: 120px;">PRIORITY</th>
                                 @if (hasDueDate) { <th style="width: 140px;">DUE DATE</th> }
-                                <th style="width: 120px;">STATUS</th>
                                 @if (hasCreatedBy) { <th>CREATED BY</th> }
                                 <th style="width: 150px;">CREATED AT</th>
                             </tr>
@@ -1750,12 +1781,130 @@
                         <tbody id="viewDataTableBody">
                             @if (allTasks.Any())
                             {
-                                foreach (var col in Model.Columns)
+                                var unassignedAdminTasks = allTasks.Where(t => t.AssignedToUserId == null || (Model.UserRolesMap.GetValueOrDefault(t.AssignedToUserId, "User") == "Admin")).ToList();
+                                var assignedTasks = allTasks.Except(unassignedAdminTasks).ToList();
+
+                                if (unassignedAdminTasks.Any())
                                 {
-                                    if (col.Tasks == null) continue;
-                                    foreach (var task in col.Tasks)
+                                    <tr class="table-group-header" id="headerUnassigned" style="background: #eff6ff !important; border-bottom: 2px solid #dbeafe;">
+                                        <td colspan="@totalCols" class="py-1 px-1 fw-bold text-uppercase text-blue-700" style="font-size: 0.8rem; letter-spacing: 0.05em; color: #1d4ed8;">
+                                            <i class="bi bi-person-dash-fill me-2 fs-5 text-blue-500"></i> UNASSIGNED TASKS (ADMIN)
+                                        </td>
+                                    </tr>
+                                    foreach (var task in unassignedAdminTasks)
                                     {
-                                        <tr class="task-data-row" data-task-id="@task.Id" data-created-at="@task.CreatedAt.Ticks">
+                                        var isUnassigned = true;
+                                        var rowBgColor = "#eff6ff";
+                                        var rowBorder = "border-left: 6px solid #3b82f6;";
+
+                                        <tr class="task-data-row" 
+                                            data-task-id="@task.Id" 
+                                            data-created-at="@task.CreatedAt.Ticks" 
+                                            data-is-unassigned="true"
+                                            style="background-color: @rowBgColor !important; @rowBorder">
+                                            
+                                            <td class="text-center fw-bold text-muted">@task.Id</td>
+
+                                            @if (hasAssigned)
+                                            {
+                                                <td class="small">
+                                                    @{
+                                                        var assigneeTeam = task.AssignedToUserId != null ? Model.UserTeamsMap.GetValueOrDefault(task.AssignedToUserId, "N/A") : "N/A";
+                                                        var assigneeRole = task.AssignedToUserId != null ? Model.UserRolesMap.GetValueOrDefault(task.AssignedToUserId, "User") : "";
+                                                        var assigneeName = task.AssignedToUser?.Name ?? "Unassigned";
+                                                    }
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="avatar-table-xs me-2 bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center">
+                                                            @(string.IsNullOrEmpty(assigneeName) ? "?" : assigneeName[0].ToString().ToUpper())
+                                                        </div>
+                                                        <div class="d-flex flex-column">
+                                                            <span class="assignee-name fw-bold">@assigneeName</span>
+                                                            <span class="text-muted" style="font-size: 0.65rem;">
+                                                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-1 me-1">@assigneeTeam</span>
+                                                                <span class="text-info">@assigneeRole</span>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            }
+
+                                            @foreach (var field in activeFields)
+                                            {
+                                                var fv = task.CustomFieldValues?.FirstOrDefault(v => v.FieldId == field.Id);
+                                                var isCountry = field.FieldName?.Trim().ToLower() == "country";
+                                                <td class="small @(isCountry ? "country-cell" : "")" 
+                                                    data-field-id="@field.Id" 
+                                                    data-field-name="@field.FieldName"
+                                                    data-full-text="@(fv?.Value ?? "-")"
+                                                    onclick="showFieldDetail(this)"
+                                                    style="cursor: pointer;">
+                                                    @(fv?.Value ?? "-")
+                                                </td>
+                                            }
+
+                                            @if (hasTitle) { <td class="fw-bold text-dark" data-field-name="Title" onclick="showFieldDetail(this)" style="cursor: pointer;">@task.Title</td> }
+                                            @if (hasDesc)
+                                            {
+                                                <td class="text-muted small description-cell" 
+                                                    title="Click to view full description" 
+                                                    data-field-name="Description"
+                                                    data-full-text="@task.Description"
+                                                    onclick="showFieldDetail(this)"
+                                                    style="cursor: pointer;">
+                                                    @(string.IsNullOrEmpty(task.Description) ? "-" :
+                                                      task.Description.Length > 80
+                                                          ? task.Description.Substring(0, 80) + "…"
+                                                          : task.Description)
+                                                </td>
+                                            }
+                                            <td class="small fw-bold">
+                                                <span class="badge rounded-pill bg-white text-black border border-blue-200 px-2 py-1 status-badge shadow-sm" data-status-task-id="@task.Id" style="color: #000 !important;">
+                                                    @task.Status
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @{
+                                                    var pColor = task.Priority == UserRoles.Models.Enums.TaskPriority.Critical ? "danger" :
+                                                                task.Priority == UserRoles.Models.Enums.TaskPriority.High    ? "warning" :
+                                                                task.Priority == UserRoles.Models.Enums.TaskPriority.Medium  ? "info"    : "secondary";
+                                                }
+                                                <span class="badge bg-soft-@pColor text-@pColor border border-@pColor-subtle rounded-pill px-2">
+                                                    <i class="bi bi-circle-fill me-1" style="font-size:0.4rem"></i>
+                                                    @task.Priority.ToString()
+                                                </span>
+                                            </td>
+                                            @if (hasDueDate)
+                                            {
+                                                <td class="text-muted small">@(task.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                            }
+                                            @if (hasCreatedBy)
+                                            {
+                                                <td class="small text-muted">@task.CreatedByUser?.Name</td>
+                                            }
+                                            <td class="small text-muted">@task.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                        </tr>
+                                    }
+                                }
+
+                                if (assignedTasks.Any())
+                                {
+                                    <tr class="table-group-header" id="headerAssigned" style="background: #f0fdf4 !important; border-bottom: 2px solid #dcfce7;">
+                                        <td colspan="@totalCols" class="py-1 px-1 fw-bold text-uppercase text-green-700" style="font-size: 0.8rem; letter-spacing: 0.05em; color: #15803d;">
+                                            <i class="bi bi-person-check-fill me-2 fs-5 text-success"></i> ASSIGNED TASKS
+                                        </td>
+                                    </tr>
+                                    foreach (var task in assignedTasks)
+                                    {
+                                        var isUnassigned = false;
+                                        var rowBgColor = "#f0fdf4";
+                                        var rowBorder = "border-left: 6px solid #22c55e;";
+
+                                        <tr class="task-data-row" 
+                                            data-task-id="@task.Id" 
+                                            data-created-at="@task.CreatedAt.Ticks" 
+                                            data-is-unassigned="false"
+                                            style="background-color: @rowBgColor !important; @rowBorder">
+                                            
                                             <td class="text-center fw-bold text-muted">@task.Id</td>
 
                                             @if (hasAssigned)
@@ -1781,27 +1930,40 @@
                                                 </td>
                                             }
 
-                                            @* ── Custom field cells (matching header order) ── *@
                                             @foreach (var field in activeFields)
                                             {
                                                 var fv = task.CustomFieldValues?.FirstOrDefault(v => v.FieldId == field.Id);
                                                 var isCountry = field.FieldName?.Trim().ToLower() == "country";
-                                                <td class="small @(isCountry ? "country-cell" : "")" data-field-id="@field.Id">
+                                                <td class="small @(isCountry ? "country-cell" : "")" 
+                                                    data-field-id="@field.Id" 
+                                                    data-field-name="@field.FieldName"
+                                                    data-full-text="@(fv?.Value ?? "-")"
+                                                    onclick="showFieldDetail(this)"
+                                                    style="cursor: pointer;">
                                                     @(fv?.Value ?? "-")
                                                 </td>
                                             }
 
-                                            @* ── Standard field cells ── *@
-                                            @if (hasTitle) { <td class="fw-bold text-dark">@task.Title</td> }
+                                            @if (hasTitle) { <td class="fw-bold text-dark" data-field-name="Title" onclick="showFieldDetail(this)" style="cursor: pointer;">@task.Title</td> }
                                             @if (hasDesc)
                                             {
-                                                <td class="text-muted small description-cell" title="@task.Description">
+                                                <td class="text-muted small description-cell" 
+                                                    title="Click to view full description" 
+                                                    data-field-name="Description"
+                                                    data-full-text="@task.Description"
+                                                    onclick="showFieldDetail(this)"
+                                                    style="cursor: pointer;">
                                                     @(string.IsNullOrEmpty(task.Description) ? "-" :
                                                       task.Description.Length > 80
                                                           ? task.Description.Substring(0, 80) + "…"
                                                           : task.Description)
                                                 </td>
                                             }
+                                            <td class="small fw-bold">
+                                                <span class="badge rounded-pill bg-white text-black border border-green-200 px-2 py-1 status-badge shadow-sm" data-status-task-id="@task.Id" style="color: #000 !important;">
+                                                    @task.Status
+                                                </span>
+                                            </td>
                                             <td>
                                                 @{
                                                     var pColor = task.Priority == UserRoles.Models.Enums.TaskPriority.Critical ? "danger" :
@@ -1817,11 +1979,6 @@
                                             {
                                                 <td class="text-muted small">@(task.DueDate?.ToString("yyyy-MM-dd") ?? "-")</td>
                                             }
-                                            <td>
-                                                <span class="badge bg-light text-dark border rounded-pill status-badge" data-status-task-id="@task.Id">
-                                                    @col.ColumnName
-                                                </span>
-                                            </td>
                                             @if (hasCreatedBy)
                                             {
                                                 <td class="small text-muted">@task.CreatedByUser?.Name</td>
@@ -1845,6 +2002,26 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 📦 FIELD DETAIL MODAL -->
+<div class="modal fade" id="fieldDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0" style="border-radius: 16px;">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-bold text-muted letter-spacing-1" id="fieldDetailModalTitle">FIELD DETAIL</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-4">
+                <div id="fieldDetailModalContent" class="text-dark fs-5 p-3 bg-light rounded-3" style="white-space: pre-wrap; word-wrap: break-word; min-height: 100px;">
+                    <!-- Content will be injected here -->
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

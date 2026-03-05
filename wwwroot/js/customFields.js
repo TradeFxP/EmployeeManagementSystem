@@ -34,7 +34,7 @@ async function loadCustomFields(team) {
 
     try {
         console.log(`Fetching custom fields for team ${team}...`);
-        const url = team ? `/Tasks/GetCustomFields?team=${encodeURIComponent(team)}&t=${new Date().getTime()}` : `/Tasks/GetCustomFields?t=${new Date().getTime()}`;
+        const url = team ? `/TaskCustomFields/GetCustomFields?team=${encodeURIComponent(team)}&t=${new Date().getTime()}` : `/TaskCustomFields/GetCustomFields?t=${new Date().getTime()}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to load custom fields');
 
@@ -326,7 +326,7 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
 
                     // Fetch columns for the team
                     if (team) {
-                        fetch(`/Tasks/GetColumns?team=${encodeURIComponent(team)}`)
+                        fetch(`/TaskColumns/GetColumns?team=${encodeURIComponent(team)}`)
                             .then(res => res.json())
                             .then(cols => {
                                 input.innerHTML = '<option value="">-- Select Column --</option>';
@@ -409,6 +409,18 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
 
                     input.innerHTML = `
                         <div class="remarks-split-container d-flex flex-column flex-md-row gap-3 p-3 bg-white border border-secondary-subtle rounded-3 shadow-sm" style="min-height: 250px;">
+
+
+                         <!-- Right: History Area (60%) -->
+                            <div class="remarks-history-side flex-grow-1" style="max-height: 400px; overflow-y: auto;">
+                                <div class="d-flex align-items-center justify-content-between mb-2 position-sticky top-0 bg-white py-1 z-index-1">
+                                    <label class="x-small fw-bold text-muted mb-0" style="font-size: 10px; text-transform: uppercase;">Remark History</label>
+                                    <span class="badge bg-light text-muted border text-uppercase" style="font-size: 8px; letter-spacing: 0.5px;">${points.length} ENTRIES</span>
+                                </div>
+                                <div class="remarks-list">
+                                    ${pointsHtml || '<div class="text-center py-5 text-muted small italic opacity-50"><i class="bi bi-journal-text d-block fs-3 mb-2"></i>No entries found</div>'}
+                                </div>
+                            </div>
                             <!-- Left: Input Area (40%) -->
                             <div class="remarks-input-side" style="flex: 0 0 40%; border-right: 1px solid #f1f5f9; padding-right: 15px;">
                                 <div class="mb-2">
@@ -426,16 +438,7 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                                 </button>
                             </div>
 
-                            <!-- Right: History Area (60%) -->
-                            <div class="remarks-history-side flex-grow-1" style="max-height: 400px; overflow-y: auto;">
-                                <div class="d-flex align-items-center justify-content-between mb-2 position-sticky top-0 bg-white py-1 z-index-1">
-                                    <label class="x-small fw-bold text-muted mb-0" style="font-size: 10px; text-transform: uppercase;">Remark History</label>
-                                    <span class="badge bg-light text-muted border text-uppercase" style="font-size: 8px; letter-spacing: 0.5px;">${points.length} ENTRIES</span>
-                                </div>
-                                <div class="remarks-list">
-                                    ${pointsHtml || '<div class="text-center py-5 text-muted small italic opacity-50"><i class="bi bi-journal-text d-block fs-3 mb-2"></i>No entries found</div>'}
-                                </div>
-                            </div>
+                           
 
                             <div class="hidden-remark-values d-none">
                                 ${hiddenValues}
@@ -489,7 +492,7 @@ async function addNewCustomField() {
 
     try {
         const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
-        const response = await fetch('/Tasks/CreateCustomField', {
+        const response = await fetch('/TaskCustomFields/CreateCustomField', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -514,7 +517,7 @@ async function renameCustomField(id, currentName) {
     if (!newName || newName === currentName) return;
 
     try {
-        const response = await fetch('/Tasks/UpdateCustomField', {
+        const response = await fetch('/TaskCustomFields/UpdateCustomField', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -536,7 +539,7 @@ async function deleteCustomFieldInline(id) {
     if (!confirm("Delete this field? All data in this field across all tasks will be lost.")) return;
 
     try {
-        const response = await fetch('/Tasks/DeleteCustomField', {
+        const response = await fetch('/TaskCustomFields/DeleteCustomField', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(id)
@@ -865,7 +868,7 @@ async function loadFieldsList(team) {
                     onEnd: async function () {
                         const ids = Array.from(sortableEl.querySelectorAll('.field-order-item')).map(el => parseInt(el.dataset.id));
                         try {
-                            const response = await fetch('/Tasks/ReorderCustomFields', {
+                            const response = await fetch('/TaskCustomFields/ReorderCustomFields', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify(ids)
@@ -939,7 +942,7 @@ async function createNewField() {
     }
 
     try {
-        const response = await fetch('/Tasks/CreateCustomField', {
+        const response = await fetch('/TaskCustomFields/CreateCustomField', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -984,7 +987,7 @@ async function deleteField(fieldId) {
     if (!confirm('Deactivate this field? It will be hidden from the UI, but existing task data will be preserved.')) return;
 
     try {
-        const response = await fetch('/Tasks/DeleteCustomField', {
+        const response = await fetch('/TaskCustomFields/DeleteCustomField', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fieldId)
@@ -1046,7 +1049,7 @@ async function toggleNewOptionsSection() {
 
         if (team) {
             try {
-                const res = await fetch(`/Tasks/GetColumns?team=${encodeURIComponent(team)}`);
+                const res = await fetch(`/TaskColumns/GetColumns?team=${encodeURIComponent(team)}`);
                 const cols = await res.json();
                 if (cols && cols.length > 0) {
                     let preview = '<div class="mt-2 border-top pt-2"><label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 8px;">Column Preview</label><select class="form-select form-select-sm" disabled>';
@@ -1083,7 +1086,7 @@ async function toggleEditOptionsSection(fieldId) {
 
         if (team) {
             try {
-                const res = await fetch(`/Tasks/GetColumns?team=${encodeURIComponent(team)}`);
+                const res = await fetch(`/TaskColumns/GetColumns?team=${encodeURIComponent(team)}`);
                 const cols = await res.json();
                 if (cols && cols.length > 0) {
                     let preview = '<div class="mt-2 border-top pt-2"><label class="x-small fw-bold text-muted mb-1 text-uppercase" style="font-size: 8px;">Column Preview</label><select class="form-select form-select-sm" disabled>';
@@ -1146,7 +1149,7 @@ async function saveFieldChanges(fieldId) {
     }
 
     try {
-        const response = await fetch('/Tasks/UpdateCustomField', {
+        const response = await fetch('/TaskCustomFields/UpdateCustomField', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1379,7 +1382,7 @@ async function uploadFieldImage(input, fieldId, containerId) {
     formData.append('file', file);
 
     try {
-        const response = await fetch('/Tasks/UploadCustomFieldImage', {
+        const response = await fetch('/TaskCustomFields/UploadCustomFieldImage', {
             method: 'POST',
             body: formData
         });
@@ -1456,7 +1459,7 @@ async function updateTeamSettings() {
     applySystemFieldVisibilityToModals();
 
     try {
-        const response = await fetch('/Tasks/UpdateTeamSettings', {
+        const response = await fetch('/TaskPermissions/UpdateTeamSettings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

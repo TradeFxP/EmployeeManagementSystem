@@ -79,8 +79,8 @@
                         {
                                 <li class="nav-item">
                                     <a class="nav-link"
-                                       asp-controller="Users"
-                                       asp-action="OrgChart">
+                                       asp-controller="OrgChart"
+                                       asp-action="Index">
                                         <i class="bi bi-diagram-3 me-1"></i> Organization Chart
                                     </a>
                                 </li>
@@ -124,7 +124,7 @@
                                     @displayName
                                     @if (!string.IsNullOrEmpty(role))
                                     {
-                                                    <span class="badge bg-primary text-dark ms-1" style="font-size: 0.7rem;">@role</span>
+                                                    <span class="badge bg-primary text-white ms-1" style="font-size: 0.7rem;">@role</span>
                                     }
                                     </span>
                                 </li>

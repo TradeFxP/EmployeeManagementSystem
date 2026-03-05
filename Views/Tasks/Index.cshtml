@@ -28,6 +28,11 @@
             icon.className = 'bi bi-layout-sidebar-inset';
         }
     }
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
 </script>
 
 <style>
@@ -897,31 +902,26 @@
                             <i class="bi bi-toggle-on me-1"></i> System Fields Visibility
                         </div>
                         <div class="card-body py-2">
-                            <div class="row row-cols-1 row-cols-md-2 g-2">
-                                <div class="col">
-                                    <div class="form-check form-switch mb-2">
-                                        <input class="form-check-input" type="checkbox" id="showOtherCheckbox" onchange="updateTeamSettings()">
-                                        <label class="form-check-label fw-bold" for="showOtherCheckbox">Show Other</label>
-                                    </div>
-                                    <div class="form-check form-switch mb-2">
-                                        <input class="form-check-input" type="checkbox" id="showTitleCheckbox" @(Model?.TeamSettings?.IsTitleVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label" for="showTitleCheckbox">Show Title Field</label>
-                                    </div>
-                                    <div class="form-check form-switch mb-2">
-                                        <input class="form-check-input" type="checkbox" id="showDescriptionCheckbox" @(Model?.TeamSettings?.IsDescriptionVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label" for="showDescriptionCheckbox">Show Description Field</label>
-                                    </div>
+                            <div class="d-flex flex-wrap align-items-center gap-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showOtherCheckbox" onchange="updateTeamSettings()">
+                                    <label class="form-check-label fw-bold" for="showOtherCheckbox">Show Other</label>
                                 </div>
-                                <div class="col text-md-end text-start">
-                                    <div class="form-check form-switch mb-2 d-md-inline-block">
-                                        <input class="form-check-input" type="checkbox" id="showPriorityCheckbox" @(Model?.TeamSettings?.IsPriorityVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label me-md-5" for="showPriorityCheckbox">Show Priority</label>
-                                    </div>
-                                    <br class="d-none d-md-block" />
-                                    <div class="form-check form-switch mb-2 d-md-inline-block">
-                                        <input class="form-check-input" type="checkbox" id="showDueDateCheckbox" @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label me-md-5" for="showDueDateCheckbox">Show Due Date</label>
-                                    </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showTitleCheckbox" @(Model?.TeamSettings?.IsTitleVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showTitleCheckbox">Show Title Field</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showDescriptionCheckbox" @(Model?.TeamSettings?.IsDescriptionVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showDescriptionCheckbox">Show Description Field</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showPriorityCheckbox" @(Model?.TeamSettings?.IsPriorityVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showPriorityCheckbox">Show Priority</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showDueDateCheckbox" @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showDueDateCheckbox">Show Due Date</label>
                                 </div>
                             </div>
                         </div>
@@ -1670,7 +1670,7 @@
         const columnName = document.getElementById('newColumnName').value.trim();
         if (!columnName) { alert('Column name is required'); return; }
 
-        fetch('/Tasks/AddColumn', {
+        fetch('/TaskColumns/AddColumn', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ team: team, columnName: columnName })
@@ -1731,7 +1731,7 @@
 
                 if (columnIds.length === 0) return;
 
-                fetch('/Tasks/ReorderColumns', {
+                fetch('/TaskColumns/ReorderColumns', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(columnIds)
@@ -1770,7 +1770,7 @@
         const newName = input?.value?.trim();
         if (!newName) { alert('Column name required'); return; }
 
-        fetch('/Tasks/RenameColumn', {
+        fetch('/TaskColumns/RenameColumn', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId: columnId, name: newName })
         })
             .then(res => { if (!res.ok) throw new Error(); return res.text(); })
@@ -1784,7 +1784,7 @@
     function confirmDeleteColumn(columnId) {
         if (!__isTasksAdmin) return;
         if (!confirm('Delete this column?')) return;
-        fetch('/Tasks/DeleteColumn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId }) })
+        fetch('/TaskColumns/DeleteColumn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId }) })
             .then(res => { if (!res.ok) return res.text().then(t => { throw new Error(t); }); return res.text(); })
             .then(() => document.querySelector(`[data-column-id='${columnId}']`)?.remove())
             .catch(err => alert(err.message));
@@ -1906,10 +1906,20 @@
         if (typeof filterBoardTasks === 'function') filterBoardTasks();
         if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
 
-        // ✅ NEW: Update View Data table status badge
+        // ✅ Update View Data table status badge
         const statusBadge = document.querySelector(`.status-badge[data-status-task-id="${data.taskId}"]`);
         if (statusBadge) {
             statusBadge.textContent = data.columnName;
+            
+            // Fix badge colors based on assignment status (in case it changed)
+            const row = statusBadge.closest('.task-data-row');
+            if (row) {
+                const isUnassigned = row.dataset.isUnassigned === "true";
+                statusBadge.className = isUnassigned 
+                    ? "badge rounded-pill bg-white text-black border border-blue-200 px-2 py-1 status-badge shadow-sm"
+                    : "badge rounded-pill bg-white text-black border border-green-200 px-2 py-1 status-badge shadow-sm";
+                statusBadge.style.color = "#000";
+            }
         }
 
         showToast(`Task #${data.taskId} moved to ${data.columnName}`, 'info');
@@ -1997,8 +2007,66 @@
                 if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
 
                 showToast(`Task #${data.taskId} assigned to ${data.assignedTo}`, 'success');
+
+                // ✅ Sync View Data table row if present
+                const row = document.querySelector(`.task-data-row[data-task-id="${data.taskId}"]`);
+                if (row) {
+                    const isUnassigned = data.role === "Admin";
+                    row.dataset.isUnassigned = isUnassigned ? "true" : "false";
+                    
+                    // Update premium styling
+                    row.style.setProperty("background-color", isUnassigned ? "#eff6ff" : "#f0fdf4", "important");
+                    row.style.borderLeft = isUnassigned ? "6px solid #3b82f6" : "6px solid #22c55e";
+
+                    const assigneeNameSpan = row.querySelector('.assignee-name');
+                    if (assigneeNameSpan) assigneeNameSpan.innerText = data.assignedTo;
+
+                    const avatar = row.querySelector('.avatar-table-xs');
+                    if (avatar) {
+                        avatar.innerText = (data.assignedTo && data.assignedTo.length > 0) ? data.assignedTo[0].toUpperCase() : "?";
+                        avatar.className = `avatar-table-xs me-2 ${isUnassigned ? 'bg-secondary' : 'bg-primary'} text-white rounded-circle d-flex align-items-center justify-content-center`;
+                    }
+
+                    const teamBadge = row.querySelector('.badge.bg-secondary-subtle');
+                    if (teamBadge) teamBadge.innerText = data.team;
+
+                    const roleSpan = row.querySelector('.text-info');
+                    if (roleSpan) roleSpan.innerText = data.role;
+
+                    // Update Status Badge styling
+                    const statusBadge = row.querySelector('.status-badge');
+                    if (statusBadge) {
+                        statusBadge.className = isUnassigned 
+                            ? "badge rounded-pill bg-white text-black border border-blue-200 px-2 py-1 status-badge shadow-sm"
+                            : "badge rounded-pill bg-white text-black border border-green-200 px-2 py-1 status-badge shadow-sm";
+                        statusBadge.style.color = "#000";
+                    }
+
+                    // Move row to correct section (under correct header)
+                    const headerId = isUnassigned ? 'headerUnassigned' : 'headerAssigned';
+                    const header = document.getElementById(headerId);
+                    if (header && row.parentNode) {
+                        header.after(row);
+                    }
+                }
             })
             .catch(err => console.error("Error updating assigned task:", err));
+    }
+
+    function executeDynamicScripts(container) {
+        if (!container) return;
+        const scripts = container.querySelectorAll('script');
+        scripts.forEach(script => {
+            const newScript = document.createElement('script');
+            if (script.src) {
+                newScript.src = script.src;
+            } else {
+                newScript.textContent = script.textContent;
+            }
+            document.body.appendChild(newScript);
+            // Remove after short delay to clean up DOM, script will already have executed
+            setTimeout(() => newScript.remove(), 100);
+        });
     }
 
     function loadTeamBoard(team, quiet = false) {
@@ -2044,17 +2112,7 @@
                 }
 
                 // Execute scripts from the dynamically loaded content
-                const scripts = container.querySelectorAll('script');
-                scripts.forEach(script => {
-                    const newScript = document.createElement('script');
-                    if (script.src) {
-                        newScript.src = script.src;
-                    } else {
-                        newScript.textContent = script.textContent;
-                    }
-                    document.body.appendChild(newScript);
-                    setTimeout(() => newScript.remove(), 100);
-                });
+                executeDynamicScripts(container);
 
                 if (typeof syncBoardPermissions === "function") syncBoardPermissions();
                 if (typeof enableColumnDrag === "function") enableColumnDrag();
@@ -2080,6 +2138,9 @@
             .then(html => {
                 container.innerHTML = html;
                 window.currentTeamName = team; // Keep track of the team
+
+                // Execute scripts from the dynamically loaded content
+                executeDynamicScripts(container);
 
                 // Highlight corresponding team button if possible
                 document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
@@ -2225,109 +2286,256 @@
                 }
 
                 body.innerHTML = `
-                    <!-- Title + Badges -->
-                    <div style="border-left: 5px solid ${prio.color}; padding-left: 16px; margin-bottom: 16px;">
-                        <h4 style="font-weight: 700; color: #1e293b; margin: 0 0 8px 0; font-size: 1.5rem;">${escapeHtml(t.title)}</h4>
-                        <div class="d-flex gap-2 flex-wrap align-items-center">
-                            <span style="background: ${prio.bg}; color: ${prio.color}; border: 1px solid ${prio.border}; padding: 3px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                <i class="bi ${prio.icon}" style="margin-right: 4px;"></i>${escapeHtml(effectivePriority.toUpperCase())}
-                            </span>
-                            ${taskTypeBadge}
-                            ${reviewBadge}
-                            <span style="background: #f1f5f9; color: #475569; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #e2e8f0;">${escapeHtml(t.column || t.status)}</span>
-                            ${t.dueDateFormatted ? `<span style="color: #dc2626; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #fecaca; background: #fef2f2;"><i class="bi bi-calendar-event" style="margin-right: 4px;"></i>${t.dueDateFormatted}</span>` : ''}
+                    <!-- Unified Task Header -->
+                    <div style="background: #fff; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; margin: -20px -24px 20px -24px;">
+                        <div class="d-flex justify-content-between align-items-start gap-4">
+                            <div style="flex: 1;">
+                                <h4 style="font-weight: 800; color: #0f172a; margin: 0 0 10px 0; font-size: 1.6rem; line-height: 1.3;">${escapeHtml(t.title)}</h4>
+                                <div class="d-flex gap-2 flex-wrap align-items-center">
+                                    <span style="background: ${prio.bg}; color: ${prio.color}; border: 1px solid ${prio.border}; padding: 3px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase;">
+                                        <i class="bi ${prio.icon} me-1"></i>${escapeHtml(effectivePriority)}
+                                    </span>
+                                    ${taskTypeBadge}
+                                    ${reviewBadge}
+                                    <span class="badge" style="background: #f1f5f9; color: #1e293b; border: 1px solid #e2e8f0; padding: 4px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase;">
+                                        <i class="bi bi-columns-gap me-1"></i>${escapeHtml(t.column || t.status || 'To Do')}
+                                    </span>
+                                    ${t.dueDateFormatted ? `<span class="badge bg-red-50 text-red-600 border border-red-100" style="padding: 4px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem;"><i class="bi bi-calendar-event me-1"></i>${t.dueDateFormatted}</span>` : ''}
+                                </div>
+                            </div>
+                          @*  <div class="d-flex flex-column align-items-end gap-2" style="min-width: 140px;">
+                                <div class="d-flex -space-x-2 overflow-hidden">
+                                     <div title="Created By: ${escapeHtml(t.createdBy)}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem; z-index: 10;">${getInitials(t.createdBy)}</div>
+                                     <div title="Assigned To: ${escapeHtml(t.assignedTo)}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem; margin-left: -8px; z-index: 20;">${getInitials(t.assignedTo)}</div>
+                                </div>
+                                <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Live Task Frame</div>
+                            </div>*@
                         </div>
                     </div>
 
-                    <!-- Lead Identity Banner (if stub) -->
-                    ${t.externalLeadId ? `
-                    <div id="leadIdentityBanner" class="alert alert-success d-flex align-items-center justify-content-between gap-3 mb-3 p-2 px-3 border-0 shadow-sm" style="background: #ecfdf5; color: #065f46; border-radius: 10px;">
-                        <div class="d-flex align-items-center gap-2">
-                             <i class="bi bi-lightning-charge-fill"></i>
-                             <span style="font-size: 0.85rem; font-weight: 700;">CONNECTED FACEBOOK LEAD</span>
-                        </div>
-                        <span id="leadSyncStatus" class="badge bg-success-subtle text-success border border-success-subtle fw-normal">LIVE</span>
-                    </div>
-                    <div id="leadLiveDetailsArea" class="mb-3 text-center py-2"><div class="spinner-border spinner-border-sm text-success"></div> <span class="ms-1 small text-muted">Hydrating fields...</span></div>
-                    ` : ''}
+                    <div id="taskMainContent" class="px-2">
+                        <!-- DETAILS SECTION -->
+                        <div class="mb-4">
+                            <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                <i class="bi bi-grid-fill" style="font-size: 0.8rem;"></i> DETAILS
+                            </div>
+                            <div class="row g-3">
+                                ${(() => {
+                                    const grouped = (t.customFields || []).reduce((acc, f) => {
+                                        const name = f.fieldName || 'Field';
+                                        if (!acc[name]) acc[name] = { name, values: [], type: f.fieldType };
+                                        if (f.value) acc[name].values.push(f.value);
+                                        return acc;
+                                    }, {});
 
-                    <!-- Description -->
-                    ${t.description ? `
-                    <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 6px;"><i class="bi bi-text-paragraph me-1"></i>Description/Notes</div>
-                        <p style="margin: 0; color: #475569; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(t.description)}</p>
-                    </div>` : ''}
+                                    const fieldArray = Object.values(grouped);
+                                    window.currTaskFields = fieldArray;
 
-                    <!-- Custom Fields -->
-                    ${t.customFields && t.customFields.length > 0 ? `
-                    <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 8px;"><i class="bi bi-grid-3x3-gap me-1"></i>System Fields</div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
-                            ${t.customFields.map(f => {
-                                const isImage = f.value && (f.value.startsWith('data:image/') || f.value.includes('/Tasks/GetFieldImage/') || f.value.includes('/Tasks/GetFieldImageById/') || f.value.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/));
-                                return `<div style="background: #fff; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0; position: relative; overflow: hidden;">
-                                    <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">${escapeHtml(f.fieldName || '')}</div>
-                                    <div class="d-flex flex-wrap gap-2 mt-1">
-                                        ${isImage ? `
-                                            <div style="position: relative; cursor: pointer;" onclick="openLightbox('${f.value}')" title="Click to view full image">
-                                                <img src="${f.value}" style="max-width: 100px; max-height: 80px; object-fit: contain; border-radius: 6px; border: 1px solid #f1f5f9;" />
-                                                <div style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 4px; padding: 2px; font-size: 0.6rem;">
-                                                    <i class="bi bi-arrows-fullscreen"></i>
+                                    return fieldArray.map((f, idx) => {
+                                        // Process values to extract text only for point-wise data
+                                        const textValues = f.values.map(v => {
+                                            if (typeof v === 'string' && (v.trim().startsWith('{') || v.trim().startsWith('['))) {
+                                                try {
+                                                    const p = JSON.parse(v);
+                                                    if (Array.isArray(p)) return p.map(item => item.t || '').join(', ');
+                                                    return p.t || v;
+                                                } catch(e) { return v; }
+                                            }
+                                            return v;
+                                        });
+
+                                        const valDisplay = textValues.join(', ') || '—';
+
+                                        return `
+                                        <div class="col-md-4">
+                                            <div onclick="toggleFieldDetail(${idx})" 
+                                                 style="padding: 4px 0; cursor: pointer; transition: opacity 0.2s ease;"
+                                                 onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+                                                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.5px;">${escapeHtml(f.name)}</div>
+                                                <div class="field-value-text" style="font-size: 0.85rem; font-weight: 700; color: #000; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">
+                                                    ${escapeHtml(valDisplay)}
                                                 </div>
-                                            </div>` 
-                                        : `<div style="font-weight: 600; color: #334155; font-size: 0.85rem; margin-top: 2px;">${escapeHtml(f.value || '—')}</div>`}
-                                    </div>
-                                </div>`;
-                            }).join('')}
+                                            </div>
+                                        </div>`;
+                                    }).join('') || '<div class="col-12 text-muted small ps-3 italic">No additional details available</div>';
+                                })()}
+                            </div>
                         </div>
-                    </div>` : ''}
 
-                    <!-- Review Note -->
-                    ${t.reviewNote ? `
-                    <div style="background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 10px 14px; margin-bottom: 14px;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #d97706; margin-bottom: 4px;"><i class="bi bi-chat-left-dots-fill me-1"></i>Review Note</div>
-                        <div style="color: #92400e; font-size: 0.85rem;">${escapeHtml(t.reviewNote)}</div>
-                    </div>` : ''}
-
-                    <!-- Timeline + People side by side -->
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; border: 1px solid #f1f5f9; height: 100%;">
-                                <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px;"><i class="bi bi-clock-history me-1"></i>Timeline</div>
+                        <!-- BOTTOM SECTIONS: TIMELINE & PEOPLE -->
+                        <div class="row g-4 mt-2">
+                            <!-- TIMELINE -->
+                            <div class="col-md-7">
+                                <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                                    <i class="bi bi-clock-history" style="font-size: 0.8rem;"></i> TIMELINE
+                                </div>
                                 <div style="position: relative; padding-left: 20px;">
-                                    <div style="position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: #e2e8f0;"></div>
-                                    ${t.createdAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #6366f1;"></div><strong>Created</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.createdAtFormatted}</span></div>` : ''}
-                                    ${t.assignedAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #06b6d4;"></div><strong>Assigned</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.assignedAtFormatted}</span></div>` : ''}
-                                    ${t.reviewedAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></div><strong>Reviewed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.reviewedAtFormatted}</span></div>` : ''}
-                                    ${t.completedAtFormatted ? `<div style="position: relative; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></div><strong>Completed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.completedAtFormatted}</span></div>` : ''}
+                                    <div style="position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: #e2e8f0;"></div>
+                                    
+                                    <div style="position: relative; margin-bottom: 24px;">
+                                        <div style="position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #6366f1; border: 2px solid #fff; box-shadow: 0 0 0 2px #6366f120;"></div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Created</div>
+                                            <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">${t.createdAtFormatted}</div>
+                                        </div>
+                                    </div>
+
+                                    <div style="position: relative;">
+                                        <div style="position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #0ea5e9; border: 2px solid #fff; box-shadow: 0 0 0 2px #0ea5e920;"></div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Assigned</div>
+                                            <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">${t.assignedAtFormatted || 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- PEOPLE -->
+                            <div class="col-md-5">
+                                <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                                    <i class="bi bi-people-fill" style="font-size: 0.8rem;"></i> PEOPLE
+                                </div>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem;">${getInitials(t.createdBy)}</div>
+                                        <div>
+                                            <div style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Created By</div>
+                                            <div style="font-size: 0.8rem; font-weight: 700; color: #334155;">${escapeHtml(t.createdBy)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem;">${getInitials(t.assignedTo)}</div>
+                                        <div>
+                                            <div style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Assigned To</div>
+                                            <div style="font-size: 0.8rem; font-weight: 700; color: #334155;">${escapeHtml(t.assignedTo)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: #475569; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem;">${getInitials(t.assignedBy || t.createdBy)}</div>
+                                        <div>
+                                            <div style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Assigned By</div>
+                                            <div style="font-size: 0.8rem; font-weight: 700; color: #334155;">${escapeHtml(t.assignedBy || t.createdBy)}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; border: 1px solid #f1f5f9; height: 100%;">
-                                <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px;"><i class="bi bi-people me-1"></i>People</div>
-                                <div class="d-flex flex-column gap-2">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.createdBy)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Created By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.createdBy || 'N/A')}</div></div>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #06b6d4, #0891b2); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.assignedTo)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Assigned To</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.assignedTo || 'Unassigned')}</div></div>
-                                    </div>
-                                    ${t.assignedBy ? `<div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #64748b, #475569); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.assignedBy)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Assigned By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.assignedBy)}</div></div>
-                                    </div>` : ''}
-                                    ${t.reviewedBy ? `<div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.reviewedBy)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Reviewed By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.reviewedBy)}</div></div>
-                                    </div>` : ''}
-                                </div>
+
+                        ${t.externalLeadId ? `
+                        <div id="leadLiveDetailsArea" class="mt-4 d-none"></div>
+                        <div id="leadIdentityBanner" onclick="document.getElementById('leadLiveDetailsArea').classList.toggle('d-none')" style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 14px; cursor: pointer; margin-top: 20px;">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                 <span style="font-size: 0.65rem; font-weight: 800; color: #1d4ed8; text-transform: uppercase;">Lead Sync</span>
+                                 <span class="badge bg-blue-100 text-blue-700" style="font-size: 0.6rem;">LIVE</span>
                             </div>
-                        </div>
+                            <div class="fw-700 text-blue-900" style="font-size: 0.85rem;"><i class="bi bi-facebook me-1"></i>FB Form Connection - Click to show full details</div>
+                        </div>` : ''}
                     </div>
+
+                    <!-- Detail Overlay (Table Mode) -->
+                    <div id="fieldDetailOverlay" class="d-none" style="position: absolute; inset: 0; background: #fff; z-index: 1000; padding: 24px; animation: slideIn 0.3s ease;">
+                        <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
+                            <h5 id="detailOverlayTitle" style="font-weight: 800; color: #0f172a; margin: 0; font-size: 1.1rem;"></h5>
+                            <button class="btn btn-sm btn-light border" onclick="closeFieldDetail()" style="border-radius: 8px; font-weight: 600;">
+                                <i class="bi bi-x-lg me-1"></i> Close
+                            </button>
+                        </div>
+                        <div id="fieldDetailContent" style="max-height: calc(100% - 100px); overflow-y: auto; padding: 10px 5px;"></div>
+                    </div>
+
+                    <style>
+                        @@keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+                        .field-card:hover { border-color: #6366f1 !important; box-shadow: 0 4px 12px rgba(99,102,241,0.08) !important; transform: translateY(-2px); }
+                        .fw-600 { font-weight: 600; }
+                        .fw-700 { font-weight: 700; }
+                        .fw-800 { font-weight: 800; }
+                        .detail-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; }
+                        .detail-table th { background: #f8fafc; color: #64748b; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; letter-spacing: 0.5px; }
+                        .detail-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #000; font-size: 0.9rem; line-height: 1.5; }
+                        .detail-table tr:last-child td { border-bottom: none; }
+                    </style>
                 `;
+
+                // Re-hydrate logic for detail view
+                window.toggleFieldDetail = function(idx) {
+                    try {
+                        const f = window.currTaskFields[idx];
+                        const overlay = document.getElementById('fieldDetailOverlay');
+                        const title = document.getElementById('detailOverlayTitle');
+                        const content = document.getElementById('fieldDetailContent');
+                        
+                        if (!overlay || !content) return;
+
+                        title.innerText = (f.name || 'Field') + ' Full Information';
+                        
+                        const isRemarks = f.type === 'Remarks' || f.name.toLowerCase().includes('remark') || f.name.toLowerCase() === 'status';
+                        const isImage = f.type === 'Image' || f.name.toLowerCase().includes('image');
+
+                        if (isRemarks) {
+                            const points = f.values.reduce((acc, v) => {
+                                if (typeof v === 'string' && (v.trim().startsWith('{') || v.trim().startsWith('['))) {
+                                    try {
+                                        const p = JSON.parse(v);
+                                        if (Array.isArray(p)) acc.push(...p);
+                                        else acc.push(p);
+                                    } catch(e) { acc.push({ t: v, d: new Date().toISOString(), u: 'User', r: 'Member' }); }
+                                } else {
+                                    acc.push({ t: v, d: new Date().toISOString(), u: 'User', r: 'Member' });
+                                }
+                                return acc;
+                            }, []).sort((a, b) => new Date(b.d) - new Date(a.d));
+
+                            content.innerHTML = `
+                                <table class="detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 150px;">Member</th>
+                                            <th style="width: 180px;">Date & Time</th>
+                                            <th>Content / Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${points.map(p => `
+                                            <tr>
+                                                <td class="fw-700">${escapeHtml(p.u || 'Unknown')} <small class="d-block text-muted opacity-50">${escapeHtml(p.r || 'Member')}</small></td>
+                                                <td class="text-muted small">${p.d ? new Date(p.d).toLocaleString() : 'N/A'}</td>
+                                                <td>${escapeHtml(p.t || '')}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>`;
+                        } else if (isImage) {
+                            content.innerHTML = `
+                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding: 10px;">
+                                    ${f.values.map(val => `
+                                        <div style="border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; background: #fafafa;">
+                                            <img src="${val}" style="width: 100%; height: 180px; object-fit: cover; cursor: pointer;" onclick="window.open('${val}', '_blank')">
+                                            <div style="padding: 10px; font-size: 0.7rem; text-align: center;"><a href="${val}" target="_blank" class="text-primary fw-700 text-decoration-none">View Original</a></div>
+                                        </div>`).join('')}
+                                </div>`;
+                        } else {
+                            content.innerHTML = `
+                                <table class="detail-table">
+                                    <tbody>
+                                        <tr>
+                                            <th style="width: 200px;">Property Name</th>
+                                            <td class="fw-700">${escapeHtml(f.name)}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Full Information</th>
+                                            <td style="white-space: pre-wrap;">${escapeHtml(f.values.join(', ') || '—')}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>`;
+                        }
+
+                        overlay.classList.remove('d-none');
+                    } catch (e) { console.error("Detail toggle error:", e); }
+                };
+
+                window.closeFieldDetail = function() {
+                    document.getElementById('fieldDetailOverlay').classList.add('d-none');
+                };
 
                 // Hydrate Lead Details if externalLeadId exists
                 if (t.externalLeadId) {
@@ -2359,13 +2567,13 @@
                                         </div>
                                     </div>`;
                             } else {
-                                detailArea.innerHTML = '<div class="text-warning small"><i class="bi bi-exclamation-triangle"></i> Live data unavailable</div>';
+                                detailArea.innerHTML = '<div class="text-warning small text-center"><i class="bi bi-exclamation-triangle"></i> Live data unavailable</div>';
                             }
                         })
                         .catch(e => {
                             console.error("Hydration error:", e);
                             const detailArea = document.getElementById('leadLiveDetailsArea');
-                            if (detailArea) detailArea.innerHTML = '<div class="text-danger small">Sync failed</div>';
+                            if (detailArea) detailArea.innerHTML = '<div class="text-danger small text-center">Sync failed</div>';
                         });
                 }
             })
@@ -3366,7 +3574,7 @@ async function clearColumnTasks(columnId) {
     }
 
     try {
-        const resp = await fetch('/Tasks/DeleteAllTasksInColumn', {
+        const resp = await fetch('/TaskColumns/DeleteAllTasksInColumn', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

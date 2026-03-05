@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using UserRoles.Models;
 using UserRoles.Services;
@@ -71,7 +71,7 @@ namespace UserRoles.Controllers
             var roles = await userManager.GetRolesAsync(user);
 
             if (roles.Contains("Admin") || roles.Contains("Manager"))
-                return RedirectToAction("OrgChart", "Users");
+            return RedirectToAction("Index", "OrgChart");
 
             return RedirectToAction("Index", "Reports");
         }
@@ -117,7 +117,7 @@ namespace UserRoles.Controllers
             // 5?? Sign in with NEW email
             await signInManager.SignInAsync(user, isPersistent: false);
 
-            return RedirectToAction("OrgChart", "Users");
+            return RedirectToAction("Index", "OrgChart");
         }
 
 

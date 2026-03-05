@@ -39,7 +39,7 @@ function confirmSubmitMoveRequest() {
         return;
     }
 
-    fetch('/Tasks/SubmitMoveRequest', {
+    fetch('/TaskMoveRequests/SubmitMoveRequest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, toColumnId })
@@ -68,7 +68,7 @@ function openMoveRequestsModal(teamName) {
     const tbody = document.getElementById('moveRequestsTableBody');
     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
 
-    fetch(`/Tasks/GetBoardMoveRequests?teamName=${encodeURIComponent(teamName)}`)
+    fetch(`/TaskMoveRequests/GetBoardMoveRequests?teamName=${encodeURIComponent(teamName)}`)
         .then(res => {
             if (!res.ok) throw new Error('Unauthorized or server error');
             return res.json();
@@ -197,7 +197,7 @@ function confirmHandleMoveRequest() {
     const approved = document.getElementById('handleRequestApproved').value === 'true';
     const adminReply = document.getElementById('handleRequestReply').value;
 
-    fetch('/Tasks/HandleMoveRequest', {
+    fetch('/TaskMoveRequests/HandleMoveRequest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, approved, adminReply })
@@ -211,7 +211,7 @@ function confirmHandleMoveRequest() {
 
                 // Refresh table
                 if (window.currentTeamName) {
-                    fetch(`/Tasks/GetBoardMoveRequests?teamName=${encodeURIComponent(window.currentTeamName)}`)
+                    fetch(`/TaskMoveRequests/GetBoardMoveRequests?teamName=${encodeURIComponent(window.currentTeamName)}`)
                         .then(res => res.json())
                         .then(requests => renderMoveRequests(requests));
                 }
