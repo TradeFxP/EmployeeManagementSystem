@@ -23,11 +23,35 @@ namespace UserRoles.Models
         [JsonPropertyName("phone")]
         public string Phone { get; set; } = string.Empty;
 
+        [JsonPropertyName("pageId")]
+        public string? PageId { get; set; }
+
+        [JsonPropertyName("status")]
+        public string? Status { get; set; }
+
+        [JsonPropertyName("remark")]
+        public string? Remark { get; set; }
+
+        [JsonPropertyName("departmentId")]
+        public string? DepartmentId { get; set; }
+
+        [JsonPropertyName("departmentName")]
+        public string? DepartmentName { get; set; }
+
+        [JsonPropertyName("campaignId")]
+        public string? CampaignId { get; set; }
+
         [JsonPropertyName("campaignName")]
         public string? CampaignName { get; set; }
 
+        [JsonPropertyName("adsetId")]
+        public string? AdsetId { get; set; }
+
         [JsonPropertyName("adsetName")]
         public string? AdsetName { get; set; }
+
+        [JsonPropertyName("adId")]
+        public string? AdId { get; set; }
 
         [JsonPropertyName("adName")]
         public string? AdName { get; set; }
@@ -35,8 +59,11 @@ namespace UserRoles.Models
         [JsonPropertyName("metaCreatedAt")]
         public string? MetaCreatedAt { get; set; }
 
+        [JsonPropertyName("syncedAt")]
+        public string? SyncedAt { get; set; }
+
         [JsonPropertyName("fields")]
-        public Dictionary<string, string>? Fields { get; set; }
+        public Dictionary<string, object>? Fields { get; set; }
     }
 
     public class LeadIdConverter : JsonConverter<string>

@@ -68,65 +68,8 @@ namespace UserRoles.Controllers
         // ═══════════════════════════════════════════════════════
         //  FACEBOOK LEADS
         // ═══════════════════════════════════════════════════════
-
-        [HttpGet, Authorize]
-        public async Task<IActionResult> GetVirtualLeads()
-        {
-            if (!User.IsInRole("Admin")) return Unauthorized("Only admins can view virtual leads.");
-            try
-            {
-                var leads = await _leadsService.FetchLeadsAsync();
-                return Json(new { success = true, leads });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to fetch virtual leads");
-                return Json(new { success = false, message = ex.Message });
-            }
-        }
-
-        [HttpPost, Authorize]
-        public async Task<IActionResult> ConvertLeadToTask([FromBody] LeadConversionDto dto)
-        {
-            if (dto == null || string.IsNullOrEmpty(dto.id))
-                return BadRequest("Invalid lead data: ID is required.");
-
-            string leadId = dto.id;
-            var existing = await _context.TaskItems.FirstOrDefaultAsync(t => t.ExternalLeadId == leadId);
-            if (existing != null) return Json(new { success = true, taskId = existing.Id, alreadyExists = true });
-
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null) return Unauthorized();
-
-            int targetColumnId = dto.columnId ?? 0;
-            if (targetColumnId <= 0) return BadRequest("Column ID is required.");
-
-            var column = await _context.TeamColumns.FindAsync(targetColumnId);
-            if (column == null) return BadRequest("Column not found");
-
-            var task = new TaskItem
-            {
-                ExternalLeadId = leadId,
-                Title = dto.name ?? "API Lead",
-                Description = $"Facebook Lead: {leadId}",
-                ColumnId = targetColumnId,
-                TeamName = column.TeamName,
-                Priority = Models.Enums.TaskPriority.Medium,
-                Status = Models.Enums.TaskStatus.ToDo,
-                CreatedByUserId = user.Id,
-                CreatedAt = DateTime.UtcNow,
-                AssignedToUserId = user.Id,
-                AssignedByUserId = user.Id,
-                AssignedAt = DateTime.UtcNow,
-                CurrentColumnEntryAt = DateTime.UtcNow
-            };
-
-            _context.TaskItems.Add(task);
-            await _context.SaveChangesAsync();
-            await _historyService.LogTaskCreated(task.Id, user.Id);
-
-            return Json(new { success = true, taskId = task.Id, alreadyExists = false });
-        }
+        // Facebook leads are now ingested automatically by FacebookLeadIngestionService
+        // and stored as persistent TaskItems.
 
         [HttpGet, Authorize]
         public async Task<IActionResult> GetLeadLiveDetails(string leadId)
@@ -219,6 +162,15 @@ namespace UserRoles.Controllers
             var task = await _taskService.GetTaskByIdAsync(id, includeRelated: true);
             if (task == null) return NotFound();
 
+            var customFields = task.CustomFieldValues?.Select(fv => new
+            {
+                FieldName = fv.Field?.FieldName,
+                FieldType = fv.Field?.FieldType,
+                Value = fv.Field?.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var dt)
+                        ? dt.ToString("dd MMM yyyy, hh:mm tt")
+                        : fv.Value
+            }).ToList();
+
             return Ok(new
             {
                 task.Id,
@@ -239,14 +191,7 @@ namespace UserRoles.Controllers
                 ReviewedAtFormatted = task.ReviewedAt?.ToString("dd MMM yyyy, hh:mm tt"),
                 CompletedAtFormatted = task.CompletedAt?.ToString("dd MMM yyyy, hh:mm tt"),
                 DueDateFormatted = task.DueDate?.ToString("dd MMM, hh:mm tt"),
-                CustomFields = task.CustomFieldValues?.Select(fv => new
-                {
-                    FieldName = fv.Field?.FieldName,
-                    FieldType = fv.Field?.FieldType,
-                    Value = fv.Field?.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var dt)
-                            ? dt.ToString("dd MMM yyyy, hh:mm tt")
-                            : fv.Value
-                }).ToList()
+                CustomFields = customFields
             });
         }
 
