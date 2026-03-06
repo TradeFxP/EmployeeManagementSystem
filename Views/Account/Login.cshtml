@@ -6,10 +6,11 @@
 }
 
 <div class="relative h-screen w-full flex items-center justify-center overflow-hidden font-sans selection:bg-blue-500/30">
-    <!-- SWIRL BACKDROP -->
-    <div class="absolute inset-0 z-0">
-        <img src="~/images/ems_swirl_background.png" class="w-full h-full object-cover" alt="Background" />
-        <div class="absolute inset-0 bg-blue-900/20 backdrop-blur-[1px]"></div>
+    <!-- PREMIUM BACKDROP -->
+    <div class="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat" 
+         style="background-image: url('@Url.Content("~/images/ems_swirl_background.png")'); background-attachment: fixed;">
+        <div class="absolute inset-0 bg-blue-900/30 backdrop-blur-[2px]"></div>
+        <div class="absolute inset-0 bg-gradient-to-br from-blue-900/20 via-transparent to-black/40"></div>
     </div>
 
     <!-- MAIN LOGIN CONTAINER -->
