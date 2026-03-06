@@ -39,9 +39,12 @@ function confirmSubmitMoveRequest() {
         return;
     }
 
-    fetch('/Tasks/SubmitMoveRequest', {
+    fetch('/TaskMoveRequests/SubmitMoveRequest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify({ taskId, toColumnId })
     })
         .then(res => res.json())
@@ -68,7 +71,7 @@ function openMoveRequestsModal(teamName) {
     const tbody = document.getElementById('moveRequestsTableBody');
     tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4"><div class="spinner-border spinner-border-sm text-primary"></div></td></tr>';
 
-    fetch(`/Tasks/GetBoardMoveRequests?teamName=${encodeURIComponent(teamName)}`)
+    fetch(`/TaskMoveRequests/GetBoardMoveRequests?teamName=${encodeURIComponent(teamName)}`)
         .then(res => {
             if (!res.ok) throw new Error('Unauthorized or server error');
             return res.json();
@@ -108,8 +111,11 @@ function renderMoveRequests(requests) {
         const rowClass = r.isNew && r.status === 'Pending' ? 'table-primary fw-bold border-start border-4 border-primary' : '';
         const timeStr = r.requestedAtFormatted || new Date(r.requestedAt).toLocaleString();
 
+        // Admin enhancement: clickable row to preview task
+        const adminAttr = window.isAdmin ? `onclick="focusTask(${r.taskId})" style="cursor: pointer;"` : '';
+
         return `
-            <tr class="${rowClass}">
+            <tr class="${rowClass}" ${adminAttr}>
                 <td class="ps-3">
                     <div class="fw-bold text-dark">${escapeHtml(r.taskTitle)}</div>
                     <div class="text-muted" style="font-size: 0.75rem;">By <span class="text-primary fw-bold">${escapeHtml(r.requestedByUserName)}</span></div>
@@ -130,7 +136,7 @@ function renderMoveRequests(requests) {
                         </div>
                     ` : ''}
                 </td>
-                <td class="text-end pe-3">
+                <td class="text-end pe-3" onclick="event.stopPropagation()">
                     ${r.status === 'Pending' ? `
                         <div class="btn-group shadow-sm">
                             <button class="btn btn-sm btn-success" onclick="handleMoveRequest('${r.id}', true)" title="Approve">
@@ -194,9 +200,12 @@ function confirmHandleMoveRequest() {
     const approved = document.getElementById('handleRequestApproved').value === 'true';
     const adminReply = document.getElementById('handleRequestReply').value;
 
-    fetch('/Tasks/HandleMoveRequest', {
+    fetch('/TaskMoveRequests/HandleMoveRequest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify({ requestId, approved, adminReply })
     })
         .then(res => res.json())
@@ -208,7 +217,7 @@ function confirmHandleMoveRequest() {
 
                 // Refresh table
                 if (window.currentTeamName) {
-                    fetch(`/Tasks/GetBoardMoveRequests?teamName=${encodeURIComponent(window.currentTeamName)}`)
+                    fetch(`/TaskMoveRequests/GetBoardMoveRequests?teamName=${encodeURIComponent(window.currentTeamName)}`)
                         .then(res => res.json())
                         .then(requests => renderMoveRequests(requests));
                 }

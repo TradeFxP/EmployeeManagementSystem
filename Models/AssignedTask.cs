@@ -17,19 +17,19 @@ namespace UserRoles.Models
         public string Priority { get; set; } = "Medium"; // Low, Medium, High
 
         [Required]
-        public string AssignedById { get; set; }
+        public string AssignedById { get; set; } = string.Empty;
 
         [Required]
-        public string AssignedToId { get; set; }
+        public string AssignedToId { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation
         [ForeignKey(nameof(AssignedById))]
-        public Users AssignedBy { get; set; }
+        public Users AssignedBy { get; set; } = null!;
 
         [ForeignKey(nameof(AssignedToId))]
-        public Users AssignedTo { get; set; }
+        public Users AssignedTo { get; set; } = null!;
 
         public string Status { get; set; } = "New";
 

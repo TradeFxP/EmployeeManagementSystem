@@ -14,10 +14,12 @@ namespace UserRoles.Controllers
     public class TeamsController : Controller
     {
         private readonly AppDbContext _context;
-
-        public TeamsController(AppDbContext context)
+        private readonly ILogger<TeamsController> _logger;
+ 
+        public TeamsController(AppDbContext context, ILogger<TeamsController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // GET: /Teams/GetAll
@@ -28,7 +30,6 @@ namespace UserRoles.Controllers
             if (!await _context.Teams.AnyAsync())
             {
                  _context.Teams.AddRange(
-                    new Team { Name = "Development", CreatedAt = DateTime.UtcNow },
                     new Team { Name = "Testing", CreatedAt = DateTime.UtcNow },
                     new Team { Name = "Sales", CreatedAt = DateTime.UtcNow }
                  );
@@ -38,7 +39,7 @@ namespace UserRoles.Controllers
                  if (!await _context.TeamColumns.AnyAsync()) 
                  {
                      var defaults = new List<TeamColumn>();
-                     foreach(var tName in new[] { "Development", "Testing", "Sales" })
+                     foreach(var tName in new[] { "Testing", "Sales" })
                      {
                          defaults.Add(new TeamColumn { TeamName = tName, ColumnName = "To Do", Order = 1 });
                          defaults.Add(new TeamColumn { TeamName = tName, ColumnName = "Doing", Order = 2 });
@@ -50,6 +51,7 @@ namespace UserRoles.Controllers
             }
 
             var teams = await _context.Teams
+                .Where(t => t.Name != "Development")
                 .OrderBy(t => t.Name)
                 .ToListAsync();
             return Ok(teams);

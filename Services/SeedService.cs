@@ -22,11 +22,40 @@ namespace UserRoles.Services
                 await context.Database.EnsureCreatedAsync();
 
                 // Manual Migration: Add AssignedToUserId to Hierarchy Tables if missing
-                logger.LogInformation("Applying manual schema updates for assignments.");
+                logger.LogInformation("Applying manual schema updates for assignments and permissions.");
                 await context.Database.ExecuteSqlRawAsync(@"
                     ALTER TABLE ""Epics"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
                     ALTER TABLE ""Features"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
                     ALTER TABLE ""Stories"" ADD COLUMN IF NOT EXISTS ""AssignedToUserId"" text;
+
+                    -- Board Permissions Update
+                    ALTER TABLE ""BoardPermissions"" ADD COLUMN IF NOT EXISTS ""CanViewHistory"" boolean DEFAULT false;
+
+                    -- Column Permissions Table Creation (for fresh DBs)
+                    CREATE TABLE IF NOT EXISTS ""ColumnPermissions"" (
+                        ""Id"" SERIAL PRIMARY KEY,
+                        ""UserId"" text NOT NULL,
+                        ""ColumnId"" integer NOT NULL,
+                        ""CanRename"" boolean NOT NULL DEFAULT false,
+                        ""CanDelete"" boolean NOT NULL DEFAULT false,
+                        ""CanAddTask"" boolean NOT NULL DEFAULT false,
+                        ""CanAssignTask"" boolean NOT NULL DEFAULT false,
+                        ""CanEditTask"" boolean NOT NULL DEFAULT false,
+                        ""CanDeleteTask"" boolean NOT NULL DEFAULT false,
+                        ""CanClearTasks"" boolean NOT NULL DEFAULT false,
+                        ""CanViewHistory"" boolean NOT NULL DEFAULT false,
+                        CONSTRAINT ""FK_ColumnPermissions_AspNetUsers_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""AspNetUsers"" (""Id"") ON DELETE CASCADE,
+                        CONSTRAINT ""FK_ColumnPermissions_TeamColumns_ColumnId"" FOREIGN KEY (""ColumnId"") REFERENCES ""TeamColumns"" (""Id"") ON DELETE CASCADE
+                    );
+
+                    -- Column Permissions Table Updates (for existing DBs)
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanAssignTask"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanEditTask"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanDeleteTask"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanClearTasks"" boolean NOT NULL DEFAULT false;
+                    ALTER TABLE ""ColumnPermissions"" ADD COLUMN IF NOT EXISTS ""CanViewHistory"" boolean NOT NULL DEFAULT false;
+
+                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ColumnPermissions_UserId_ColumnId"" ON ""ColumnPermissions"" (""UserId"", ""ColumnId"");
                 ");
 
                 // Add roles
@@ -38,39 +67,36 @@ namespace UserRoles.Services
 
 
                 // -----------------------------
-                // Seed Team Columns
+                // Seed Team & Columns
                 // -----------------------------
-                logger.LogInformation("Seeding team columns.");
+                logger.LogInformation("Seeding teams and columns.");
 
-                if (!await context.TeamColumns.AnyAsync())
+                var teamsToSeed = new[]
                 {
-                    context.TeamColumns.AddRange(
+                    new { Name = "Testing", Columns = new[] { "To Test", "Testing", "Bug Found", "Verified" } },
+                    new { Name = "Sales", Columns = new[] { "Leads", "Follow Up", "Negotiation", "Closed" } },
+                    new { Name = "Digi Leads", Columns = new[] { "To Do", "Doing", "Review", "Completed" } }
+                };
 
-                        // Development Team
-                        new TeamColumn { TeamName = "Development", ColumnName = "ToDo", Order = 1 },
-                        new TeamColumn { TeamName = "Development", ColumnName = "Doing", Order = 2 },
-                        new TeamColumn { TeamName = "Development", ColumnName = "Review", Order = 3 },
-                        new TeamColumn { TeamName = "Development", ColumnName = "Complete", Order = 4 },
-
-                        // Testing Team
-                        new TeamColumn { TeamName = "Testing", ColumnName = "To Test", Order = 1 },
-                        new TeamColumn { TeamName = "Testing", ColumnName = "Testing", Order = 2 },
-                        new TeamColumn { TeamName = "Testing", ColumnName = "Bug Found", Order = 3 },
-                        new TeamColumn { TeamName = "Testing", ColumnName = "Verified", Order = 4 },
-
-                        // Sales Team
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Leads", Order = 1 },
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Follow Up", Order = 2 },
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Negotiation", Order = 3 },
-                        new TeamColumn { TeamName = "Sales", ColumnName = "Closed", Order = 4 }
-                    );
-
-                    await context.SaveChangesAsync();
-                    logger.LogInformation("Team columns seeded successfully.");
-                }
-                else
+                foreach (var teamData in teamsToSeed)
                 {
-                    logger.LogInformation("Team columns already exist. Skipping seeding.");
+                    if (!await context.Teams.AnyAsync(t => t.Name == teamData.Name))
+                    {
+                        context.Teams.Add(new Team { Name = teamData.Name });
+                        await context.SaveChangesAsync();
+
+                        for (int i = 0; i < teamData.Columns.Length; i++)
+                        {
+                            context.TeamColumns.Add(new TeamColumn
+                            {
+                                TeamName = teamData.Name,
+                                ColumnName = teamData.Columns[i],
+                                Order = i + 1
+                            });
+                        }
+                        await context.SaveChangesAsync();
+                        logger.LogInformation("Seeded team and columns for: {TeamName}", teamData.Name);
+                    }
                 }
 
 
@@ -103,36 +129,36 @@ namespace UserRoles.Services
                 }
 
                 // Add Manager user
-            //    logger.LogInformation("Seeding Manager user.");
-            //    var ManagerEmail = "manager@gmail.com";
-            //    if (await userManager.FindByEmailAsync(ManagerEmail) == null)
-            //    {
-            //        var ManagerUser = new Users
-            //        {
-            //            Name = "Manager",
-            //            UserName = ManagerEmail,
-            //            NormalizedUserName = ManagerEmail.ToUpper(),
-            //            Email = ManagerEmail,
-            //            NormalizedEmail = ManagerEmail.ToUpper(),
-            //            EmailConfirmed = true,
-            //            SecurityStamp = Guid.NewGuid().ToString()
-            //        };
+                //    logger.LogInformation("Seeding Manager user.");
+                //    var ManagerEmail = "manager@gmail.com";
+                //    if (await userManager.FindByEmailAsync(ManagerEmail) == null)
+                //    {
+                //        var ManagerUser = new Users
+                //        {
+                //            Name = "Manager",
+                //            UserName = ManagerEmail,
+                //            NormalizedUserName = ManagerEmail.ToUpper(),
+                //            Email = ManagerEmail,
+                //            NormalizedEmail = ManagerEmail.ToUpper(),
+                //            EmailConfirmed = true,
+                //            SecurityStamp = Guid.NewGuid().ToString()
+                //        };
 
-            //        var result = await userManager.CreateAsync(ManagerUser, "Manager@123");
-            //        if (result.Succeeded)
-            //        {
-            //            logger.LogInformation("Assigning Manager role to the Manager user.");
-            //            await userManager.AddToRoleAsync(ManagerUser, "Manager");
-            //        }
-            //        else
-            //        {
-            //            logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
-            //        }
-            //    }
+                //        var result = await userManager.CreateAsync(ManagerUser, "Manager@123");
+                //        if (result.Succeeded)
+                //        {
+                //            logger.LogInformation("Assigning Manager role to the Manager user.");
+                //            await userManager.AddToRoleAsync(ManagerUser, "Manager");
+                //        }
+                //        else
+                //        {
+                //            logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+                //        }
+                //    }
             }
             catch (Exception ex)
             {
-               logger.LogError(ex, "An error occurred while seeding the database.");
+                logger.LogError(ex, "An error occurred while seeding the database.");
 
             }
 

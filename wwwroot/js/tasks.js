@@ -1,4 +1,4 @@
-﻿// tasks.js
+// tasks.js
 // Single responsibility: load boards into right panel
 
 $(document).ready(function () {
@@ -66,7 +66,10 @@ function deleteTask(taskId) {
 
     fetch('/Tasks/DeleteTask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify(taskId)
     })
         .then(res => {
@@ -90,7 +93,14 @@ $(document).on("click", ".delete-task", function (e) {
     e.preventDefault();
     e.stopPropagation();
     const id = $(this).data("id");
-    deleteTask(id);
+
+    $.post("/Tasks/DeleteTask", { id: id })
+        .done(() => {
+            if (window.loadTeamBoard && window.currentTeamName) {
+                window.loadTeamBoard(window.currentTeamName, true);
+            }
+        })
+        .fail(() => showToast('Failed to delete task. Please try again.', 'danger'));
 });
 
 
@@ -145,7 +155,11 @@ $(document).on("click", ".edit-task", function () {
         id: id,
         title: title,
         description: desc
-    }).done(() => location.reload());
+    }).done(() => {
+        if (window.loadTeamBoard && window.currentTeamName) {
+            window.loadTeamBoard(window.currentTeamName, true);
+        }
+    });
 });
 
 
@@ -153,52 +167,74 @@ $(document).on("click", ".edit-task", function () {
 
 // Open create task modal
 async function openCreateTaskModal(columnId) {
-    document.getElementById("taskColumnId").value = columnId;
-    document.getElementById("taskTitle").value = "";
-    document.getElementById("taskDescription").value = "";
-    document.getElementById("taskPriority").value = "1"; // Default to Medium
-    document.getElementById("taskDueDate").value = "";
+    const columnIdInput = document.getElementById("taskColumnId");
+    if (columnIdInput) columnIdInput.value = columnId;
 
-    const team = document.getElementById('kanbanBoard')?.dataset.teamName;
+    // Reset basic fields
+    ["taskTitle", "taskDescription", "taskDueDate"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
 
-    // Render custom fields if available and wait for them to load
+    const priorityEl = document.getElementById("taskPriority");
+    if (priorityEl) priorityEl.value = "1"; // Default to Medium
+
+    const board = document.getElementById('kanbanBoard');
+    const team = board?.dataset.teamName;
+    const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
+
+    // 🔥 Dynamic Visibility for System Fields
+    const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
+    const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
+    const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
+    const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
+
+    ["Priority", "DueDate", "Title", "Description"].forEach(field => {
+        const group = document.getElementById(`groupCreateTask${field}`);
+        const visible = eval(`${field.charAt(0).toLowerCase() + field.slice(1)}Visible`);
+        if (group) group.style.display = visible ? 'block' : 'none';
+    });
+
+    // Render custom fields if available
     if (typeof renderCustomFieldInputs === 'function') {
         try {
             await renderCustomFieldInputs('customFieldsContainer', {}, team);
         } catch (e) {
-            console.error('Failed to render custom fields before showing modal', e);
+            console.error('Failed to render custom fields', e);
         }
     }
 
-    const modal = new bootstrap.Modal(document.getElementById('createTaskModal'));
-    modal.show();
+    const modalEl = document.getElementById('createTaskModal');
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
 }
 
 // Submit create task form
-function submitCreateTask() {
+async function submitCreateTask() {
     const titleEl = document.getElementById("taskTitle");
-    const title = titleEl?.value.trim() || "New Task";
-    const description = document.getElementById("taskDescription")?.value.trim();
-    const columnId = document.getElementById("taskColumnId").value;
-    const projectId = document.getElementById("taskProjectId")?.value || null;
-    const priority = parseInt(document.getElementById("taskPriority").value);
+    const title = titleEl ? titleEl.value.trim() : "";
+    const columnId = document.getElementById("taskColumnId")?.value;
+    const priority = document.getElementById("taskPriority")?.value || "1";
     const dueDate = document.getElementById("taskDueDate")?.value || null;
+    const description = document.getElementById("taskDescription")?.value || "";
 
-    // Check if title is visible
     const titleGroup = document.getElementById('groupCreateTaskTitle');
     const isTitleVisible = titleGroup && titleGroup.style.display !== 'none';
 
-    if (isTitleVisible && (!title || title === "New Task")) {
-        showToast('Please enter a task title to continue.', 'warning');
+    if (isTitleVisible && !title) {
+        if (typeof showToast === 'function') showToast('Please enter a task title.', 'warning');
+        else alert('Please enter a task title.');
         return;
     }
 
     if (!columnId) {
-        showToast('Column not found — please refresh.', 'danger');
+        if (typeof showToast === 'function') showToast('Column identification failed.', 'danger');
         return;
     }
 
-    // Ensure custom fields are rendered and validated before collecting values
+    // Validate custom fields
     if (typeof validateCustomFields === 'function' && !validateCustomFields('customFieldsContainer')) {
         return;
     }
@@ -207,40 +243,164 @@ function submitCreateTask() {
         ? collectCustomFieldValues('customFieldsContainer')
         : {};
 
-    $.ajax({
-        url: "/Tasks/CreateTask",
-        method: "POST",
-        contentType: "application/json",
-        data: JSON.stringify({
-            columnId: parseInt(columnId),
-            title: title,
-            description: description,
-            projectId: projectId ? parseInt(projectId) : null,
-            priority: priority,
-            dueDate: dueDate,
-            customFieldValues: customFieldValues
-        }),
-        success: function (response) {
-            if (response && response.success) {
-                // Properly close modal
-                const modalEl = document.getElementById("createTaskModal");
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
+    try {
+        const response = await fetch("/Tasks/CreateTask", {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json',
+                "RequestVerificationToken": window.getAntiForgeryToken()
+            },
+            body: JSON.stringify({
+                columnId: parseInt(columnId),
+                title: title,
+                description: description,
+                priority: parseInt(priority),
+                dueDate: dueDate,
+                customFieldValues: customFieldValues
+            })
+        });
 
-                showToast("✅ Task created successfully!", "success");
-            } else {
-                showToast(response.message || 'Failed to create task.', 'danger');
+        if (response.ok) {
+            const modalEl = document.getElementById("createTaskModal");
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+
+            if (typeof showToast === 'function') showToast("✅ Task created successfully!", "success");
+
+            // Reload board
+            if (window.loadTeamBoard && window.currentTeamName) {
+                window.loadTeamBoard(window.currentTeamName, true);
             }
-        },
-        error: function (xhr) {
-            const text = xhr.responseText || 'An error occurred while creating the task.';
-            showToast(text, 'danger');
+        } else {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create task');
         }
-    });
+    } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast(err.message, 'danger');
+    }
+}
+
+// Open edit task modal
+async function openEditTaskModal(taskId) {
+    const team = window.currentTeamName;
+    try {
+        const response = await fetch(`/Tasks/GetTask?id=${taskId}`);
+        if (!response.ok) throw new Error("Failed to load task details");
+        const task = await response.json();
+
+        // Populate Modal Fields
+        const idEl = document.getElementById('editTaskId');
+        const titleEl = document.getElementById('editTaskTitle');
+        const descEl = document.getElementById('editTaskDescription');
+        const priorityEl = document.getElementById('editTaskPriority');
+        const assignedEl = document.getElementById('editTaskAssignedTo');
+        const dueEl = document.getElementById('editTaskDueDate');
+
+        if (idEl) idEl.value = task.id;
+        if (titleEl) titleEl.value = task.title;
+        if (descEl) descEl.value = task.description || "";
+        if (priorityEl) priorityEl.value = task.priority;
+        if (assignedEl) assignedEl.value = task.assignedToUserId || "";
+        if (dueEl) dueEl.value = task.dueDate || "";
+
+        const board = document.getElementById('kanbanBoard');
+        const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
+
+        // 🔥 Dynamic Visibility
+        const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
+        const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
+        const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
+        const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
+
+        ["Priority", "DueDate", "Title", "Description"].forEach(field => {
+            const group = document.getElementById(`groupEditTask${field}`);
+            const visible = eval(`${field.charAt(0).toLowerCase() + field.slice(1)}Visible`);
+            if (group) group.style.display = visible ? 'block' : 'none';
+        });
+
+        // Render custom fields
+        if (typeof renderCustomFieldInputs === 'function') {
+            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
+        }
+
+        const modalEl = document.getElementById('editTaskModal');
+        if (modalEl) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+
+            // Load Communication Buttons for sales1 team
+            loadSalesCommunicationButtons(team, task);
+        }
+
+    } catch (err) {
+        console.error(err);
+        if (typeof showToast === 'function') showToast(err.message, 'danger');
+    }
+}
+
+async function loadSalesCommunicationButtons(team, task) {
+    const container = document.getElementById('communicationButtonsContainer');
+    if (!container) return;
+    container.innerHTML = ''; // Clear previous
+
+    if (team !== 'sales1' && team !== 'Sales1') return;
+
+    try {
+        // Load partials
+        const [wsRes, emRes] = await Promise.all([
+            fetch('/Communication/GetWhatsAppButton'),
+            fetch('/Communication/GetEmailButton')
+        ]);
+
+        if (wsRes.ok) container.innerHTML += await wsRes.text();
+        if (emRes.ok) container.innerHTML += await emRes.text();
+
+        // Setup handlers
+        const wsBtn = document.getElementById('whatsappBtn');
+
+        if (wsBtn) {
+            wsBtn.onclick = (e) => {
+                e.preventDefault();
+                window.open(`/Communication/WhatsApp/${task.id}`, '_blank');
+            };
+        }
+
+        const emBtn = document.getElementById('emailDropdown');
+
+        if (emBtn) {
+            const gmailOpt = document.getElementById('gmailOption');
+            const outlookOpt = document.getElementById('outlookOption');
+            const defaultOpt = document.getElementById('defaultMailOption');
+
+            if (gmailOpt) {
+                gmailOpt.onclick = (e) => {
+                    window.open(`/Communication/Email?id=${task.id}&type=gmail`, '_blank');
+                };
+            }
+
+            if (outlookOpt) {
+                outlookOpt.onclick = (e) => {
+                    window.open(`/Communication/Email?id=${task.id}&type=outlook`, '_blank');
+                };
+            }
+
+            if (defaultOpt) {
+                defaultOpt.onclick = (e) => {
+                    window.location.href = `/Communication/Email?id=${task.id}&type=default`;
+                };
+            }
+        }
+
+    } catch (err) {
+        console.error("Failed to load communication buttons:", err);
+    }
 }
 
 function submitEditTask() {
-    const taskId = parseInt(document.getElementById('editTaskId').value);
+    const taskIdEl = document.getElementById('editTaskId');
+    if (!taskIdEl) return;
+    const taskId = parseInt(taskIdEl.value);
     const titleEl = document.getElementById('editTaskTitle');
     const title = titleEl ? titleEl.value.trim() || "Task" : "Task";
 
@@ -422,7 +582,7 @@ function submitReview() {
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
 
     $.ajax({
-        url: '/Tasks/ReviewTask',
+        url: '/TaskReview/ReviewTask',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({
@@ -448,9 +608,7 @@ function submitReview() {
                 console.log("SignalR will handle the UI update.");
             } else {
                 if (window.currentTeamName && window.loadTeamBoard) {
-                    window.loadTeamBoard(window.currentTeamName);
-                } else {
-                    location.reload();
+                    window.loadTeamBoard(window.currentTeamName, true);
                 }
             }
         },
@@ -472,16 +630,14 @@ function archiveCompletedTasks(teamName) {
     if (!confirm('Archive all completed & passed tasks to the history column?')) return;
 
     $.ajax({
-        url: '/Tasks/ArchiveCompletedTasks',
+        url: '/TaskReview/ArchiveCompletedTasks',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify({ TeamName: teamName }),
         success: function (response) {
             showToast(`Archived ${response.archivedCount} task(s) to history`, 'success');
             if (window.currentTeamName && window.loadTeamBoard) {
-                window.loadTeamBoard(window.currentTeamName);
-            } else {
-                location.reload();
+                window.loadTeamBoard(window.currentTeamName, true);
             }
         },
         error: function (xhr) {
@@ -494,16 +650,14 @@ function archiveSingleTask(taskId) {
     if (!confirm('Archive this task to the history column?')) return;
 
     $.ajax({
-        url: '/Tasks/ArchiveSingleTask',
+        url: '/TaskReview/ArchiveSingleTask',
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(taskId),
         success: function () {
             showToast('Task archived to history', 'success');
             if (window.currentTeamName && window.loadTeamBoard) {
-                window.loadTeamBoard(window.currentTeamName);
-            } else {
-                location.reload();
+                window.loadTeamBoard(window.currentTeamName, true);
             }
         },
         error: function (xhr) {
@@ -526,7 +680,7 @@ function loadArchivedTasks(teamName) {
     }
 
     $.ajax({
-        url: '/Tasks/GetArchivedTasks',
+        url: '/TaskReview/GetArchivedTasks',
         method: 'GET',
         data: { team: teamName },
         success: function (tasks) {
@@ -598,7 +752,7 @@ function openArchivedTaskDetail(taskId) {
     modal.show();
 
     $.ajax({
-        url: '/Tasks/GetArchivedTaskDetail',
+        url: '/TaskReview/GetArchivedTaskDetail',
         method: 'GET',
         data: { id: taskId },
         success: function (t) {
@@ -699,12 +853,8 @@ function openArchivedTaskDetail(taskId) {
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════
 
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.appendChild(document.createTextNode(str));
-    return div.innerHTML;
-}
+// Unified escapeHtml is now in ajax-utils.js
+
 
 function formatDate(dateStr) {
     if (!dateStr) return '';
@@ -729,95 +879,8 @@ function formatDate(dateStr) {
     }
 }
 
-function showToast(message, type) {
-    type = type || 'info';
-    // Remove existing toasts
-    document.querySelectorAll('.premium-toast').forEach(t => t.remove());
+// Unified showToast is now in ajax-utils.js
 
-    const icons = {
-        success: 'bi-check-circle-fill',
-        danger: 'bi-exclamation-triangle-fill',
-        warning: 'bi-exclamation-circle-fill',
-        info: 'bi-info-circle-fill'
-    };
-    const bgColors = {
-        success: 'linear-gradient(135deg, #00C851, #007E33)',
-        danger: 'linear-gradient(135deg, #ff4444, #CC0000)',
-        warning: 'linear-gradient(135deg, #ffbb33, #FF8800)',
-        info: 'linear-gradient(135deg, #33b5e5, #0099CC)'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = 'premium-toast';
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 10000;
-        padding: 14px 20px;
-        border-radius: 12px;
-        color: #fff;
-        font-weight: 600;
-        font-size: 14px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-        animation: toastSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        max-width: 420px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        backdrop-filter: blur(10px);
-        background: ${bgColors[type] || bgColors.info};
-    `;
-
-    const icon = document.createElement('i');
-    icon.className = `bi ${icons[type] || icons.info}`;
-    icon.style.fontSize = '18px';
-
-    const text = document.createElement('span');
-    text.style.flex = '1';
-    text.textContent = message;
-
-    const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '&times;';
-    closeBtn.style.cssText = 'background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 0 0 8px;opacity:0.8;';
-    closeBtn.onclick = () => {
-        toast.style.animation = 'toastSlideOut 0.3s ease-in forwards';
-        setTimeout(() => toast.remove(), 300);
-    };
-
-    // Progress bar
-    const progress = document.createElement('div');
-    progress.style.cssText = 'position:absolute;bottom:0;left:0;height:3px;background:rgba(255,255,255,0.4);border-radius:0 0 12px 12px;animation:toastProgress 5s linear forwards;';
-
-    toast.appendChild(icon);
-    toast.appendChild(text);
-    toast.appendChild(closeBtn);
-    toast.appendChild(progress);
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.animation = 'toastSlideOut 0.3s ease-in forwards';
-        setTimeout(() => toast.remove(), 300);
-    }, 5000);
-}
-
-// Add toast animations
-const toastStyle = document.createElement('style');
-toastStyle.textContent = `
-    @keyframes toastSlideIn {
-        from { transform: translateX(100%) scale(0.95); opacity: 0; }
-        to { transform: translateX(0) scale(1); opacity: 1; }
-    }
-    @keyframes toastSlideOut {
-        from { transform: translateX(0) scale(1); opacity: 1; }
-        to { transform: translateX(100%) scale(0.95); opacity: 0; }
-    }
-    @keyframes toastProgress {
-        from { width: 100%; }
-        to { width: 0%; }
-    }
-`;
-document.head.appendChild(toastStyle);
 
 function deleteArchivedTask(event, taskId) {
     if (event) event.stopPropagation();
@@ -886,7 +949,10 @@ function moveTaskFromEditModal() {
 
     fetch('/Tasks/MoveTask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify({
             taskId: taskId,
             columnId: targetColumnId
@@ -913,4 +979,343 @@ function moveTaskFromEditModal() {
             alert("Failed to move task.");
             populateMoveToDropdown();
         });
+}
+// ═══════════════════════════════════════════════
+// VIRTUAL LEAD LOGIC (NO-STORAGE)
+// ═══════════════════════════════════════════════
+
+function fetchVirtualLeads() {
+    if (!window.isAdmin) return; // Only admins see virtual leads pool
+    console.log("Fetching virtual leads...");
+    fetch('/Tasks/GetVirtualLeads')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.leads) {
+                const toDoColumn = document.querySelector('.kanban-column[data-column-name="To Do"]');
+                const columnId = toDoColumn ? parseInt(toDoColumn.dataset.columnId) : null;
+
+                if (columnId) {
+                    data.leads.slice().reverse().forEach(lead => {
+                        renderVirtualLeadCard(lead, columnId);
+                    });
+                }
+            }
+        })
+        .catch(err => console.error("Error fetching virtual leads:", err));
+}
+
+function handleNewLeadsUpdate(data) {
+    if (window.currentTeamName !== 'Digi Leads' || !window.isAdmin) return;
+
+    if (data.leads && data.columnId) {
+        data.leads.forEach(lead => {
+            renderVirtualLeadCard(lead, data.columnId);
+        });
+        if (typeof showToast === 'function') {
+            showToast(`📣 ${data.leads.length} new lead(s) detected!`, 'success');
+        }
+    }
+}
+
+/**
+ * Renders a virtual lead card that matches _TaskCard.cshtml appearance
+ */
+function renderVirtualLeadCard(lead, columnId) {
+    if (!window.isAdmin) return;
+
+    // Prevent duplicates
+    if (document.querySelector(`.task-card[data-lead-id="${lead.id}"]`) ||
+        document.querySelector(`.task-card[data-external-lead-id="${lead.id}"]`)) return;
+
+    const targetColumn = document.querySelector(`.kanban-column[data-column-id="${columnId}"]`);
+    if (!targetColumn) return;
+
+    const taskList = targetColumn.querySelector('.kanban-tasks');
+    if (!taskList) return;
+
+    const leadJson = JSON.stringify(lead).replace(/"/g, '&quot;');
+
+    // Build dynamic fields HTML - Include EVERYTHING from root AND fields object
+    let fieldsHtml = '';
+
+    // Add common root fields if present
+    if (lead.campaignName) fieldsHtml += `<div class="cf-row"><span class="cf-label">Campaign:</span><span>${lead.campaignName}</span></div>`;
+    if (lead.formId) fieldsHtml += `<div class="cf-row"><span class="cf-label">Form ID:</span><span>${lead.formId}</span></div>`;
+
+    if (lead.fields) {
+        for (const [key, value] of Object.entries(lead.fields)) {
+            // Already showing these at root or standard fields
+            if (['name', 'email', 'phone', 'full_name', 'campaignname', 'formid'].includes(key.toLowerCase()) || !value) continue;
+
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            fieldsHtml += `
+                <div class="cf-row">
+                    <span class="cf-label">${label}:</span>
+                    <span>${value}</span>
+                </div>`;
+        }
+    }
+
+    const cardHtml = `
+        <div class="task-card virtual-lead-card priority-medium mb-3 animate__animated animate__fadeInDown" 
+             data-lead-id="${lead.id}" 
+             data-column-id="${columnId}"
+             data-lead-data="${leadJson}"
+             onclick="handleVirtualCardClick(this)">
+            
+            <div class="card-top-row d-flex align-items-start w-100">
+                <div class="d-flex flex-nowrap align-items-center gap-2">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle d-flex align-items-center gap-1 small fw-normal" 
+                          style="font-size: 0.7rem; white-space: nowrap;">
+                        <i class="bi bi-lightning-fill"></i> VIRTUAL LEAD
+                    </span>
+                    <span class="priority-pill priority-medium">MEDIUM</span>
+                </div>
+                <div class="ms-auto d-flex flex-column align-items-end gap-1">
+                    <span class="badge bg-light text-muted border small" style="font-size: 0.7rem;">API</span>
+                </div>
+            </div>
+            
+            <div class="task-title-text mt-2" style="font-size: 0.825rem; font-weight: bold; color: #064e3b;">
+                ${lead.name || 'Anonymous Lead'}
+            </div>
+            
+            <div class="custom-fields-summary mt-2">
+                <div class="cf-row">
+                    <span class="cf-label">Email:</span>
+                    <span>${lead.email || 'N/A'}</span>
+                </div>
+                <div class="cf-row">
+                    <span class="cf-label">Phone:</span>
+                    <span>${lead.phone || 'N/A'}</span>
+                </div>
+                ${fieldsHtml}
+            </div>
+
+            <div class="task-actions mt-2 pt-2 border-top">
+                <button class="action-btn action-btn-info" title="View History / Info" 
+                        onclick="handleVirtualAction(this, 'history'); event.stopPropagation();">
+                    <i class="bi bi-clock-history"></i>
+                </button>
+                <button class="action-btn action-btn-edit" title="Edit Lead (Virtual)" 
+                        onclick="handleVirtualAction(this, 'edit'); event.stopPropagation();">
+                    <i class="bi bi-pencil-square"></i>
+                </button>
+                <button class="action-btn action-btn-secondary" title="Quick Assign (Virtual)" 
+                        onclick="handleVirtualAction(this, 'assign'); event.stopPropagation();">
+                    <i class="bi bi-person-plus"></i>
+                </button>
+                <button class="action-btn action-btn-danger" title="Delete / Dismiss" 
+                        onclick="handleVirtualAction(this, 'delete'); event.stopPropagation();">
+                    <i class="bi bi-trash3"></i>
+                </button>
+            </div>
+        </div>
+    `;
+
+    taskList.insertAdjacentHTML('afterbegin', cardHtml);
+    if (typeof updateColumnCounts === 'function') updateColumnCounts();
+}
+
+/**
+ * Transparently shows virtual lead details in the task overview modal without DB conversion
+ */
+function focusVirtualLead(lead, columnId) {
+    const body = document.getElementById('taskOverviewBody');
+    const headerActions = document.getElementById('taskOverviewActions');
+    if (!body) return;
+
+    body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    if (headerActions) headerActions.innerHTML = '';
+
+    const modalEl = document.getElementById('taskOverviewModal');
+    if (!modalEl) return;
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    // Header Actions for Virtual Lead
+    if (headerActions) {
+        headerActions.innerHTML = `
+            <button class="modal-action-btn-sm btn-modal-assign" title="Assign & Convert" onclick="convertAndAction('${lead.id}', 'assign')">
+                <i class="bi bi-person-plus"></i>
+            </button>
+            <button class="modal-action-btn-sm btn-modal-edit" title="Edit & Convert" onclick="convertAndAction('${lead.id}', 'edit')">
+                <i class="bi bi-pencil-square"></i>
+            </button>
+        `;
+    }
+
+    // Prepare table rows from all available fields
+    let tableRows = '';
+    const addRow = (label, value) => {
+        tableRows += `
+            <tr>
+                <td class="fw-bold text-muted border-end" style="width: 35%; background: #f8fafc; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">${escapeHtml(label)}</td>
+                <td class="ps-3 fw-semibold text-dark" style="font-size: 0.9rem;">${escapeHtml(value || '—')}</td>
+            </tr>`;
+    };
+
+    addRow('Name', lead.name);
+    addRow('Email', lead.email);
+    addRow('Phone', lead.phone);
+    addRow('Form ID', lead.formId);
+    addRow('Campaign', lead.campaignName);
+    addRow('Ad Set', lead.adsetName);
+    addRow('Ad Name', lead.adName);
+
+    if (lead.fields) {
+        for (const [key, value] of Object.entries(lead.fields)) {
+            // Skip core fields already added
+            if (['name', 'email', 'phone', 'full_name', 'form_id'].includes(key.toLowerCase()) || !value) continue;
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            addRow(label, value);
+        }
+    }
+
+    // Render Modal Body (Premium Table Layout)
+    body.innerHTML = `
+        <div style="border-left: 5px solid #10b981; padding-left: 16px; margin-bottom: 20px;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-success-subtle text-success border border-success-subtle d-flex align-items-center gap-1 small fw-normal" 
+                      style="font-size: 0.7rem; padding: 4px 10px;">
+                    <i class="bi bi-lightning-fill"></i> VIRTUAL LEAD
+                </span>
+                <span style="background: #eff6ff; color: #3b82f6; border: 1px solid #dbeafe; padding: 3px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem;">
+                    API LIVE DATA
+                </span>
+            </div>
+            <h4 style="font-weight: 700; color: #1e293b; margin: 0; font-size: 1.5rem;">${escapeHtml(lead.name || 'Anonymous Lead')}</h4>
+        </div>
+
+        <div class="card border-0 shadow-sm overflow-hidden mb-4" style="border-radius: 12px;">
+            <div class="card-header bg-white border-bottom py-3">
+                <h6 class="mb-0 fw-bold text-primary d-flex align-items-center">
+                    <i class="bi bi-table me-2"></i> Lead Form Data
+                </h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="alert alert-info d-flex align-items-center gap-3 mb-0" style="font-size: 0.85rem; border-left: 4px solid #0dcaf0; border-radius: 10px;">
+            <i class="bi bi-info-circle-fill fs-4 text-info"></i>
+            <div>
+                <strong>Information:</strong> This lead is currently <strong>not stored</strong> in the database. 
+                Any fields you add or changes you make will only be saved once you <strong>Assign</strong> or <strong>Edit</strong> the lead, 
+                at which point it will be converted into a persistent task.
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Helper to convert and then perform an action from the modal
+ */
+function convertAndAction(leadId, actionType) {
+    const card = document.querySelector(`.task-card[data-lead-id="${leadId}"]`);
+    if (!card) return;
+
+    const modal = bootstrap.Modal.getInstance(document.getElementById('taskOverviewModal'));
+    if (modal) modal.hide();
+
+    handleVirtualAction(card.querySelector(`.action-btn-${actionType}`), actionType);
+}
+
+/**
+ * Handles actions on virtual cards: Convert to task then trigger real action
+ */
+async function handleVirtualAction(btn, actionType) {
+    const card = btn.closest('.virtual-lead-card');
+    const leadId = card.dataset.leadId;
+    const leadDataJsonString = card.dataset.leadData.replace(/&quot;/g, '"');
+    const leadData = JSON.parse(leadDataJsonString);
+
+    if (actionType === 'delete') {
+        const result = await Swal.fire({
+            title: 'Dismiss Lead?',
+            text: "This virtual lead will be removed from your view. It is not stored in the database.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Dismiss'
+        });
+        if (result.isConfirmed) {
+            card.remove();
+            if (typeof updateColumnCounts === 'function') updateColumnCounts();
+        }
+        return;
+    }
+
+    if (actionType === 'history') {
+        focusVirtualLead(leadData, card.dataset.columnId);
+        return;
+    }
+
+    // For Edit or Assign, we convert to persistent task
+    btn.disabled = true;
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    try {
+        const payload = {
+            id: String(leadData.id), // Ensure string
+            name: leadData.name,
+            email: leadData.email,
+            phone: leadData.phone,
+            formId: leadData.formId,
+            columnId: parseInt(card.dataset.columnId),
+            campaignName: leadData.campaignName,
+            adsetName: leadData.adsetName,
+            adName: leadData.adName,
+            metaCreatedAt: leadData.metaCreatedAt,
+            fields: leadData.fields
+        };
+
+        const response = await fetch('/Tasks/ConvertLeadToTask', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) throw new Error(await response.text());
+
+        const convertResult = await response.json();
+        if (!convertResult.success) throw new Error(convertResult.message || "Conversion failed");
+
+        const taskId = convertResult.taskId;
+
+        if (window.loadTeamBoard) {
+            await window.loadTeamBoard(window.currentTeamName, true);
+            setTimeout(() => {
+                if (actionType === 'edit') openEditTaskModal(taskId);
+                else if (actionType === 'assign') showAssignUI(taskId);
+            }, 600);
+        }
+
+    } catch (err) {
+        console.error("Error in handleVirtualAction:", err);
+        showToast(err.message || "Error processing virtual action", "danger");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+}
+
+function handleVirtualCardClick(card) {
+    if (event.target.closest('.task-actions, button')) return;
+
+    try {
+        const leadData = JSON.parse(card.dataset.leadData.replace(/&quot;/g, '"'));
+        focusVirtualLead(leadData, card.dataset.columnId);
+    } catch (e) {
+        console.error("Error parsing lead data for click:", e);
+    }
 }

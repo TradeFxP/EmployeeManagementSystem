@@ -8,17 +8,17 @@ namespace UserRoles.Models
     {
         public int Id { get; set; }
 
-        public string ApplicationUserId { get; set; }
+        public string ApplicationUserId { get; set; } = string.Empty;
 
         public DateTime Date { get; set; }
 
-        public string Task { get; set; }
+        public string Task { get; set; } = string.Empty;
 
-        public string Note { get; set; }
+        public string Note { get; set; } = string.Empty;
 
-        public string ReportedTo { get; set; }
+        public string ReportedTo { get; set; } = string.Empty;
 
-        public string SubmittedByRole { get; set; }
+        public string SubmittedByRole { get; set; } = string.Empty;
 
         // ✅ MUST EXIST
         public string? ReviewerComment { get; set; }

@@ -7,6 +7,9 @@
         // Auto-generated ID: P1T1, P1T2 (for project-linked tasks) or E1F1S1T1 (for story-linked tasks)
         public string? WorkItemId { get; set; }
 
+        // For Facebook Leads integration
+        public string? ExternalLeadId { get; set; }
+
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         
@@ -34,8 +37,7 @@
 
 
         public string CreatedByUserId { get; set; } = null!;
-        public Users CreatedByUser { get; set; } = null!;   // ✅ ADD THIS
-
+        public Users CreatedByUser { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
 
         public DateTime? UpdatedAt { get; set; }

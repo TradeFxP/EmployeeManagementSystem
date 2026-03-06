@@ -11,6 +11,7 @@ using UserRoles.Helpers;
 using UserRoles.Models;
 using UserRoles.Services;
 using UserRoles.ViewModels;
+using UserRoles.DTOs;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using static QuestPDF.Helpers.Colors;
 
@@ -23,166 +24,22 @@ namespace UserRoles.Controllers
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IEmailService _emailService;
         private readonly AppDbContext _context;
+        private readonly IUserHierarchyService _hierarchyService;
 
         public UsersController(
             UserManager<Users> userManager,
             RoleManager<IdentityRole> roleManager,
             IEmailService emailService,
-            AppDbContext context)
+            AppDbContext context,
+            IUserHierarchyService hierarchyService)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _emailService = emailService;
             _context = context;
+            _hierarchyService = hierarchyService;
         }
 
-        // Updated OrgChart to support Admin / Manager scoped views:
-        // - Admin: full org chart (same behavior as before)
-        // - Manager: only the manager's subtree (the manager is the root shown)
-        // Note: Users (role "User") are not authorized to view the org chart (enforced at controller level)
-        [Authorize(Roles = "Admin,Manager")]
-        public async Task<IActionResult> OrgChart()
-        {
-            // Current logged in user
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (currentUser == null) return Unauthorized();
-
-            var currentUserId = currentUser.Id;
-            var currentRoles = await _userManager.GetRolesAsync(currentUser);
-            var currentRole = currentRoles.FirstOrDefault() ?? "User";
-
-            // Load all users once (no tracking)
-            var allUsers = await _userManager.Users
-                .AsNoTracking()
-                .ToListAsync();
-
-            // Role lookup map (Id -> role)
-            var roleMap = new Dictionary<string, string>();
-            foreach (var u in allUsers)
-            {
-                var roles = await _userManager.GetRolesAsync(u);
-                roleMap[u.Id] = roles.FirstOrDefault() ?? "User";
-            }
-
-            // Collections used by the view
-            List<Users> managers = new List<Users>();
-            Dictionary<string, List<Users>> subManagers = new Dictionary<string, List<Users>>();
-            Dictionary<string, List<Users>> subManagerUsers = new Dictionary<string, List<Users>>();
-            List<Users> adminUsers = new List<Users>(); // users held by Admin (ParentUserId == null and role == User)
-
-            // Root user to display at top of chart (can be Admin or Manager)
-            Users rootUser = null;
-
-            if (currentRole == "Admin")
-            {
-                // Admin sees the full org chart
-                rootUser = currentUser;
-
-                // Top-level managers are those with ParentUserId == null
-                managers = allUsers
-                    .Where(u => roleMap[u.Id] == "Manager" && string.IsNullOrEmpty(u.ParentUserId))
-                    .ToList();
-
-                // Sub-manager groups
-                subManagers = allUsers
-                    .Where(u => roleMap[u.Id] == "Manager" && !string.IsNullOrEmpty(u.ParentUserId))
-                    .GroupBy(u => u.ParentUserId)
-                    .ToDictionary(g => g.Key!, g => g.ToList());
-
-                // Users grouped by parent manager id (only those with a parent)
-                subManagerUsers = allUsers
-                    .Where(u => roleMap[u.Id] == "User" && !string.IsNullOrEmpty(u.ParentUserId))
-                    .GroupBy(u => u.ParentUserId)
-                    .ToDictionary(g => g.Key!, g => g.ToList());
-
-                // Users directly held by Admin (ParentUserId == null, role == User)
-                adminUsers = allUsers
-                    .Where(u => roleMap[u.Id] == "User" && string.IsNullOrEmpty(u.ParentUserId))
-                    .ToList();
-            }
-            else // currentRole == "Manager"
-            {
-                // Manager should see only their subtree with themselves as the root
-                rootUser = currentUser;
-
-                // Visible manager ids are the manager + all descendant managers
-                var visibleIds = await GetVisibleManagerIdsAsync(currentUserId);
-
-                // The managers list for the view will contain only the current manager as root
-                managers = new List<Users> { currentUser };
-
-                // SubManagers: include only managers in the visible set that have a parent (group by parent)
-                subManagers = allUsers
-                    .Where(u => roleMap[u.Id] == "Manager" && !string.IsNullOrEmpty(u.ParentUserId) && visibleIds.Contains(u.Id))
-                    .GroupBy(u => u.ParentUserId)
-                    .ToDictionary(g => g.Key!, g => g.ToList());
-
-                // Users under visible manager ids (include users assigned directly under any visible manager)
-                subManagerUsers = allUsers
-                    .Where(u => roleMap[u.Id] == "User" && !string.IsNullOrEmpty(u.ParentUserId) && visibleIds.Contains(u.ParentUserId))
-                    .GroupBy(u => u.ParentUserId)
-                    .ToDictionary(g => g.Key!, g => g.ToList());
-            }
-
-            // Expose current role to the view so the UI can hide admin-only controls
-            ViewBag.CurrentRole = currentRole;
-
-            ViewBag.Admin = rootUser;
-            ViewBag.Managers = managers;
-            ViewBag.SubManagers = subManagers;
-            ViewBag.SubManagerUsers = subManagerUsers;
-            ViewBag.AdminUsers = adminUsers;
-
-            return View();
-        }
-
-        public async Task<IActionResult> GetDetails(string id)
-        {
-            var user = await _userManager.FindByIdAsync(id);
-            if (user == null) return NotFound();
-
-            var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
-            return PartialView("_UserDetails", (user, role));
-        }
-
-        // ================= ORG CHART TREE BUILDER =================
-        // Builds unlimited depth hierarchy (Manager → Sub-Manager → Sub-Manager → User)
-        private OrgTreeNodeViewModel BuildOrgTree(
-            Users root,
-            List<Users> allManagers,
-            List<Users> allUsers)
-        {
-            var node = new OrgTreeNodeViewModel
-            {
-                User = root
-            };
-
-            // 1️⃣ Find child MANAGERS (Sub-Managers)
-            var childManagers = allManagers
-                .Where(m => m.ParentUserId == root.Id)
-                .ToList();
-
-            foreach (var manager in childManagers)
-            {
-                // Recursively build sub-tree
-                node.Children.Add(BuildOrgTree(manager, allManagers, allUsers));
-            }
-
-            // 2️⃣ Find USERS under this manager / sub-manager
-            var childUsers = allUsers
-                .Where(u => u.ParentUserId == root.Id)
-                .ToList();
-
-            foreach (var user in childUsers)
-            {
-                node.Children.Add(new OrgTreeNodeViewModel
-                {
-                    User = user
-                });
-            }
-
-            return node;
-        }
 
         [Authorize(Roles = "Admin,Manager")]
         [HttpPost]
@@ -282,14 +139,14 @@ namespace UserRoles.Controllers
                 .Where(u => u.ParentUserId == managerId)
                 .ToListAsync();
 
-            // 🚨 BLOCK DELETE IF USERS EXIST AND NO TARGET
+            // ?? BLOCK DELETE IF USERS EXIST AND NO TARGET
             if (users.Any() && string.IsNullOrEmpty(targetManagerId))
             {
                 TempData["Error"] = "You must reassign users before deleting the manager.";
                 return RedirectToAction(nameof(ConfirmDeleteManager), new { managerId });
             }
 
-            // 🔁 SHIFT ALL USERS
+            // ?? SHIFT ALL USERS
             if (shiftAll)
             {
                 foreach (var user in users)
@@ -299,7 +156,7 @@ namespace UserRoles.Controllers
                     await _userManager.UpdateAsync(user);
                 }
             }
-            // 🔄 SHIFT SELECTED USERS
+            // ?? SHIFT SELECTED USERS
             else
             {
                 if (selectedUserIds == null || !selectedUserIds.Any())
@@ -316,7 +173,7 @@ namespace UserRoles.Controllers
                 }
             }
 
-            // 🔐 FINAL SAFETY CHECK
+            // ?? FINAL SAFETY CHECK
             bool stillAssigned = await _userManager.Users
                 .AnyAsync(u => u.ParentUserId == managerId || u.ManagerId == managerId);
 
@@ -326,7 +183,7 @@ namespace UserRoles.Controllers
                 return RedirectToAction(nameof(ConfirmDeleteManager), new { managerId });
             }
 
-            // ✅ CLEANUP TASK HISTORY (Set ChangedByUser to NULL)
+            // ? CLEANUP TASK HISTORY (Set ChangedByUser to NULL)
             var historyRecords = await _context.TaskHistories.Where(h => h.ChangedByUserId == managerId).ToListAsync();
             foreach (var record in historyRecords)
             {
@@ -337,7 +194,7 @@ namespace UserRoles.Controllers
                 await _context.SaveChangesAsync();
             }
 
-            // ✅ NOW SAFE TO HARD DELETE
+            // ? NOW SAFE TO HARD DELETE
             await PurgeUserReferences(manager.Id);
             var result = await _userManager.DeleteAsync(manager);
             if (!result.Succeeded)
@@ -385,7 +242,7 @@ namespace UserRoles.Controllers
             }
 
             // ---------------- MANAGER DATA ----------------
-            var allManagers = await GetAllManagersAsync(); // ✅ DEFINE IT FIRST
+            var allManagers = await _hierarchyService.GetAllManagersAsync(); // ? DEFINE IT FIRST
 
             // ================= ASSIGNABLE MANAGERS =================
             ViewBag.AssignableManagers = new List<Users>(); // always safe
@@ -398,7 +255,7 @@ namespace UserRoles.Controllers
             else if (isManager)
             {
                 // Manager can assign only to visible sub-managers
-                var visibleIds = await GetVisibleManagerIdsAsync(currentUserId);
+                var visibleIds = await _hierarchyService.GetVisibleManagerIdsAsync(currentUserId);
 
                 ViewBag.AssignableManagers = allManagers
                     .Where(m => visibleIds.Contains(m.Id) && m.Id != currentUserId)
@@ -412,12 +269,12 @@ namespace UserRoles.Controllers
             // ---------------- USERS QUERY ----------------
             IQueryable<Users> usersQuery = _userManager.Users
                 .AsNoTracking()
-                .Where(u => u.Id != currentUserId); // ✅ ONLY HERE
+                .Where(u => u.Id != currentUserId); // ? ONLY HERE
 
             // ================= MANAGER VISIBILITY =================
             if (isManager)
             {
-                var visibleIds = await GetVisibleManagerIdsAsync(currentUserId);
+                var visibleIds = await _hierarchyService.GetVisibleManagerIdsAsync(currentUserId);
 
                 usersQuery = usersQuery.Where(u =>
                     visibleIds.Contains(u.ParentUserId) ||
@@ -450,7 +307,7 @@ namespace UserRoles.Controllers
 
             foreach (var user in users)
             {
-                // 🚫 ABSOLUTE SAFETY: NEVER SHOW LOGGED-IN USER
+                // ?? ABSOLUTE SAFETY: NEVER SHOW LOGGED-IN USER
                 var roles = await _userManager.GetRolesAsync(user);
                 string role = roles.FirstOrDefault() ?? "User";
 
@@ -495,12 +352,12 @@ namespace UserRoles.Controllers
 
             IQueryable<Users> query = _userManager.Users
                 .AsNoTracking()
-                .Where(u => u.Id != currentUserId); // 🚫 never show self
+                .Where(u => u.Id != currentUserId); // ?? never show self
 
             // ---------------- MANAGER VISIBILITY ----------------
             if (isManager)
             {
-                var visibleIds = await GetVisibleManagerIdsAsync(currentUserId);
+                var visibleIds = await _hierarchyService.GetVisibleManagerIdsAsync(currentUserId);
 
                 query = query.Where(u =>
                     visibleIds.Contains(u.ParentUserId) ||
@@ -557,7 +414,7 @@ namespace UserRoles.Controllers
         //            string name,
         //            string email,
         //            string role,
-        //            string managerId) // 🔹      THIS
+        //            string managerId) // ??      THIS
         //        {
         //            /* ================= NAME VALIDATION ================= */
         //            if (string.IsNullOrWhiteSpace(name))
@@ -592,7 +449,7 @@ namespace UserRoles.Controllers
         //            if (!Regex.IsMatch(
         //                    email,
         //                    @"^(?!.*\.\.)[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}$"))
-        //            {
+        //                {
         //                ModelState.AddModelError("Email", "Enter a valid email address.");
         //                return View();
         //            }
@@ -701,7 +558,7 @@ namespace UserRoles.Controllers
             string role,
             string managerId,
             string addType,
-            List<string> teams   // ✅ RECEIVES CHECKBOX VALUES
+            List<string> teams   // ? RECEIVES CHECKBOX VALUES
         )
         {
             if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(email))
@@ -773,7 +630,7 @@ namespace UserRoles.Controllers
                     return BadRequest(string.Join(", ", upd.Errors.Select(e => e.Description)));
 
                 /* ================================
-                   ✅ UPDATE USER TEAMS (EXISTING USER)
+                   ? UPDATE USER TEAMS (EXISTING USER)
                    ================================ */
                 var oldTeams = _context.UserTeams.Where(t => t.UserId == existing.Id);
                 _context.UserTeams.RemoveRange(oldTeams);
@@ -785,7 +642,7 @@ namespace UserRoles.Controllers
                         _context.UserTeams.Add(new UserTeam
                         {
                             UserId = existing.Id,
-                            TeamName = team   // ✅ USE LOOP VARIABLE
+                            TeamName = team   // ? USE LOOP VARIABLE
                         });
                     }
 
@@ -844,7 +701,7 @@ namespace UserRoles.Controllers
                 }
             }
 
-            // ✅ Assign next sequential numeric ID as the primary ID (Admin=100, others start at 101+)
+            // ? Assign next sequential numeric ID as the primary ID (Admin=100, others start at 101+)
             var allIds = await _context.Users
                 .IgnoreQueryFilters()
                 .Select(u => u.Id)
@@ -871,7 +728,7 @@ namespace UserRoles.Controllers
 
 
             /* ================================
-   ✅ SAVE USER TEAMS (NEW USER)
+   ? SAVE USER TEAMS (NEW USER)
    ================================ */
             if (teams != null && teams.Any())
             {
@@ -942,7 +799,7 @@ namespace UserRoles.Controllers
         // ================= EDIT USER / MANAGER =================
         [Authorize(Roles = "Admin,Manager")]
         [HttpPost]
-        [IgnoreAntiforgeryToken] // ✅ REQUIRED FOR AJAX
+        [IgnoreAntiforgeryToken] // ? REQUIRED FOR AJAX
         public async Task<IActionResult> EditInline(string id, string name, string email)
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -1066,11 +923,11 @@ namespace UserRoles.Controllers
             if (newRole != "Manager" && newRole != "SubManager" && newRole != "User")
                 return BadRequest(new { success = false, message = "Invalid role specified." });
 
-            // ── 1. Remove all existing roles ──────────────────────────────
+            // -- 1. Remove all existing roles ------------------------------
             if (currentRoles.Any())
                 await _userManager.RemoveFromRolesAsync(user, currentRoles);
 
-            // ── 2. Assign new Identity role ───────────────────────────────
+            // -- 2. Assign new Identity role -------------------------------
             // SubManager uses Identity role "Manager" (same permissions level)
             string identityRole = (newRole == "SubManager") ? "Manager" : newRole;
 
@@ -1079,7 +936,7 @@ namespace UserRoles.Controllers
 
             await _userManager.AddToRoleAsync(user, identityRole);
 
-            // ── 3. Update hierarchy fields ────────────────────────────────
+            // -- 3. Update hierarchy fields --------------------------------
             if (newRole == "Manager")
             {
                 // Promote to top-level Manager (directly under Admin)
@@ -1123,26 +980,14 @@ namespace UserRoles.Controllers
                 return BadRequest(new { success = false, message = errors });
             }
 
-            // ── 4. Refresh security stamp so session tokens are invalidated ──
+            // -- 4. Refresh security stamp so session tokens are invalidated --
             await _userManager.UpdateSecurityStampAsync(user);
 
             string displayRole = newRole == "SubManager" ? "Sub-Manager" : newRole;
             return Ok(new { success = true, message = $"Role changed to {displayRole} successfully." });
         }
 
-        // DTO for ChangeRole body
-        public class ChangeRoleRequest
-        {
-            public string UserId { get; set; } = "";
-            public string NewRole { get; set; } = "";
-            public string? ParentId { get; set; }
-        }
 
-        public class MoveOrgNodeRequest
-        {
-            public string UserId { get; set; }
-            public string NewParentId { get; set; }
-        }
 
         //// ================= REASSIGN USER =================
         //[Authorize(Roles = "Admin")]
@@ -1153,7 +998,7 @@ namespace UserRoles.Controllers
         //    if (user == null)
         //        return BadRequest("User not found");
 
-        //    // 🔥 ADMIN DROP (manager → admin)
+        //    // ?? ADMIN DROP (manager ? admin)
         //    if (managerId == "ADMIN")
         //    {
         //        user.ParentUserId = null;
@@ -1162,7 +1007,7 @@ namespace UserRoles.Controllers
         //        return Ok(new { success = true });
         //    }
 
-        //    // 🔽 Manager drop
+        //    // ?? Manager drop
         //    var manager = await _context.Users.FindAsync(managerId);
         //    if (manager == null)
         //        return BadRequest("Target manager not found");
@@ -1173,72 +1018,6 @@ namespace UserRoles.Controllers
         //    await _context.SaveChangesAsync();
         //    return Ok(new { success = true });
         //}
-
-
-
-
-
-
-        /// <summary>
-        /// Moves entire subtree when a SubManager is reassigned
-        /// Keeps child hierarchy intact
-        /// </summary>
-        private async Task CascadeMove(string subManagerId, string newParentId)
-        {
-            // Get direct children
-            var children = await _context.Users
-                .Where(u => u.ParentUserId == subManagerId || u.ManagerId == subManagerId)
-                .ToListAsync();
-
-            foreach (var child in children)
-            {
-                // Children remain under this sub-manager
-                child.ParentUserId = subManagerId;
-                child.ManagerId = subManagerId;
-
-                // Recursive move for deeper levels
-                await CascadeMove(child.Id, subManagerId);
-            }
-        }
-
-
-
-        [Authorize(Roles = "Admin")]
-        [HttpPost]
-        public async Task<IActionResult> MoveOrgNode([FromBody] MoveOrgNodeRequest model)
-        {
-            if (string.IsNullOrEmpty(model.UserId))
-                return BadRequest("Invalid user");
-
-            var user = await _context.Users.FindAsync(model.UserId);
-            if (user == null)
-                return NotFound("User not found");
-
-            // ================= ADMIN DROP =================
-            if (model.NewParentId == "ADMIN")
-            {
-                user.ParentUserId = null;   // 🔥 Admin owns the user
-                user.ManagerId = null;      // optional (safe reset)
-
-                await _context.SaveChangesAsync();
-                return Ok(new { success = true });
-            }
-
-            // ================= MANAGER / SUBMANAGER DROP =================
-            var parent = await _context.Users.FindAsync(model.NewParentId);
-            if (parent == null)
-                return BadRequest("Target parent not found");
-
-            user.ParentUserId = parent.Id;
-            user.ManagerId = parent.Id; // works for Manager + SubManager
-
-            await _context.SaveChangesAsync();
-            return Ok(new { success = true });
-        }
-
-
-
-
 
 
 
@@ -1259,14 +1038,14 @@ namespace UserRoles.Controllers
 
             var roles = await _userManager.GetRolesAsync(user);
 
-            // 🚨 BLOCK MANAGER DIRECT DELETE
+            // ?? BLOCK MANAGER DIRECT DELETE
             if (roles.Contains("Manager"))
             {
                 TempData["Error"] = "Managers cannot be deleted directly. Please reassign users first.";
                 return RedirectToAction(nameof(Managers));
             }
 
-            // ✅ SAFE HARD DELETE FOR NORMAL USERS
+            // ? SAFE HARD DELETE FOR NORMAL USERS
             await PurgeUserReferences(user.Id);
             var result = await _userManager.DeleteAsync(user);
             if (!result.Succeeded)
@@ -1343,62 +1122,7 @@ namespace UserRoles.Controllers
             await _context.SaveChangesAsync();
         }
 
-        // ================= MANAGER VISIBILITY (Manager login) =================
-        // Manager can see:
-        //  - himself
-        //  - his direct sub-managers
-        private async Task<List<string>> GetVisibleManagerIdsAsync(string rootManagerId)
-        {
-            var managers = await GetAllManagersAsync();
-
-            var result = new List<string> { rootManagerId };
-
-            void Traverse(string parentId)
-            {
-                var children = managers
-                    .Where(m => m.ParentUserId == parentId)
-                    .Select(m => m.Id)
-                    .ToList();
-
-                foreach (var childId in children)
-                {
-                    if (!result.Contains(childId))
-                    {
-                        result.Add(childId);
-                        Traverse(childId); // 🔁 recursive
-                    }
-                }
-            }
-
-            Traverse(rootManagerId);
-            return result;
-        }
-
-        // ================= ADMIN MANAGER TREE =================
-        // Returns all users who are Managers (Admin view)
-        // ================= ADMIN MANAGER TREE (SAFE VERSION) =================
-
         // ======================= HIERARCHY HELPERS =======================
-
-        // 1️⃣ Get ALL managers (Admin only)
-        private async Task<List<Users>> GetAllManagersAsync()
-        {
-            var users = await _userManager.Users
-                .AsNoTracking()
-                .ToListAsync();
-
-            var managers = new List<Users>();
-
-            foreach (var u in users)
-            {
-                if (await _userManager.IsInRoleAsync(u, "Manager"))
-                {
-                    managers.Add(u);
-                }
-            }
-
-            return managers;
-        }
 
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> ListEmployeesForAdmin()
@@ -1430,7 +1154,7 @@ namespace UserRoles.Controllers
                     .ToListAsync();
             }
 
-            // Sort by role hierarchy: Admin → Manager → Sub Manager → User
+            // Sort by role hierarchy: Admin ? Manager ? Sub Manager ? User
             var roleOrder = new Dictionary<string, int>
             {
                 { "Admin", 0 },

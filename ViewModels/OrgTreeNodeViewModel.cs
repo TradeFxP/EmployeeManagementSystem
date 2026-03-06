@@ -7,7 +7,7 @@ namespace UserRoles.ViewModels
     public class OrgTreeNodeViewModel
     {
         // Current user
-        public Users User { get; set; }
+        public Users User { get; set; } = default!;
 
         // Children under this user (managers or users)
         public List<OrgTreeNodeViewModel> Children { get; set; } = new();

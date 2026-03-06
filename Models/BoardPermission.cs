@@ -30,6 +30,7 @@ namespace UserRoles.Models
         public bool CanReviewTask { get; set; }
         public bool CanImportExcel { get; set; }
         public bool CanAssignTask { get; set; }
+        public bool CanViewHistory { get; set; }
 
         /// <summary>
         /// JSON string storing allowed transitions.

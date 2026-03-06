@@ -111,7 +111,7 @@
             <div class="tree-sub-managers">
                 @foreach (var sub in subManagers[Model.Id])
                 {
-                    @Html.Partial("_TreeNode", sub)
+                    <partial name="_TreeNode" model="sub" />
                 }
             </div>
         }

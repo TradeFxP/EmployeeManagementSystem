@@ -13,6 +13,31 @@
     var canAssign = isAdmin || isManager || isSubManager;
 }
 
+<script>
+    window.currentUserName = "@(User.Identity?.Name ?? "User")";
+    window.currentUserId = "@(UserManager.GetUserId(User))";
+    window.currentUserRole = "@(isAdmin ? "Admin" : isManager ? "Manager" : isSubManager ? "Sub-Manager" : "Member")";
+    window.isAdmin = @(isAdmin ? "true" : "false");
+
+    function toggleSidebarWide() {
+        document.querySelector('.app-wrapper').classList.toggle('sidebar-retracted');
+        const icon = document.querySelector('[onclick="toggleSidebarWide()"] i');
+        if (document.querySelector('.app-wrapper').classList.contains('sidebar-retracted')) {
+            icon.className = 'bi bi-layout-sidebar-inset-reverse';
+        } else {
+            icon.className = 'bi bi-layout-sidebar-inset';
+        }
+    }
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.toString().replace(/[&<>"']/g, m => map[m]);
+    }
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
 <style>
     .modal-action-buttons {
         display: flex;
@@ -124,14 +149,43 @@
         background: #f8fafc;
     }
 
-    .edit-options-list {
-        max-height: 250px;
-        overflow-y: auto;
-        padding: 8px;
-        background: #fdfdfd;
-        border: 1px dashed #cbd5e1;
-        border-radius: 8px;
-        margin-bottom: 10px;
+    .field-label-highlight {
+        color: #4f46e5 !important;
+        background: #eef2ff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: inline-block;
+    }
+
+    .remarks-split-container {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        scrollbar-width: thin;
+    }
+
+    .remarks-history-side::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .remarks-history-side::-webkit-scrollbar-thumb {
+        background-color: #e2e8f0;
+        border-radius: 20px;
+    }
+
+    .remark-point {
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+        padding-left: 10px !important;
+    }
+
+    .remark-point:hover {
+        background: #f8fafc;
+        border-left-color: #6366f1;
+    }
+
+    .remark-text {
+        white-space: pre-wrap;
+        word-break: break-word;
     }
 
     .btn-xs {
@@ -174,6 +228,83 @@
         background: #cbd5e1;
         border-radius: 10px;
     }
+
+    /* ---- TIMELINE UI (REMARKS) ---- */
+    .timeline-container {
+        border: 2px solid #eef2ff;
+        background: #fcfdff;
+        border-radius: 14px;
+        padding: 12px;
+        max-height: 400px;
+        overflow-y: auto;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    
+    .timeline-add-section {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 8px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.05);
+    }
+
+    .timeline-point {
+        position: relative;
+        padding-left: 20px;
+        margin-bottom: 12px;
+        border-left: 2px solid #cbd5e1;
+        padding-bottom: 8px;
+    }
+
+    .timeline-point:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .timeline-point::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        background: white;
+        border: 2px solid #6366f1;
+        border-radius: 50%;
+    }
+
+    .timeline-meta {
+        font-size: 0.7rem;
+        color: #64748b;
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .timeline-text {
+        font-size: 0.85rem;
+        color: #1e293b;
+        line-height: 1.4;
+        background: white;
+        padding: 6px 10px;
+        border-radius: 8px;
+        border: 1px solid #f1f5f9;
+        display: inline-block;
+        max-width: 100%;
+        word-wrap: break-word;
+    }
+
+    .field-label-highlight {
+        color: #4f46e5;
+        font-weight: 800 !important;
+        letter-spacing: 0.5px;
+        background: #eef2ff;
+        padding: 2px 8px;
+        border-radius: 4px;
+        display: inline-block;
+    }
 </style>
 
 <!-- MOBILE SIDEBAR OVERLAY -->
@@ -184,7 +315,10 @@
     <!-- LEFT SIDEBAR -->
     <aside class="left-sidebar" id="leftSidebar">
 
-        <h5>Boards</h5>
+        <div class="sidebar-header d-flex align-items-center justify-content-between px-3 mb-2">
+            <h5 class="mb-0">Boards</h5>
+            <i class="bi bi-layout-sidebar-inset sidebar-toggle-btn" style="cursor: pointer; font-size: 1.2rem;" onclick="toggleSidebarWide()"></i>
+        </div>
 
         <div class="list-group list-group-flush">
 
@@ -202,105 +336,105 @@
                 <div id="projectList"></div>
                 @if (isAdmin)
                 {
-                    <button type="button" class="list-group-item list-group-item-action ps-4"
-                        onclick="openCreateProjectModal()">
-                        <i class="bi bi-plus-lg me-2"></i> New Project
-                    </button>
+                        <button type="button" class="list-group-item list-group-item-action ps-4"
+                            onclick="openCreateProjectModal()">
+                            <i class="bi bi-plus-lg me-2"></i> New Project
+                        </button>
                 }
             </div>
 
             @if (isAdmin)
             {
-                <!-- ================= EMPLOYEES SECTION ================= -->
-                <button type="button"
-                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                    onclick="loadEmployeesAdminPanel()">
-                    <span>
-                        <i class="bi bi-person-badge-fill me-2"></i> Employees
-                    </span>
-                </button>
+                    <!-- ================= EMPLOYEES SECTION ================= -->
+                    <button type="button"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        onclick="loadEmployeesAdminPanel()">
+                        <span>
+                            <i class="bi bi-person-badge-fill me-2"></i> Employees
+                        </span>
+                    </button>
 
-                <!-- ================= TEAM TASKS ================= -->
-                <button type="button"
-                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                    onclick="toggleTeamTasks()">
-                    <span>
-                        <i class="bi bi-people-fill me-2"></i> Team Tasks
-                    </span>
-                    <span id="teamArrow">▲</span>
-                </button>
+                    <!-- ================= TEAM TASKS ================= -->
+                    <button type="button"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        onclick="toggleTeamTasks()">
+                        <span>
+                            <i class="bi bi-people-fill me-2"></i> Team Tasks
+                        </span>
+                        <span id="teamArrow">▲</span>
+                    </button>
 
-                <div id="teamTasksDropdown" style="display:block;">
-                    <div id="adminTeamList"></div>
-                    <!-- The team list is loaded dynamically, we'll need to handle it in JS or just let it be -->
+                    <div id="teamTasksDropdown" style="display:block;">
+                        <div id="adminTeamList"></div>
+                        <!-- The team list is loaded dynamically, we'll need to handle it in JS or just let it be -->
 
-                    <div class="mt-2 pt-2 px-3" style="border-top: 1px solid rgba(255,255,255,0.08);">
-                        <div id="addTeamInputContainer" style="display:none;" class="mb-2">
-                            <input type="text" id="newTeamNameInput"
-                                class="form-control form-control-sm bg-dark text-white border-secondary"
-                                placeholder="Enter team name..." />
-                            <div class="d-flex justify-content-end mt-1 gap-1">
-                                <button class="btn btn-xs btn-secondary" onclick="toggleAddTeamInput()">Cancel</button>
-                                <button class="btn btn-xs btn-primary" onclick="submitCreateTeam()">Add</button>
+                        <div class="mt-2 pt-2 px-3" style="border-top: 1px solid rgba(255,255,255,0.08);">
+                            <div id="addTeamInputContainer" style="display:none;" class="mb-2">
+                                <input type="text" id="newTeamNameInput"
+                                    class="form-control form-control-sm bg-dark text-white border-secondary"
+                                    placeholder="Enter team name..." />
+                                <div class="d-flex justify-content-end mt-1 gap-1">
+                                    <button class="btn btn-xs btn-secondary" onclick="toggleAddTeamInput()">Cancel</button>
+                                    <button class="btn btn-xs btn-primary" onclick="submitCreateTeam()">Add</button>
+                                </div>
                             </div>
-                        </div>
 
-                        <button type="button" class="btn btn-sm w-100 text-start"
-                            style="color: rgba(255,255,255,0.5); border: 1px dashed rgba(255,255,255,0.15);"
-                            onclick="toggleAddTeamInput()">
-                            <i class="bi bi-plus-circle me-2"></i> Add Team
-                        </button>
+                            <button type="button" class="btn btn-sm w-100 text-start"
+                                style="color: rgba(255,255,255,0.5); border: 1px dashed rgba(255,255,255,0.15);"
+                                onclick="toggleAddTeamInput()">
+                                <i class="bi bi-plus-circle me-2"></i> Add Team
+                            </button>
+                        </div>
                     </div>
-                </div>
             }
             else
             {
-                <!-- ================= USER/MANAGER: MY TEAM ================= -->
-                <button type="button"
-                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-                    onclick="toggleMyTasks()">
-                    <span>
-                        <i class="bi bi-kanban-fill me-2"></i> My Team
-                    </span>
-                    <span id="myTasksArrow">▼</span>
-                </button>
+                    <!-- ================= USER/MANAGER: MY TEAM ================= -->
+                    <button type="button"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                        onclick="toggleMyTasks()">
+                        <span>
+                            <i class="bi bi-kanban-fill me-2"></i> My Team
+                        </span>
+                        <span id="myTasksArrow">▼</span>
+                    </button>
 
-                <div id="myTasksDropdown" style="display:none;">
-                        @if (userTeams.Any())
+                    <div id="myTasksDropdown" style="display:none;">
+                    @if (userTeams.Any())
+                    {
+                        @foreach (var team in userTeams)
                         {
-                            @foreach (var team in userTeams)
-                            {
-                                var icon = "bi-people";
-                                var teamSafeId = "team_" + team.Replace(" ", "_");
-                                
-                                <div class="team-sidebar-item">
-                                    <button type="button" class="list-group-item list-group-item-action ps-4 team-btn d-flex align-items-center" 
-                                            data-team="@team"
-                                            onclick="loadTeamBoard('@team')"
-                                            @(canAssign ? $"ondblclick=toggleTeamItem('{teamSafeId}')" : "")
-                                            title="@(canAssign ? "Single-click: Board | Double-click: Toggle Assign" : "Click to view board")">
-                                        <i class="bi @icon me-2"></i> @team Team
-                                    </button>
-                                    
-                                    @if (canAssign)
-                                    {
-                                        <div id="@teamSafeId" style="display:none;">
-                                            <button type="button" class="list-group-item list-group-item-action ps-5 py-2 border-0 text-info bg-dark" 
-                                                    onclick="loadAssignedTasksOverview('@team')">
-                                                <i class="bi bi-person-check me-2"></i> Assign Task
-                                            </button>
-                                        </div>
-                                    }
-                                </div>
-                            }
+                            var icon = "bi-people";
+                            var teamSafeId = "team_" + team.Replace(" ", "_");
+
+                                            <div class="team-sidebar-item">
+                                                <button type="button" class="list-group-item list-group-item-action ps-4 team-btn d-flex align-items-center" 
+                                                        data-team="@team"
+                                                        onclick="loadTeamBoard('@team')"
+                                @(canAssign ? $"ondblclick=toggleTeamItem('{teamSafeId}')" : "")
+                                                        title="@(canAssign ? "Single-click: Board | Double-click: Toggle Assign" : "Click to view board")">
+                                                    <i class="bi @icon me-2"></i> @team Team
+                                                </button>
+
+                                @if (canAssign)
+                                {
+                                                        <div id="@teamSafeId" style="display:none;">
+                                                            <button type="button" class="list-group-item list-group-item-action ps-5 py-2 border-0 text-info bg-dark" 
+                                                                    onclick="loadAssignedTasksOverview('@team')">
+                                                                <i class="bi bi-person-check me-2"></i> Assign Task
+                                                            </button>
+                                                        </div>
+                                }
+                                            </div>
                         }
+                    }
                     else
                     {
-                        <div class="text-muted ps-4 py-2" style="font-size: 0.825rem;">
-                            No teams assigned
-                        </div>
+                                <div class="text-muted ps-4 py-2" style="font-size: 0.825rem;">
+                                    No teams assigned
+                                </div>
                     }
-                </div>
+                    </div>
             }
 
         </div>
@@ -338,9 +472,11 @@
         var isManager = @((User.IsInRole("Manager") || User.IsInRole("Sub-Manager")) ? "true" : "false");
         window.isAdmin = isAdmin;
         window.isManager = isManager;
+        window.currentUserName = '@(UserManager.GetUserName(User))';
+        window.currentUserRole = currentUserRole;
     </script>
 
-    <!-- ═══════ REVIEW TASK MODAL (ADMIN ONLY) ═══════ -->
+    <!-- ------- REVIEW TASK MODAL (ADMIN ONLY) ------- -->
     <div class="modal fade" id="reviewTaskModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -398,7 +534,7 @@
         </div>
     </div>
 
-    <!-- ═══════ ARCHIVED TASK DETAIL MODAL ═══════ -->
+    <!-- ------- ARCHIVED TASK DETAIL MODAL ------- -->
     <div class="modal fade" id="archivedTaskModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -418,7 +554,7 @@
         </div>
     </div>
 
-    <!-- ═══════ TASK OVERVIEW MODAL ═══════ -->
+    <!-- ------- TASK OVERVIEW MODAL ------- -->
     <div class="modal fade" id="taskOverviewModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -469,7 +605,7 @@
 
 
     <div class="modal fade" id="createTaskModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">
                     <h5 class="modal-title fw-bold"><i class="bi bi-plus-circle me-2"></i>Create Task</h5>
@@ -541,7 +677,7 @@
 
     <!-- EDIT TASK MODAL -->
     <div class="modal fade" id="editTaskModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff;">
                     <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-2"></i>Edit Task</h5>
@@ -589,54 +725,35 @@
                             </div>
                             <select id="editTaskAssignedTo" class="form-select">
                                 <option value="">-- Unassigned --</option>
-                                @if (Model != null && Model.AssignableUsers != null)
+                                @if (Model != null)
                                 {
-                                    var isViewerSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
-                                    var isViewerManager = User.IsInRole("Manager");
-                                    var isViewerAdmin = User.IsInRole("Admin");
-
-                                    var filteredManagement = Model.AssignableUsers.Where(u => {
-                                        if (!Model.UserRolesMap.ContainsKey(u.Id)) return false;
-                                        var r = Model.UserRolesMap[u.Id];
-                                        var isTargetAdmin = r == "Admin";
-                                        var isTargetManager = r == "Manager";
-                                        var isTargetSubManager = r == "Sub-Manager" || r == "SubManager";
-
-                                        if (!isTargetAdmin && !isTargetManager && !isTargetSubManager) return false;
-
-                                        if (isViewerSubManager) return isTargetSubManager;
-                                        if (isViewerManager) return isTargetManager || isTargetSubManager;
-                                        return true;
-                                    }).ToList();
-
-                                    var filteredRegular = Model.AssignableUsers.Where(u => {
-                                        if (Model.UserRolesMap.ContainsKey(u.Id)) {
-                                            var r = Model.UserRolesMap[u.Id];
-                                            if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
-                                        }
-                                        return true;
-                                    }).ToList();
-
-                                    @if (filteredManagement.Any())
+                                    @if (Model.ManagementUsers != null && Model.ManagementUsers.Any())
                                     {
-                                        <optgroup label="Management">
-                                            @foreach (var u in filteredManagement)
+                                        <optgroup label="MANAGEMENT">
+                                            @foreach (var u in Model.ManagementUsers)
                                             {
-                                                var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                                <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                                <option value="@u.Id">[@u.RoleName] @u.Name</option>
                                             }
                                         </optgroup>
                                     }
 
-                                    @if (filteredRegular.Any())
+                                    @if (Model.TeamGroups != null)
                                     {
-                                        <optgroup label="Team Members">
-                                            @foreach (var u in filteredRegular)
-                                            {
-                                                var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                                <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
-                                            }
-                                        </optgroup>
+                                        @foreach (var group in Model.TeamGroups)
+                                        {
+                                            <optgroup label="@group.TeamName.ToUpper()">
+                                                @foreach (var u in group.Users)
+                                                {
+                                                    <option value="@u.Id">
+                                                        @for (int i = 0; i < u.Level; i++)
+                                                        {
+                                                            @Html.Raw("&nbsp;&nbsp;")
+                                                        }
+                                                        [@u.RoleName] @u.Name
+                                                    </option>
+                                                }
+                                            </optgroup>
+                                        }
                                     }
                                 }
                             </select>
@@ -657,7 +774,7 @@
                 <div class="modal-footer bg-light border-0 py-3">
                     @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                     {
-                        <div class="me-auto d-flex gap-2">
+                        <div class="me-auto d-flex gap-2 align-items-center">
                             <button class="btn btn-sm btn-outline-secondary px-3 fw-bold" style="border-radius: 8px;"
                                 onclick="openManageFieldsModal(); event.preventDefault();">
                                 <i class="bi bi-gear me-1"></i> Manage Fields
@@ -666,6 +783,9 @@
                                 onclick="addNewCustomField(); event.preventDefault();">
                                 <i class="bi bi-plus-lg me-1"></i> Add Field
                             </button> 
+                            
+                            <!-- Sales Communication Buttons -->
+                            <div id="communicationButtonsContainer" class="d-flex gap-2 ms-2 ps-2 border-start"></div>
                         </div>
                     }
                     <button class="btn btn-secondary px-4 fw-bold" style="border-radius: 8px;" data-bs-dismiss="modal">Cancel</button>
@@ -692,59 +812,40 @@
                     <label class="form-label">Assign to</label>
                     <select id="assignUserSelect" class="form-select">
                         <option value="">-- Select User --</option>
-                        @if (Model != null && Model.AssignableUsers != null && Model.AssignableUsers.Any())
+                        @if (Model != null)
                         {
-                            var isViewerSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
-                            var isViewerManager = User.IsInRole("Manager");
-                            var isViewerAdmin = User.IsInRole("Admin");
-
-                            var filteredManagement = Model.AssignableUsers.Where(u => {
-                                if (!Model.UserRolesMap.ContainsKey(u.Id)) return false;
-                                var r = Model.UserRolesMap[u.Id];
-                                var isTargetAdmin = r == "Admin";
-                                var isTargetManager = r == "Manager";
-                                var isTargetSubManager = r == "Sub-Manager" || r == "SubManager";
-
-                                if (!isTargetAdmin && !isTargetManager && !isTargetSubManager) return false;
-
-                                if (isViewerSubManager) return isTargetSubManager;
-                                if (isViewerManager) return isTargetManager || isTargetSubManager;
-                                return true;
-                            }).ToList();
-
-                            var filteredRegular = Model.AssignableUsers.Where(u => {
-                                if (Model.UserRolesMap.ContainsKey(u.Id)) {
-                                    var r = Model.UserRolesMap[u.Id];
-                                    if (r == "Admin" || r == "Manager" || r == "Sub-Manager" || r == "SubManager") return false;
-                                }
-                                return true;
-                            }).ToList();
-
-                            @if (filteredManagement.Any())
+                            @if (Model.ManagementUsers != null && Model.ManagementUsers.Any())
                             {
-                                <optgroup label="Management">
-                                    @foreach (var u in filteredManagement)
+                                <optgroup label="MANAGEMENT">
+                                    @foreach (var u in Model.ManagementUsers)
                                     {
-                                        var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                        <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
+                                        <option value="@u.Id">[@u.RoleName] @u.Name</option>
                                     }
                                 </optgroup>
                             }
 
-                            @if (filteredRegular.Any())
+                            @if (Model.TeamGroups != null)
                             {
-                                <optgroup label="Team Members">
-                                    @foreach (var u in filteredRegular)
-                                    {
-                                        var role = Model.UserRolesMap.ContainsKey(u.Id) ? Model.UserRolesMap[u.Id] : "User";
-                                        <option value="@u.Id">[@role] @(string.IsNullOrEmpty(u.Name) ? u.UserName : u.Name)</option>
-                                    }
-                                </optgroup>
+                                @foreach (var group in Model.TeamGroups)
+                                {
+                                    <optgroup label="@group.TeamName.ToUpper()">
+                                        @foreach (var u in group.Users)
+                                        {
+                                            <option value="@u.Id">
+                                                @for (int i = 0; i < u.Level; i++)
+                                                {
+                                                    @Html.Raw("&nbsp;&nbsp;")
+                                                }
+                                                [@u.RoleName] @u.Name
+                                            </option>
+                                        }
+                                    </optgroup>
+                                }
                             }
                         }
                         else
                         {
-                            <option disabled>No users available</option>
+                                <option disabled>No users available</option>
                         }
                     </select>
                 </div>
@@ -791,7 +892,7 @@
 
     <!-- MANAGE CUSTOM FIELDS MODAL (Admin Only) -->
     <div class="modal fade" id="manageFieldsModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff;">
                     <h5 class="modal-title fw-bold"><i class="bi bi-sliders me-2"></i>Manage Custom Fields</h5>
@@ -804,31 +905,26 @@
                             <i class="bi bi-toggle-on me-1"></i> System Fields Visibility
                         </div>
                         <div class="card-body py-2">
-                            <div class="row row-cols-1 row-cols-md-2 g-2">
-                                <div class="col">
-                                    <div class="form-check form-switch mb-2">
-                                        <input class="form-check-input" type="checkbox" id="showOtherCheckbox" onchange="updateTeamSettings()">
-                                        <label class="form-check-label fw-bold" for="showOtherCheckbox">Show Other</label>
-                                    </div>
-                                    <div class="form-check form-switch mb-2">
-                                        <input class="form-check-input" type="checkbox" id="showTitleCheckbox" @(Model?.TeamSettings?.IsTitleVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label" for="showTitleCheckbox">Show Title Field</label>
-                                    </div>
-                                    <div class="form-check form-switch mb-2">
-                                        <input class="form-check-input" type="checkbox" id="showDescriptionCheckbox" @(Model?.TeamSettings?.IsDescriptionVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label" for="showDescriptionCheckbox">Show Description Field</label>
-                                    </div>
+                            <div class="d-flex flex-wrap align-items-center gap-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showOtherCheckbox" onchange="updateTeamSettings()">
+                                    <label class="form-check-label fw-bold" for="showOtherCheckbox">Show Other</label>
                                 </div>
-                                <div class="col text-md-end text-start">
-                                    <div class="form-check form-switch mb-2 d-md-inline-block">
-                                        <input class="form-check-input" type="checkbox" id="showPriorityCheckbox" @(Model?.TeamSettings?.IsPriorityVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label me-md-5" for="showPriorityCheckbox">Show Priority</label>
-                                    </div>
-                                    <br class="d-none d-md-block" />
-                                    <div class="form-check form-switch mb-2 d-md-inline-block">
-                                        <input class="form-check-input" type="checkbox" id="showDueDateCheckbox" @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
-                                        <label class="form-check-label me-md-5" for="showDueDateCheckbox">Show Due Date</label>
-                                    </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showTitleCheckbox" @(Model?.TeamSettings?.IsTitleVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showTitleCheckbox">Show Title Field</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showDescriptionCheckbox" @(Model?.TeamSettings?.IsDescriptionVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showDescriptionCheckbox">Show Description Field</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showPriorityCheckbox" @(Model?.TeamSettings?.IsPriorityVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showPriorityCheckbox">Show Priority</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="showDueDateCheckbox" @(Model?.TeamSettings?.IsDueDateVisible ?? true ? "checked" : "") onchange="updateTeamSettings()">
+                                    <label class="form-check-label" for="showDueDateCheckbox">Show Due Date</label>
                                 </div>
                             </div>
                         </div>
@@ -863,6 +959,7 @@
                                     <option value="Dropdown">▼ Dropdown</option>
                                     <option value="List">📋 List (Columns)</option>
                                     <option value="Image">🖼️ Image</option>
+                                    <option value="Remarks"> Remarks</option>
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -900,7 +997,7 @@
         </div>
     </div>
 
-    <!-- ═══════ EXCEL IMPORT MODAL ═══════ -->
+    <!-- ------- EXCEL IMPORT MODAL ------- -->
     <div class="modal fade" id="excelImportModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -1113,7 +1210,7 @@
     </div>
 
     <style>
-        /* ═══════ PREMIUM UI/UX ENHANCEMENTS ═══════ */
+        /* ------- PREMIUM UI/UX ENHANCEMENTS ------- */
         .modal-content { border-radius: 16px; overflow: hidden; }
         .modal-header { border-bottom: none !important; padding: 1.5rem 2rem; }
         .modal-body { padding: 2rem; }
@@ -1164,7 +1261,7 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
         }
         
-        /* ═══════ EXCEL IMPORT MODAL STYLES ═══════ */
+        /* ------- EXCEL IMPORT MODAL STYLES ------- */
         .excel-drop-zone {
             border: 2px dashed #0d9488;
             border-radius: 16px;
@@ -1310,7 +1407,7 @@
 </div>
 
 
-    <!-- ═══════ BOARD PERMISSION MODAL (Admin Only) ═══════ -->
+    <!-- ------- BOARD PERMISSION MODAL (Admin Only) ------- -->
     <div class="modal fade" id="boardPermissionModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
@@ -1321,28 +1418,43 @@
                     <h5 class="modal-title">
                         <i class="bi bi-shield-lock me-2 text-info"></i>Board Permissions
                     </h5>
-                    <div class="d-flex align-items-center gap-2 me-3">
-                        <button id="toggleDragDropMode" class="btn btn-sm btn-outline-info border-0" onclick="toggleBoardPermissionMode()" title="Configure Drag & Drop Rules">
-                            <i class="bi bi-arrows-move me-1"></i>Drag & Drop
-                        </button>
-                        <div class="vr bg-white-50 mx-1" style="height: 20px;"></div>
-                        <label class="small text-white-50 mb-0">Role Filter:</label>
-                        <select id="boardRoleFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="filterBoardPermissions()" style="width: auto; min-width: 140px;">
-                            <option value="All">All Members</option>
-                            <option value="Manager">Manager</option>
-                            <option value="Sub Manager">Sub Manager</option>
-                            <option value="User">User</option>
-                        </select>
+
+                     <div class="d-flex align-items-center gap-3 me-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="small text-white-50 mb-0">Role:</label>
+                            <select id="boardRoleFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="filterBoardPermissions()" style="width: auto; min-width: 150px;">
+                                <option value="All">All Members</option>
+                                <option value="Manager">Manager</option>
+                                <option value="Sub Manager">Sub Manager</option>
+                                <option value="User">User</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="small text-white-50 mb-0">Manage:</label>
+                            <select id="permissionViewType" class="form-select form-select-sm bg-secondary text-white border-0" onchange="onPermissionViewTypeChange()" style="width: auto; min-width: 160px;">
+                                <option value="Board">Board Level</option>
+                                <option value="Column">Show Columns</option>
+                                <option value="Task">Show Tasks</option>
+                                <option value="DragDrop">Drag & Drop</option>
+                            </select>
+                        </div>
+                       
+                        <div id="columnSelectWrapper" class="d-flex align-items-center gap-2" style="display: none !important;">
+                            <label class="small text-white-50 mb-0">Column:</label>
+                            <select id="permissionColumnFilter" class="form-select form-select-sm bg-secondary text-white border-0" onchange="renderPermissionTable()" style="width: auto; min-width: 140px; padding-right: 2rem !important; background-position: right 0.75rem center !important;">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
                     </div>
                     <button type="button" class="btn-close btn-close-white ms-0" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div class="modal-body p-0">
-                    <div class="table-responsive">
+                    <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
                         <table class="table table-hover align-middle mb-0">
-                            <thead class="bg-light text-muted small text-uppercase fw-bold">
+                            <thead class="bg-light text-muted small text-uppercase fw-bold sticky-top" style="z-index: 10;">
                                 <tr>
-                                    <th class="ps-4 py-3">Member</th>
+                                    <th class="ps-1 py-1">Member</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Add Col</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Rename</th>
                                     <th class="text-center small text-uppercase fw-bold text-muted" style="font-size: 0.65rem;">Reorder</th>
@@ -1467,9 +1579,9 @@
                 container.innerHTML = teams.map(t => {
                     let safeName = t.name.replace(/ /g, '_');
                     let teamId = 'teamAdmin_' + safeName;
-                    
+
                     let icon = "bi-people";
-                    
+
                     let deleteBtn = `
                         <button class="btn btn-sm btn-link text-danger p-0 me-2" 
                                 style="opacity:0.5;"
@@ -1479,7 +1591,7 @@
                                 title="Delete Team">
                             <i class="bi bi-trash"></i>
                         </button>`;
-                    
+
                     let assignBtn = '';
                     if (@(canAssign ? "true" : "false")) {
                         assignBtn = `
@@ -1561,7 +1673,7 @@
         const columnName = document.getElementById('newColumnName').value.trim();
         if (!columnName) { alert('Column name is required'); return; }
 
-        fetch('/Tasks/AddColumn', {
+        fetch('/TaskColumns/AddColumn', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ team: team, columnName: columnName })
@@ -1575,23 +1687,6 @@
             .catch(() => alert('Failed to add column'));
     });
 </script>
-
-@{
-    ViewData["Title"] = "Task Board";
-}
-
-
-<link rel="stylesheet" href="~/css/taskHistory.css" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-<script src="~/js/customFields.js"></script>
-<script src="~/js/taskHistory.js"></script>
-<script src="~/js/column_filter.js"></script>
-<script src="~/js/index_ui.js"></script>
-<script src="~/js/board-permissions.js"></script>
-
 <script>
     function enableColumnDrag() {
         if (!__isTasksAdmin) return;
@@ -1602,7 +1697,7 @@
             return;
         }
 
-        // 🔥 SAFETY: remove old sortable safely
+        // ?? SAFETY: remove old sortable safely
         if (board._sortableInstance) {
             board._sortableInstance.destroy();
             board._sortableInstance = null;
@@ -1622,7 +1717,7 @@
 
                 if (columnIds.length === 0) return;
 
-                fetch('/Tasks/ReorderColumns', {
+                fetch('/TaskColumns/ReorderColumns', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(columnIds)
@@ -1661,7 +1756,7 @@
         const newName = input?.value?.trim();
         if (!newName) { alert('Column name required'); return; }
 
-        fetch('/Tasks/RenameColumn', {
+        fetch('/TaskColumns/RenameColumn', {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId: columnId, name: newName })
         })
             .then(res => { if (!res.ok) throw new Error(); return res.text(); })
@@ -1675,7 +1770,7 @@
     function confirmDeleteColumn(columnId) {
         if (!__isTasksAdmin) return;
         if (!confirm('Delete this column?')) return;
-        fetch('/Tasks/DeleteColumn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId }) })
+        fetch('/TaskColumns/DeleteColumn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ columnId }) })
             .then(res => { if (!res.ok) return res.text().then(t => { throw new Error(t); }); return res.text(); })
             .then(() => document.querySelector(`[data-column-id='${columnId}']`)?.remove())
             .catch(err => alert(err.message));
@@ -1683,7 +1778,7 @@
 </script>
 
 <script>
-    // ════════ SignalR Real-Time Logic ════════
+    // -------- SignalR Real-Time Logic --------
     var taskHubConnection = new signalR.HubConnectionBuilder()
         .withUrl("/taskHub")
         .withAutomaticReconnect()
@@ -1726,35 +1821,25 @@
         }
     });
 
-    taskHubConnection.on("MoveRequestHandled", function (data) {
-        console.log("Move request handled received:", data);
-        if (typeof showToast === 'function') {
-            const status = data.approved ? '✅ Approved' : '❌ Rejected';
-            showToast(`Move Request ${status}: ${data.reply || ''}`, data.approved ? 'success' : 'warning', 10000);
-        }
-    });
-
     taskHubConnection.on("PermissionsUpdated", function (userId, teamName) {
-        console.log("Permissions updated received for:", userId, teamName);
-        const currentUserId = '@UserManager.GetUserId(User)';
-        if (userId === currentUserId && window.currentTeamName && window.currentTeamName.toLowerCase().trim() === teamName.toLowerCase().trim()) {
-            if (typeof loadTeamBoard === "function") {
-                loadTeamBoard(window.currentTeamName);
-                if (typeof showToast === "function") {
-                    showToast("🔔 Your board permissions have been updated.", "info");
-                }
+        console.log("Permissions updated for user:", userId, "on team:", teamName);
+        // If current user is the one whose permissions changed, reload the board
+        if (userId === window.currentUserId && teamName === window.currentTeamName) {
+            console.log("Refreshing board due to permission update...");
+            if (typeof window.loadTeamBoard === 'function') {
+                window.loadTeamBoard(teamName, true);
             }
         }
     });
 
-    taskHubConnection.on("ProjectAccessUpdated", function () {
-        console.log("Project access updated received");
-        if (typeof loadProjectList === "function") {
-            loadProjectList();
-            showToast("📁 A new project has been assigned to you.", "success");
+    taskHubConnection.on("NewLeadsDetected", function (data) {
+        console.log("New leads detected received:", data);
+        if (typeof handleNewLeadsUpdate === 'function') {
+            handleNewLeadsUpdate(data);
         }
     });
 
+    // SignalR is now loaded at the top of the scripts section
     taskHubConnection.start()
         .then(() => {
             console.log("SignalR Connected");
@@ -1774,13 +1859,9 @@
         const taskList = targetColumn.querySelector('.kanban-tasks');
         if (!taskList) return;
 
-        // Move the element
         taskList.appendChild(card);
-        
-        // Update attributes
         card.dataset.columnId = data.newColumnId;
 
-        // UI Adjustments (Buttons / Badges)
         const colName = data.columnName.toLowerCase().trim();
         const isReview = colName === 'review';
         const isCompleted = colName === 'completed';
@@ -1811,6 +1892,23 @@
         updateColumnCounts();
         if (typeof filterBoardTasks === 'function') filterBoardTasks();
         if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
+
+        // ✅ Update View Data table status badge
+        const statusBadge = document.querySelector(`.status-badge[data-status-task-id="${data.taskId}"]`);
+        if (statusBadge) {
+            statusBadge.textContent = data.columnName;
+            
+            // Fix badge colors based on assignment status (in case it changed)
+            const row = statusBadge.closest('.task-data-row');
+            if (row) {
+                const isUnassigned = row.dataset.isUnassigned === "true";
+                statusBadge.className = isUnassigned 
+                    ? "badge rounded-pill bg-white text-black border border-blue-200 px-2 py-1 status-badge shadow-sm"
+                    : "badge rounded-pill bg-white text-black border border-green-200 px-2 py-1 status-badge shadow-sm";
+                statusBadge.style.color = "#000";
+            }
+        }
+
         showToast(`Task #${data.taskId} moved to ${data.columnName}`, 'info');
     }
 
@@ -1831,7 +1929,6 @@
         }
         if (pendingBadge) pendingBadge.style.display = 'none';
 
-        // If moved columns due to review
         if (data.newColumnId) {
             const currentColumnId = parseInt(card.dataset.columnId);
             if (currentColumnId !== data.newColumnId) {
@@ -1856,13 +1953,8 @@
     }
 
     function handleTaskAddedUpdate(data) {
-        // Prevent duplicates
         if (document.querySelector(`.task-card[data-task-id="${data.taskId}"]`)) return;
-
-        // Ensure we are on the same team
-        if (window.currentTeamName && data.teamName && window.currentTeamName.toLowerCase() !== data.teamName.toLowerCase()) {
-            return; 
-        }
+        if (window.currentTeamName && data.teamName && window.currentTeamName.toLowerCase() !== data.teamName.toLowerCase()) return;
 
         fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
             .then(res => {
@@ -1872,12 +1964,9 @@
             .then(html => {
                 const targetColumn = document.querySelector(`.kanban-column[data-column-id="${data.columnId}"]`);
                 if (!targetColumn) {
-                    // If column not found, maybe board needs full reload or it's a dynamic column
-                    console.warn("Target column not found for TaskAdded event, reloading board...");
-                    if (window.currentTeamName) loadTeamBoard(window.currentTeamName);
+                    if (window.currentTeamName) loadTeamBoard(window.currentTeamName, true);
                     return;
                 }
-
                 const taskList = targetColumn.querySelector('.kanban-tasks');
                 if (!taskList) return;
 
@@ -1897,28 +1986,88 @@
         fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
             .then(res => res.text())
             .then(html => {
-                // Replace entire card to ensure all UI elements are correct
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = html;
                 const newCard = tempDiv.firstElementChild;
                 card.parentNode.replaceChild(newCard, card);
-                
-                // Re-apply filters to correctly show/hide the updated card
                 if (typeof filterBoardTasks === 'function') filterBoardTasks();
                 if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
 
                 showToast(`Task #${data.taskId} assigned to ${data.assignedTo}`, 'success');
+
+                // ✅ Sync View Data table row if present
+                const row = document.querySelector(`.task-data-row[data-task-id="${data.taskId}"]`);
+                if (row) {
+                    const isUnassigned = data.role === "Admin";
+                    row.dataset.isUnassigned = isUnassigned ? "true" : "false";
+                    
+                    // Update premium styling
+                    row.style.setProperty("background-color", isUnassigned ? "#eff6ff" : "#f0fdf4", "important");
+                    row.style.borderLeft = isUnassigned ? "6px solid #3b82f6" : "6px solid #22c55e";
+
+                    const assigneeNameSpan = row.querySelector('.assignee-name');
+                    if (assigneeNameSpan) assigneeNameSpan.innerText = data.assignedTo;
+
+                    const avatar = row.querySelector('.avatar-table-xs');
+                    if (avatar) {
+                        avatar.innerText = (data.assignedTo && data.assignedTo.length > 0) ? data.assignedTo[0].toUpperCase() : "?";
+                        avatar.className = `avatar-table-xs me-2 ${isUnassigned ? 'bg-secondary' : 'bg-primary'} text-white rounded-circle d-flex align-items-center justify-content-center`;
+                    }
+
+                    const teamBadge = row.querySelector('.badge.bg-secondary-subtle');
+                    if (teamBadge) teamBadge.innerText = data.team;
+
+                    const roleSpan = row.querySelector('.text-info');
+                    if (roleSpan) roleSpan.innerText = data.role;
+
+                    // Update Status Badge styling
+                    const statusBadge = row.querySelector('.status-badge');
+                    if (statusBadge) {
+                        statusBadge.className = isUnassigned 
+                            ? "badge rounded-pill bg-white text-black border border-blue-200 px-2 py-1 status-badge shadow-sm"
+                            : "badge rounded-pill bg-white text-black border border-green-200 px-2 py-1 status-badge shadow-sm";
+                        statusBadge.style.color = "#000";
+                    }
+
+                    // Move row to correct section (under correct header)
+                    const headerId = isUnassigned ? 'headerUnassigned' : 'headerAssigned';
+                    const header = document.getElementById(headerId);
+                    if (header && row.parentNode) {
+                        header.after(row);
+                    }
+                }
             })
             .catch(err => console.error("Error updating assigned task:", err));
     }
 
-    function loadTeamBoard(team) {
+    function executeDynamicScripts(container) {
+        if (!container) return;
+        const scripts = container.querySelectorAll('script');
+        scripts.forEach(script => {
+            const newScript = document.createElement('script');
+            if (script.src) {
+                newScript.src = script.src;
+            } else {
+                newScript.textContent = script.textContent;
+            }
+            document.body.appendChild(newScript);
+            // Remove after short delay to clean up DOM, script will already have executed
+            setTimeout(() => newScript.remove(), 100);
+        });
+    }
+
+    function loadTeamBoard(team, quiet = false) {
         if (!team) {
             console.error("loadTeamBoard called with empty team name");
             return;
         }
-        // ✅ JOIN GROUP
-        if (taskHubConnection.state === signalR.HubConnectionState.Connected) {
+        // ? JOIN GROUP
+        const isConnected = typeof signalR !== "undefined" 
+            && typeof taskHubConnection !== "undefined" 
+            && taskHubConnection 
+            && taskHubConnection.state === signalR.HubConnectionState.Connected;
+
+        if (isConnected) {
             if (window.currentTeamName) {
                 taskHubConnection.invoke("LeaveTeamGroup", window.currentTeamName);
             }
@@ -1931,7 +2080,9 @@
         const container = document.getElementById('taskBoardContainer');
         if (!container) return;
 
-        container.innerHTML = "<div class='text-center py-5'><div class='spinner-border text-info mb-2'></div><br><span class='text-muted'>Loading board...</span></div>";
+        if (!quiet) {
+            container.innerHTML = "<div class='text-center py-5'><div class='spinner-border text-info mb-2'></div><br><span class='text-muted'>Loading board...</span></div>";
+        }
 
         fetch(`/Tasks/TeamBoard?team=${encodeURIComponent(team)}`)
             .then(res => {
@@ -1947,33 +2098,21 @@
                     if (b.dataset.team === team) b.classList.add('active');
                 });
 
-                // Execute scripts from the dynamically loaded content
-                const scripts = container.querySelectorAll('script');
-                scripts.forEach(script => {
-                    const newScript = document.createElement('script');
-                    if (script.src) {
-                        newScript.src = script.src;
-                    } else {
-                        newScript.textContent = script.textContent;
-                    }
-                    document.body.appendChild(newScript);
-                    // Remove after execution to avoid duplicates if re-rendered
-                    setTimeout(() => newScript.remove(), 100);
-                });
+                // FETCH VIRTUAL LEADS IF TEAM IS DIGI LEADS
+                if (team === 'Digi Leads' && typeof fetchVirtualLeads === 'function') {
+                    fetchVirtualLeads();
+                }
 
-                if (typeof syncBoardPermissions === "function") {
-                    syncBoardPermissions();
-                }
-                if (typeof enableColumnDrag === "function") {
-                    enableColumnDrag();
-                }
-                if (typeof enableTaskDragDrop === "function") {
-                    enableTaskDragDrop();
-                }
+                // Execute scripts from the dynamically loaded content
+                executeDynamicScripts(container);
+
+                if (typeof syncBoardPermissions === "function") syncBoardPermissions();
+                if (typeof enableColumnDrag === "function") enableColumnDrag();
+                if (typeof enableTaskDragDrop === "function") enableTaskDragDrop();
             })
             .catch(err => {
-                container.innerHTML = "<div class='text-danger p-4'>Error loading board. Please try again.</div>";
                 console.error(err);
+                container.innerHTML = `<div class='alert alert-danger'>${err.message}</div>`;
             });
     }
 
@@ -1991,7 +2130,10 @@
             .then(html => {
                 container.innerHTML = html;
                 window.currentTeamName = team; // Keep track of the team
-                
+
+                // Execute scripts from the dynamically loaded content
+                executeDynamicScripts(container);
+
                 // Highlight corresponding team button if possible
                 document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
             })
@@ -2029,7 +2171,26 @@
         body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
         if (headerActions) headerActions.innerHTML = '';
 
-        const modal = new bootstrap.Modal(document.getElementById('taskOverviewModal'));
+        const modalEl = document.getElementById('taskOverviewModal');
+        const modal = new bootstrap.Modal(modalEl);
+        
+        // Handle nested modal layering for Move Requests
+        modalEl.addEventListener('show.bs.modal', function() {
+            const moveReqModal = document.getElementById('moveRequestsModal');
+            if (moveReqModal && moveReqModal.classList.contains('show')) {
+                // Set higher z-index if move requests are open
+                modalEl.style.zIndex = '1065';
+                setTimeout(() => {
+                    const backdrop = document.querySelector('.modal-backdrop:last-child');
+                    if (backdrop) backdrop.style.zIndex = '1064';
+                }, 0);
+            }
+        }, { once: true });
+
+        modalEl.addEventListener('hidden.bs.modal', function() {
+            modalEl.style.zIndex = '';
+        }, { once: true });
+
         modal.show();
 
         fetch(`/Tasks/GetTaskDetail?id=${taskId}`)
@@ -2040,7 +2201,7 @@
             .then(t => {
                 const customPriorityObj = (t.customFields || []).find(f => f.fieldName && f.fieldName.trim().toLowerCase() === 'priority');
                 const effectivePriority = (customPriorityObj && customPriorityObj.value) ? customPriorityObj.value : t.priority;
-                
+
                 const priorityClassMap = { 'low': 'secondary', 'medium': 'info', 'high': 'warning', 'critical': 'danger' };
                 const priorityBadgeClass = priorityClassMap[effectivePriority.toLowerCase()] || 'secondary';
                 const priorityBadge = `<span class="badge bg-${priorityBadgeClass}">${escapeHtml(effectivePriority.toUpperCase())}</span>`;
@@ -2061,10 +2222,10 @@
 
                 if (headerActions) {
                     headerActions.innerHTML = `
-                        <button class="modal-action-btn-sm btn-modal-history" title="History" onclick="openTaskHistoryFromModal(${t.id})">
+                        <button class="modal-action-btn-sm btn-modal-history" title="TaskHistory" onclick="openTaskHistoryFromModal(${t.id})">
                             <i class="bi bi-clock-history"></i>
                         </button>
-                        
+
                         ${(isAdmin || document.getElementById('kanbanBoard')?.dataset.permAssignTask === 'true') && !isCompleted ? `
                         <button class="modal-action-btn-sm btn-modal-assign" title="Assign" onclick="showAssignUIFromModal(${t.id})">
                             <i class="bi bi-person-plus"></i>
@@ -2117,97 +2278,296 @@
                 }
 
                 body.innerHTML = `
-                    <!-- Title + Badges -->
-                    <div style="border-left: 5px solid ${prio.color}; padding-left: 16px; margin-bottom: 16px;">
-                        <h4 style="font-weight: 700; color: #1e293b; margin: 0 0 8px 0; font-size: 1.5rem;">${escapeHtml(t.title)}</h4>
-                        <div class="d-flex gap-2 flex-wrap align-items-center">
-                            <span style="background: ${prio.bg}; color: ${prio.color}; border: 1px solid ${prio.border}; padding: 3px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">
-                                <i class="bi ${prio.icon}" style="margin-right: 4px;"></i>${escapeHtml(effectivePriority.toUpperCase())}
-                            </span>
-                            ${taskTypeBadge}
-                            ${reviewBadge}
-                            <span style="background: #f1f5f9; color: #475569; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #e2e8f0;">${escapeHtml(t.column || t.status)}</span>
-                            ${t.dueDateFormatted ? `<span style="color: #dc2626; padding: 3px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem; border: 1px solid #fecaca; background: #fef2f2;"><i class="bi bi-calendar-event" style="margin-right: 4px;"></i>${t.dueDateFormatted}</span>` : ''}
+                    <!-- Unified Task Header -->
+                    <div style="background: #fff; padding: 20px 24px; border-bottom: 1px solid #f1f5f9; margin: -20px -24px 20px -24px;">
+                        <div class="d-flex justify-content-between align-items-start gap-4">
+                            <div style="flex: 1;">
+                                <h4 style="font-weight: 800; color: #0f172a; margin: 0 0 10px 0; font-size: 1.6rem; line-height: 1.3;">${escapeHtml(t.title)}</h4>
+                                <div class="d-flex gap-2 flex-wrap align-items-center">
+                                    <span style="background: ${prio.bg}; color: ${prio.color}; border: 1px solid ${prio.border}; padding: 3px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase;">
+                                        <i class="bi ${prio.icon} me-1"></i>${escapeHtml(effectivePriority)}
+                                    </span>
+                                    ${taskTypeBadge}
+                                    ${reviewBadge}
+                                    <span class="badge" style="background: #f1f5f9; color: #1e293b; border: 1px solid #e2e8f0; padding: 4px 12px; border-radius: 50px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase;">
+                                        <i class="bi bi-columns-gap me-1"></i>${escapeHtml(t.column || t.status || 'To Do')}
+                                    </span>
+                                    ${t.dueDateFormatted ? `<span class="badge bg-red-50 text-red-600 border border-red-100" style="padding: 4px 12px; border-radius: 50px; font-weight: 600; font-size: 0.7rem;"><i class="bi bi-calendar-event me-1"></i>${t.dueDateFormatted}</span>` : ''}
+                                </div>
+                            </div>
+                          @*  <div class="d-flex flex-column align-items-end gap-2" style="min-width: 140px;">
+                                <div class="d-flex -space-x-2 overflow-hidden">
+                                     <div title="Created By: ${escapeHtml(t.createdBy)}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem; z-index: 10;">${getInitials(t.createdBy)}</div>
+                                     <div title="Assigned To: ${escapeHtml(t.assignedTo)}" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid #fff; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem; margin-left: -8px; z-index: 20;">${getInitials(t.assignedTo)}</div>
+                                </div>
+                                <div style="font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Live Task Frame</div>
+                            </div>*@
                         </div>
                     </div>
 
-                    <!-- Description -->
-                    ${t.description ? `
-                    <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 6px;"><i class="bi bi-text-paragraph me-1"></i>Description</div>
-                        <p style="margin: 0; color: #475569; font-size: 0.9rem; line-height: 1.5;">${escapeHtml(t.description)}</p>
-                    </div>` : ''}
+                    <div id="taskMainContent" class="px-2">
+                        <!-- DETAILS SECTION -->
+                        <div class="mb-4">
+                            <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                <i class="bi bi-grid-fill" style="font-size: 0.8rem;"></i> DETAILS
+                            </div>
+                            <div class="row g-3">
+                                ${(() => {
+                                    const grouped = (t.customFields || []).reduce((acc, f) => {
+                                        const name = f.fieldName || 'Field';
+                                        if (!acc[name]) acc[name] = { name, values: [], type: f.fieldType };
+                                        if (f.value) acc[name].values.push(f.value);
+                                        return acc;
+                                    }, {});
 
-                    <!-- Custom Fields -->
-                    ${t.customFields && t.customFields.length > 0 ? `
-                    <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; border: 1px solid #f1f5f9;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 8px;"><i class="bi bi-grid-3x3-gap me-1"></i>Details</div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;">
-                            ${t.customFields.map(f => {
-                                const isImage = f.value && (f.value.startsWith('data:image/') || f.value.includes('/Tasks/GetFieldImage/') || f.value.includes('/Tasks/GetFieldImageById/') || f.value.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/));
-                                return `<div style="background: #fff; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0; position: relative; overflow: hidden;">
-                                    <div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">${escapeHtml(f.fieldName || '')}</div>
-                                    <div class="d-flex flex-wrap gap-2 mt-1">
-                                        ${isImage ? `
-                                            <div style="position: relative; cursor: pointer;" onclick="openLightbox('${f.value}')" title="Click to view full image">
-                                                <img src="${f.value}" style="max-width: 100px; max-height: 80px; object-fit: contain; border-radius: 6px; border: 1px solid #f1f5f9;" />
-                                                <div style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 4px; padding: 2px; font-size: 0.6rem;">
-                                                    <i class="bi bi-arrows-fullscreen"></i>
+                                    const fieldArray = Object.values(grouped);
+                                    window.currTaskFields = fieldArray;
+
+                                    return fieldArray.map((f, idx) => {
+                                        // Process values to extract text only for point-wise data
+                                        const textValues = f.values.map(v => {
+                                            if (typeof v === 'string' && (v.trim().startsWith('{') || v.trim().startsWith('['))) {
+                                                try {
+                                                    const p = JSON.parse(v);
+                                                    if (Array.isArray(p)) return p.map(item => item.t || '').join(', ');
+                                                    return p.t || v;
+                                                } catch(e) { return v; }
+                                            }
+                                            return v;
+                                        });
+
+                                        const valDisplay = textValues.join(', ') || '—';
+
+                                        return `
+                                        <div class="col-md-4">
+                                            <div onclick="toggleFieldDetail(${idx})" 
+                                                 style="padding: 4px 0; cursor: pointer; transition: opacity 0.2s ease;"
+                                                 onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+                                                <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.5px;">${escapeHtml(f.name)}</div>
+                                                <div class="field-value-text" style="font-size: 0.85rem; font-weight: 700; color: #000; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">
+                                                    ${escapeHtml(valDisplay)}
                                                 </div>
-                                            </div>` 
-                                        : `<div style="font-weight: 600; color: #334155; font-size: 0.85rem; margin-top: 2px;">${escapeHtml(f.value || '—')}</div>`}
-                                    </div>
-                                </div>`;
-                            }).join('')}
+                                            </div>
+                                        </div>`;
+                                    }).join('') || '<div class="col-12 text-muted small ps-3 italic">No additional details available</div>';
+                                })()}
+                            </div>
                         </div>
-                    </div>` : ''}
 
-                    <!-- Review Note -->
-                    ${t.reviewNote ? `
-                    <div style="background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 10px 14px; margin-bottom: 14px;">
-                        <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #d97706; margin-bottom: 4px;"><i class="bi bi-chat-left-dots-fill me-1"></i>Review Note</div>
-                        <div style="color: #92400e; font-size: 0.85rem;">${escapeHtml(t.reviewNote)}</div>
-                    </div>` : ''}
-
-                    <!-- Timeline + People side by side -->
-                    <div class="row g-2">
-                        <div class="col-md-6">
-                            <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; border: 1px solid #f1f5f9; height: 100%;">
-                                <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px;"><i class="bi bi-clock-history me-1"></i>Timeline</div>
+                        <!-- BOTTOM SECTIONS: TIMELINE & PEOPLE -->
+                        <div class="row g-4 mt-2">
+                            <!-- TIMELINE -->
+                            <div class="col-md-7">
+                                <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                                    <i class="bi bi-clock-history" style="font-size: 0.8rem;"></i> TIMELINE
+                                </div>
                                 <div style="position: relative; padding-left: 20px;">
-                                    <div style="position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: #e2e8f0;"></div>
-                                    ${t.createdAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #6366f1;"></div><strong>Created</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.createdAtFormatted}</span></div>` : ''}
-                                    ${t.assignedAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #06b6d4;"></div><strong>Assigned</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.assignedAtFormatted}</span></div>` : ''}
-                                    ${t.reviewedAtFormatted ? `<div style="position: relative; padding-bottom: 10px; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></div><strong>Reviewed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.reviewedAtFormatted}</span></div>` : ''}
-                                    ${t.completedAtFormatted ? `<div style="position: relative; font-size: 0.8rem; color: #475569;"><div style="position: absolute; left: -18px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></div><strong>Completed</strong> <span style="color: #94a3b8; float: right; font-size: 0.75rem;">${t.completedAtFormatted}</span></div>` : ''}
+                                    <div style="position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: #e2e8f0;"></div>
+                                    
+                                    <div style="position: relative; margin-bottom: 24px;">
+                                        <div style="position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #6366f1; border: 2px solid #fff; box-shadow: 0 0 0 2px #6366f120;"></div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Created</div>
+                                            <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">${t.createdAtFormatted}</div>
+                                        </div>
+                                    </div>
+
+                                    <div style="position: relative;">
+                                        <div style="position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #0ea5e9; border: 2px solid #fff; box-shadow: 0 0 0 2px #0ea5e920;"></div>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div style="font-weight: 700; color: #1e293b; font-size: 0.85rem;">Assigned</div>
+                                            <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">${t.assignedAtFormatted || 'N/A'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- PEOPLE -->
+                            <div class="col-md-5">
+                                <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                                    <i class="bi bi-people-fill" style="font-size: 0.8rem;"></i> PEOPLE
+                                </div>
+                                <div class="d-flex flex-column gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem;">${getInitials(t.createdBy)}</div>
+                                        <div>
+                                            <div style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Created By</div>
+                                            <div style="font-size: 0.8rem; font-weight: 700; color: #334155;">${escapeHtml(t.createdBy)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem;">${getInitials(t.assignedTo)}</div>
+                                        <div>
+                                            <div style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Assigned To</div>
+                                            <div style="font-size: 0.8rem; font-weight: 700; color: #334155;">${escapeHtml(t.assignedTo)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: #475569; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.65rem;">${getInitials(t.assignedBy || t.createdBy)}</div>
+                                        <div>
+                                            <div style="font-size: 0.55rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Assigned By</div>
+                                            <div style="font-size: 0.8rem; font-weight: 700; color: #334155;">${escapeHtml(t.assignedBy || t.createdBy)}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div style="background: #f8fafc; border-radius: 10px; padding: 12px 16px; border: 1px solid #f1f5f9; height: 100%;">
-                                <div style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #94a3b8; margin-bottom: 10px;"><i class="bi bi-people me-1"></i>People</div>
-                                <div class="d-flex flex-column gap-2">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.createdBy)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Created By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.createdBy || 'N/A')}</div></div>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #06b6d4, #0891b2); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.assignedTo)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Assigned To</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.assignedTo || 'Unassigned')}</div></div>
-                                    </div>
-                                    ${t.assignedBy ? `<div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #64748b, #475569); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.assignedBy)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Assigned By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.assignedBy)}</div></div>
-                                    </div>` : ''}
-                                    ${t.reviewedBy ? `<div class="d-flex align-items-center gap-2">
-                                        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem; flex-shrink: 0;">${getInitials(t.reviewedBy)}</div>
-                                        <div><div style="font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Reviewed By</div><div style="font-weight: 600; color: #1e293b; font-size: 0.8rem;">${escapeHtml(t.reviewedBy)}</div></div>
-                                    </div>` : ''}
-                                </div>
+
+                        ${t.externalLeadId ? `
+                        <div id="leadLiveDetailsArea" class="mt-4 d-none"></div>
+                        <div id="leadIdentityBanner" onclick="document.getElementById('leadLiveDetailsArea').classList.toggle('d-none')" style="background: #eff6ff; border: 1px solid #dbeafe; border-radius: 12px; padding: 14px; cursor: pointer; margin-top: 20px;">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                 <span style="font-size: 0.65rem; font-weight: 800; color: #1d4ed8; text-transform: uppercase;">Lead Sync</span>
+                                 <span class="badge bg-blue-100 text-blue-700" style="font-size: 0.6rem;">LIVE</span>
                             </div>
-                        </div>
+                            <div class="fw-700 text-blue-900" style="font-size: 0.85rem;"><i class="bi bi-facebook me-1"></i>FB Form Connection - Click to show full details</div>
+                        </div>` : ''}
                     </div>
+
+                    <!-- Detail Overlay (Table Mode) -->
+                    <div id="fieldDetailOverlay" class="d-none" style="position: absolute; inset: 0; background: #fff; z-index: 1000; padding: 24px; animation: slideIn 0.3s ease;">
+                        <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
+                            <h5 id="detailOverlayTitle" style="font-weight: 800; color: #0f172a; margin: 0; font-size: 1.1rem;"></h5>
+                            <button class="btn btn-sm btn-light border" onclick="closeFieldDetail()" style="border-radius: 8px; font-weight: 600;">
+                                <i class="bi bi-x-lg me-1"></i> Close
+                            </button>
+                        </div>
+                        <div id="fieldDetailContent" style="max-height: calc(100% - 100px); overflow-y: auto; padding: 10px 5px;"></div>
+                    </div>
+
+                    <style>
+                        @@keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+                        .field-card:hover { border-color: #6366f1 !important; box-shadow: 0 4px 12px rgba(99,102,241,0.08) !important; transform: translateY(-2px); }
+                        .fw-600 { font-weight: 600; }
+                        .fw-700 { font-weight: 700; }
+                        .fw-800 { font-weight: 800; }
+                        .detail-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; }
+                        .detail-table th { background: #f8fafc; color: #64748b; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; letter-spacing: 0.5px; }
+                        .detail-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; color: #000; font-size: 0.9rem; line-height: 1.5; }
+                        .detail-table tr:last-child td { border-bottom: none; }
+                    </style>
                 `;
+
+                // Re-hydrate logic for detail view
+                window.toggleFieldDetail = function(idx) {
+                    try {
+                        const f = window.currTaskFields[idx];
+                        const overlay = document.getElementById('fieldDetailOverlay');
+                        const title = document.getElementById('detailOverlayTitle');
+                        const content = document.getElementById('fieldDetailContent');
+                        
+                        if (!overlay || !content) return;
+
+                        title.innerText = (f.name || 'Field') + ' Full Information';
+                        
+                        const isRemarks = f.type === 'Remarks' || f.name.toLowerCase().includes('remark') || f.name.toLowerCase() === 'status';
+                        const isImage = f.type === 'Image' || f.name.toLowerCase().includes('image');
+
+                        if (isRemarks) {
+                            const points = f.values.reduce((acc, v) => {
+                                if (typeof v === 'string' && (v.trim().startsWith('{') || v.trim().startsWith('['))) {
+                                    try {
+                                        const p = JSON.parse(v);
+                                        if (Array.isArray(p)) acc.push(...p);
+                                        else acc.push(p);
+                                    } catch(e) { acc.push({ t: v, d: new Date().toISOString(), u: 'User', r: 'Member' }); }
+                                } else {
+                                    acc.push({ t: v, d: new Date().toISOString(), u: 'User', r: 'Member' });
+                                }
+                                return acc;
+                            }, []).sort((a, b) => new Date(b.d) - new Date(a.d));
+
+                            content.innerHTML = `
+                                <table class="detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 150px;">Member</th>
+                                            <th style="width: 180px;">Date & Time</th>
+                                            <th>Content / Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${points.map(p => `
+                                            <tr>
+                                                <td class="fw-700">${escapeHtml(p.u || 'Unknown')} <small class="d-block text-muted opacity-50">${escapeHtml(p.r || 'Member')}</small></td>
+                                                <td class="text-muted small">${p.d ? new Date(p.d).toLocaleString() : 'N/A'}</td>
+                                                <td>${escapeHtml(p.t || '')}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>`;
+                        } else if (isImage) {
+                            content.innerHTML = `
+                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding: 10px;">
+                                    ${f.values.map(val => `
+                                        <div style="border: 1px solid #f1f5f9; border-radius: 12px; overflow: hidden; background: #fafafa;">
+                                            <img src="${val}" style="width: 100%; height: 180px; object-fit: cover; cursor: pointer;" onclick="window.open('${val}', '_blank')">
+                                            <div style="padding: 10px; font-size: 0.7rem; text-align: center;"><a href="${val}" target="_blank" class="text-primary fw-700 text-decoration-none">View Original</a></div>
+                                        </div>`).join('')}
+                                </div>`;
+                        } else {
+                            content.innerHTML = `
+                                <table class="detail-table">
+                                    <tbody>
+                                        <tr>
+                                            <th style="width: 200px;">Property Name</th>
+                                            <td class="fw-700">${escapeHtml(f.name)}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Full Information</th>
+                                            <td style="white-space: pre-wrap;">${escapeHtml(f.values.join(', ') || '—')}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>`;
+                        }
+
+                        overlay.classList.remove('d-none');
+                    } catch (e) { console.error("Detail toggle error:", e); }
+                };
+
+                window.closeFieldDetail = function() {
+                    document.getElementById('fieldDetailOverlay').classList.add('d-none');
+                };
+
+                // Hydrate Lead Details if externalLeadId exists
+                if (t.externalLeadId) {
+                    fetch(`/Tasks/GetLeadLiveDetails?leadId=${t.externalLeadId}`)
+                        .then(res => res.json())
+                        .then(ld => {
+                            const detailArea = document.getElementById('leadLiveDetailsArea');
+                            if (!detailArea) return;
+                            if (ld.success && ld.lead) {
+                                let tableRows = '';
+                                const lead = ld.lead;
+                                const addRow = (label, val) => {
+                                    tableRows += `<tr><td class="fw-bold text-muted border-end" style="width: 35%; background: #f8fafc; font-size: 0.8rem;">${escapeHtml(label)}</td><td class="ps-3 fw-semibold text-dark small">${escapeHtml(val || '—')}</td></tr>`;
+                                };
+                                addRow('Campaign', lead.campaignName);
+                                addRow('Form ID', lead.formId);
+                                if (lead.fields) {
+                                    for (const [key, value] of Object.entries(lead.fields)) {
+                                        if (['name', 'email', 'phone', 'full_name', 'formid'].includes(key.toLowerCase()) || !value) continue;
+                                        addRow(key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), value);
+                                    }
+                                }
+                                detailArea.innerHTML = `
+                                    <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 12px; border: 1px solid #e2e8f0;">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover table-sm mb-0 align-middle">
+                                                <tbody>${tableRows}</tbody>
+                                            </table>
+                                        </div>
+                                    </div>`;
+                            } else {
+                                detailArea.innerHTML = '<div class="text-warning small text-center"><i class="bi bi-exclamation-triangle"></i> Live data unavailable</div>';
+                            }
+                        })
+                        .catch(e => {
+                            console.error("Hydration error:", e);
+                            const detailArea = document.getElementById('leadLiveDetailsArea');
+                            if (detailArea) detailArea.innerHTML = '<div class="text-danger small text-center">Sync failed</div>';
+                        });
+                }
             })
             .catch(() => {
                 body.innerHTML = '<div class="text-danger text-center">Failed to load task details</div>';
@@ -2295,136 +2655,33 @@
 <script>
     // Load initially if Admin
     document.addEventListener('DOMContentLoaded', function () {
-    @if (isAdmin) {
-         // Already handled by loadAdminTeamList(true) above
-         <text>
-             const teamDropdown = document.getElementById('teamTasksDropdown');
-             const teamArrow = document.getElementById('teamArrow');
-             if (teamDropdown) teamDropdown.style.display = 'block';
-             if (teamArrow) teamArrow.innerText = '▲';
-         </text>
+    @if (isAdmin)
+    {
+        // Already handled by loadAdminTeamList(true) above
+        <text>
+                 const teamDropdown = document.getElementById('teamTasksDropdown');
+                 const teamArrow = document.getElementById('teamArrow');
+                 if (teamDropdown) teamDropdown.style.display = 'block';
+                 if (teamArrow) teamArrow.innerText = '▲';
+        </text>
     }
     else if (userTeams.Any())
     {
         var firstTeam = userTeams.First();
         <text>
-                    // User: Auto-expand My Team and load first assigned team
-                    const myDropdown = document.getElementById('myTasksDropdown');
-                    const myArrow = document.getElementById('myTasksArrow');
-                    if (myDropdown) myDropdown.style.display = 'block';
-                    if (myArrow) myArrow.innerText = '▲';
+                        // User: Auto-expand My Team and load first assigned team
+                        const myDropdown = document.getElementById('myTasksDropdown');
+                        const myArrow = document.getElementById('myTasksArrow');
+                        if (myDropdown) myDropdown.style.display = 'block';
+                        if (myArrow) myArrow.innerText = '▲';
 
-                    // load first team
-                    loadTeamBoard('@firstTeam');
+                        // load first team
+                        loadTeamBoard('@firstTeam');
         </text>
     }
     });
 </script>
 
-<script>
-    async function openCreateTaskModal(columnId) {
-        document.getElementById("taskColumnId").value = columnId;
-        document.getElementById("taskTitle").value = "";
-        document.getElementById("taskDescription").value = "";
-        document.getElementById("taskPriority").value = "1"; // Default to Medium
-        document.getElementById("taskDueDate").value = "";
-
-        const board = document.getElementById('kanbanBoard');
-        const team = board?.dataset.teamName;
-        const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
-        
-        // 🔥 Dynamic Visibility for System Fields
-        const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
-        const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
-        const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
-        const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
-        
-        const priorityGroup = document.getElementById('groupCreateTaskPriority');
-        const dueDateGroup = document.getElementById('groupCreateTaskDueDate');
-        const titleGroup = document.getElementById('groupCreateTaskTitle');
-        const descriptionGroup = document.getElementById('groupCreateTaskDescription');
-        
-        if (priorityGroup) priorityGroup.style.display = priorityVisible ? 'block' : 'none';
-        if (dueDateGroup) dueDateGroup.style.display = dueDateVisible ? 'block' : 'none';
-        if (titleGroup) titleGroup.style.display = titleVisible ? 'block' : 'none';
-        if (descriptionGroup) descriptionGroup.style.display = descriptionVisible ? 'block' : 'none';
-
-        // Render custom fields if available and wait for them to load
-        if (typeof renderCustomFieldInputs === 'function') {
-            try {
-                await renderCustomFieldInputs('customFieldsContainer', {}, team);
-            } catch (e) {
-                console.error('Failed to render custom fields before showing modal', e);
-            }
-        }
-
-        const modal = new bootstrap.Modal(document.getElementById('createTaskModal'));
-        modal.show();
-    }
-
-
-    // ================= EDIT TASK MODAL =================
-
-    function openEditTaskModal(taskId) {
-        const team = window.currentTeamName;
-        // Fetch task details
-        fetch(`/Tasks/GetTask?id=${taskId}`)
-            .then(res => {
-                if (!res.ok) throw new Error("Failed to load task details");
-                return res.json();
-            })
-            .then(task => {
-                // Populate Modal
-                document.getElementById('editTaskId').value = task.id;
-                document.getElementById('editTaskTitle').value = task.title;
-                document.getElementById('editTaskDescription').value = task.description || "";
-                document.getElementById('editTaskPriority').value = task.priority;
-                document.getElementById('editTaskAssignedTo').value = task.assignedToUserId || "";
-                document.getElementById('editTaskDueDate').value = task.dueDate || "";
-
-                // Show Modal
-                const board = document.getElementById('kanbanBoard');
-                const showOther = document.getElementById('showOtherCheckbox')?.checked !== false;
-
-                const priorityVisible = showOther && board?.dataset.priorityVisible !== 'false';
-                const dueDateVisible = showOther && board?.dataset.dueDateVisible !== 'false';
-                const titleVisible = showOther && board?.dataset.titleVisible !== 'false';
-                const descriptionVisible = showOther && board?.dataset.descriptionVisible !== 'false';
-                
-                const priorityGroup = document.getElementById('groupEditTaskPriority');
-                const dueDateGroup = document.getElementById('groupEditTaskDueDate');
-                const titleGroup = document.getElementById('groupEditTaskTitle');
-                const descriptionGroup = document.getElementById('groupEditTaskDescription');
-                
-                if (priorityGroup) priorityGroup.style.display = priorityVisible ? 'block' : 'none';
-                if (dueDateGroup) dueDateGroup.style.display = dueDateVisible ? 'block' : 'none';
-                if (titleGroup) titleGroup.style.display = titleVisible ? 'block' : 'none';
-                if (descriptionGroup) descriptionGroup.style.display = descriptionVisible ? 'block' : 'none';
-
-
-                // Render custom fields if available
-                if (typeof renderCustomFieldInputs === 'function') {
-                    renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
-                }
-
-                if (typeof populateMoveToDropdown === 'function') {
-                    populateMoveToDropdown();
-                }
-
-                new bootstrap.Modal(document.getElementById('editTaskModal')).show();
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Error loading task details");
-            });
-    }
-
-    // Consolidated task logic moved to tasks.js
-    // openCreateTaskModal and openEditTaskModal are kept here as they are view-specific for modal initialization.
-
-    // Functions like submitCreateTask, submitEditTask, etc. are moved to tasks.js or consolidated.
-    // We only keep view-specific logic here.
-</script>
 
 <script>
     function saveFocusedTask() {
@@ -2447,7 +2704,7 @@
         })
             .then(res => {
                 if (!res.ok) throw new Error();
-                loadTeamBoard(currentTeamName);
+                if (window.loadTeamBoard) loadTeamBoard(currentTeamName, true);
             })
             .catch(() => alert('Failed to update task'));
     }
@@ -2455,7 +2712,27 @@
 
 
 <script>
-    // deleteTask is moved to tasks.js
+    function deleteTask(taskId) {
+        if (!confirm('Delete this task?')) return;
+
+        fetch('/Tasks/DeleteTask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(taskId)
+        })
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to delete');
+
+                // ✅ OPTIMIZED: Remove card from DOM immediately instead of loading board
+                const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                if (card) {
+                    card.remove();
+                    updateColumnCounts();
+                }
+                showToast("🗑️ Task deleted successfully!", "info");
+            })
+            .catch(err => alert(err.message));
+    }
 </script>
 
 
@@ -2781,7 +3058,7 @@
     function applyFieldSettings() {
         const settings = getFieldSettings();
         console.log("Applying field settings:", settings);
-        
+
         // Apply hidden states
         (settings.hidden || []).forEach(groupId => {
             const el = document.getElementById(groupId);
@@ -2803,7 +3080,7 @@
         if (!labelEl) return;
         const currentName = labelEl.textContent.replace(' *', '').trim();
         const newName = prompt("Rename field:", currentName);
-        
+
         if (newName !== null && newName.trim() !== "" && newName !== currentName) {
             const name = newName.trim();
             const isRequired = labelEl.textContent.includes('*');
@@ -2978,7 +3255,7 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    // ─── Preview ───
+    // --- Preview ---
     async function previewExcelFile() {
         if (!_excelFile) return;
 
@@ -3080,7 +3357,7 @@
         return div.innerHTML;
     }
 
-    // ─── Import ───
+    // --- Import ---
     async function startExcelImport() {
         if (!_excelFile || !_previewData) return;
 
@@ -3193,7 +3470,7 @@
         }
     }
 
-    // ─── Import History ───
+    // --- Import History ---
     async function loadImportHistory() {
         const teamName = document.getElementById('importTeamName').value;
         const container = document.getElementById('importHistoryContent');
@@ -3272,7 +3549,7 @@
     function toggleTeamItem(id) {
         const el = document.getElementById(id);
         if (!el) return;
-        
+
         if (el.style.display === 'none') {
             el.style.display = 'block';
         } else {
@@ -3289,7 +3566,7 @@ async function clearColumnTasks(columnId) {
     }
 
     try {
-        const resp = await fetch('/Tasks/DeleteAllTasksInColumn', {
+        const resp = await fetch('/TaskColumns/DeleteAllTasksInColumn', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3305,7 +3582,7 @@ async function clearColumnTasks(columnId) {
 
         const res = await resp.json();
         if (typeof showToast === 'function') {
-            showToast(`✅ Successfully deleted ${res.count} tasks`, 'success');
+            showToast(`? Successfully deleted ${res.count} tasks`, 'success');
         }
 
         // Refresh board
@@ -3422,4 +3699,12 @@ async function clearColumnTasks(columnId) {
     </div>
 </div>
 
+<link rel="stylesheet" href="~/css/taskHistory.css" />
+
+<script src="~/js/customFields.js"></script>
+<script src="~/js/column_filter.js"></script>
+<script src="~/js/index_ui.js"></script>
+<script src="~/js/tasks.js"></script>
+<script src="~/js/taskHistory.js"></script>
 <script src="~/js/move-requests.js"></script>
+<script src="~/js/board-permissions.js"></script>

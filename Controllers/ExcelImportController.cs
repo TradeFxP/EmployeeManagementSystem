@@ -17,15 +17,20 @@ namespace UserRoles.Controllers
         private readonly AppDbContext _context;
         private readonly UserManager<Users> _userManager;
         private readonly ITaskHistoryService _historyService;
+        private readonly ILogger<ExcelImportController> _logger;
+
+        private const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
 
         public ExcelImportController(
             AppDbContext context,
             UserManager<Users> userManager,
-            ITaskHistoryService historyService)
+            ITaskHistoryService historyService,
+            ILogger<ExcelImportController> logger)
         {
             _context = context;
             _userManager = userManager;
             _historyService = historyService;
+            _logger = logger;
         }
 
         // ═══════════════════════════════════════════════════════
@@ -40,6 +45,9 @@ namespace UserRoles.Controllers
 
             if (file == null || file.Length == 0)
                 return BadRequest(new { success = false, message = "No file uploaded." });
+
+            if (file.Length > MaxFileSize)
+                return BadRequest(new { success = false, message = $"File too large. Maximum allowed is {MaxFileSize / (1024 * 1024)} MB." });
 
             var ext = Path.GetExtension(file.FileName).ToLower();
             if (ext != ".xlsx" && ext != ".xls")
@@ -116,6 +124,13 @@ namespace UserRoles.Controllers
 
             if (file == null || file.Length == 0)
                 return BadRequest(new { success = false, message = "No file uploaded." });
+
+            if (file.Length > MaxFileSize)
+                return BadRequest(new { success = false, message = $"File too large. Maximum allowed is {MaxFileSize / (1024 * 1024)} MB." });
+
+            var ext = Path.GetExtension(file.FileName).ToLower();
+            if (ext != ".xlsx" && ext != ".xls")
+                return BadRequest(new { success = false, message = "Only .xlsx and .xls files are supported." });
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
@@ -331,6 +346,7 @@ namespace UserRoles.Controllers
             catch (Exception ex)
             {
                 stopwatch.Stop();
+                _logger.LogError(ex, "Excel import failed for team {Team}, file {File}", teamName, file.FileName);
                 importLog.Status = "Failed";
                 importLog.ErrorDetails = ex.Message;
                 importLog.DurationMs = stopwatch.ElapsedMilliseconds;
@@ -396,7 +412,7 @@ namespace UserRoles.Controllers
             }
 
             var perms = await _context.BoardPermissions
-        .Where(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == teamName.ToLower().Trim())
+        .Where(p => p.UserId == user.Id && EF.Functions.ILike(p.TeamName, teamName.Trim()))
         .OrderByDescending(p => p.Id)
         .FirstOrDefaultAsync();
 

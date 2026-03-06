@@ -8,7 +8,7 @@ namespace UserRoles.Models
         
         // Link to task
         public int TaskId { get; set; }
-        public TaskItem Task { get; set; }
+        public TaskItem Task { get; set; } = null!;
         
         // Type of change
         public TaskHistoryChangeType ChangeType { get; set; }

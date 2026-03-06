@@ -32,8 +32,13 @@ namespace UserRoles.Controllers
         /* ===================== LOGIN ===================== */
 
         [HttpGet]
-        public IActionResult Login(string? returnUrl = null)
+        public IActionResult Login(string? returnUrl = null, string? logout = null)
         {
+            if (logout == "idle")
+            {
+                ViewBag.LogoutMessage = "Session expired due to inactivity. Please login again.";
+            }
+
             ViewData["ReturnUrl"] = returnUrl;
             return View();
         }
@@ -56,7 +61,7 @@ namespace UserRoles.Controllers
                 user,
                 model.Password,
                 model.RememberMe,
-                lockoutOnFailure: false
+                lockoutOnFailure: true
             );
 
             if (!result.Succeeded)
@@ -71,7 +76,7 @@ namespace UserRoles.Controllers
             var roles = await userManager.GetRolesAsync(user);
 
             if (roles.Contains("Admin") || roles.Contains("Manager"))
-                return RedirectToAction("OrgChart", "Users");
+            return RedirectToAction("Index", "OrgChart");
 
             return RedirectToAction("Index", "Reports");
         }
@@ -88,7 +93,7 @@ namespace UserRoles.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> LoginByCode(string email, string code)
         {
-            // 1️⃣ Find user by pending email
+            // 1?? Find user by pending email
             var user = userManager.Users
                 .FirstOrDefault(u => u.PendingEmail == email.Trim());
 
@@ -100,24 +105,24 @@ namespace UserRoles.Controllers
                 return View();
             }
 
-            // 2️⃣ Commit email change (NOW it becomes permanent)
+            // 2?? Commit email change (NOW it becomes permanent)
             user.Email = user.PendingEmail;
             user.UserName = user.PendingEmail;
 
-            // 3️⃣ Clear pending data
+            // 3?? Clear pending data
             user.PendingEmail = null;
             user.EmailChangeLoginCode = null;
             user.EmailChangeCodeExpiry = null;
 
-            // 4️⃣ Invalidate all old sessions (SECURITY)
+            // 4?? Invalidate all old sessions (SECURITY)
             user.SecurityStamp = Guid.NewGuid().ToString();
 
             await userManager.UpdateAsync(user);
 
-            // 5️⃣ Sign in with NEW email
+            // 5?? Sign in with NEW email
             await signInManager.SignInAsync(user, isPersistent: false);
 
-            return RedirectToAction("OrgChart", "Users");
+            return RedirectToAction("Index", "OrgChart");
         }
 
 

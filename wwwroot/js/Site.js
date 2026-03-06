@@ -90,7 +90,7 @@ window.updateUserPermission = function (userId, permission, value) {
     fetch('/Users/UpdatePermission', {
         method: 'POST',
         headers: {
-            'RequestVerificationToken': getCsrfToken()
+            'RequestVerificationToken': window.getAntiForgeryToken()
         },
         body: fd
     }).then(res => {
@@ -115,7 +115,7 @@ window.deleteUserSimple = function (userId) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'RequestVerificationToken': getCsrfToken()
+            'RequestVerificationToken': window.getAntiForgeryToken()
         },
         body: fd.toString()
     }).then(res => {
@@ -156,7 +156,7 @@ window.updateUserTeamAssignment = function (userId, teamName, isAssigned) {
     fetch('/Users/UpdateUserTeams', {
         method: 'POST',
         headers: {
-            'RequestVerificationToken': getCsrfToken()
+            'RequestVerificationToken': window.getAntiForgeryToken()
         },
         body: fd
     }).then(res => {

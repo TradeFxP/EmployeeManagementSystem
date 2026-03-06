@@ -54,6 +54,9 @@ function updateUserTeamAssignment(userId, teamName, isAssigned) {
 
     fetch('/Users/UpdateUserTeams', {
         method: 'POST',
+        headers: {
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: fd
     }).then(res => {
         if (!res.ok) {
@@ -172,7 +175,10 @@ function submitCreateProject() {
 
     fetch('/Project/CreateProject', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify(data)
     })
         .then(res => {

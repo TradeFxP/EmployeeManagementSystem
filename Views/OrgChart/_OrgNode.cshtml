@@ -14,7 +14,7 @@
         <ul>
             @foreach (var child in Model.Children)
             {
-                @Html.Partial("_OrgNode", child)
+                <partial name="_OrgNode" model="child" />
             }
         </ul>
     }
