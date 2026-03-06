@@ -6,6 +6,6 @@ namespace UserRoles.Services
 {
     public interface IFacebookLeadsService
     {
-        Task<List<FacebookLeadDto>> FetchLeadsAsync();
+        Task<List<FacebookLeadDto>> FetchLeadsAsync(string? formId = null);
     }
 }

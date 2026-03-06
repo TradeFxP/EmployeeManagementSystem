@@ -2354,6 +2354,76 @@
                             </div>
                         </div>
 
+                        <!-- DESCRIPTION & LEAD DATA (POST-REFINEMENT) -->
+                        ${t.description ? `
+                        <div class="mb-4">
+                            <div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                <i class="bi bi-justify-left" style="font-size: 0.8rem;"></i> DESCRIPTION / LEAD DATA
+                            </div>
+                            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; font-size: 0.9rem; color: #334155; line-height: 1.6;">
+                                ${(() => {
+                                    const rawDesc = t.description;
+                                    // Check if it's a structured lead description
+                                    if (rawDesc.includes('### Facebook Lead Data')) {
+                                        const lines = rawDesc.split('\n');
+                                        let html = '';
+                                        let currentSection = '';
+                                        let fieldsInRow = [];
+
+                                        const renderFields = () => {
+                                            if (fieldsInRow.length === 0) return '';
+                                            let rowHtml = '<div class="row g-3 mb-3">';
+                                            fieldsInRow.forEach(f => {
+                                                rowHtml += `
+                                                    <div class="col-md-4">
+                                                        <div style="background: #fff; border: 1px solid #edf2f7; border-radius: 8px; padding: 10px; height: 100%;">
+                                                            <div style="font-size: 0.6rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">${escapeHtml(f.key)}</div>
+                                                            <div style="font-size: 0.85rem; font-weight: 700; color: #1e293b; line-height: 1.3;">${escapeHtml(f.val)}</div>
+                                                        </div>
+                                                    </div>`;
+                                            });
+                                            rowHtml += '</div>';
+                                            fieldsInRow = [];
+                                            return rowHtml;
+                                        };
+
+                                        lines.forEach(line => {
+                                            const trimmed = line.trim();
+                                            if (!trimmed || trimmed === '---') return;
+
+                                            if (trimmed.startsWith('###')) {
+                                                html += renderFields();
+                                                const title = trimmed.replace('###', '').replace(/---/g, '').trim();
+                                                html += `<div style="background: #eff6ff; color: #1e40af; padding: 6px 12px; border-radius: 6px; font-weight: 800; font-size: 0.7rem; margin: 15px 0 10px 0; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px;">
+                                                            <i class="bi bi-info-circle-fill"></i> ${escapeHtml(title)}
+                                                         </div>`;
+                                            } else if (trimmed.includes(':**')) {
+                                                const parts = trimmed.split(':**');
+                                                const key = parts[0].trim('*', ' ');
+                                                const val = parts[1].trim();
+                                                fieldsInRow.push({ key, val });
+                                                if (fieldsInRow.length === 3) html += renderFields();
+                                            } else if (trimmed.startsWith('- **') && trimmed.includes(':**')) {
+                                                const parts = trimmed.split(':**');
+                                                const key = parts[0].replace('- **', '').trim();
+                                                const val = parts[1].trim();
+                                                fieldsInRow.push({ key, val });
+                                                if (fieldsInRow.length === 3) html += renderFields();
+                                            } else if (trimmed.startsWith('*Synced on')) {
+                                                html += renderFields();
+                                                html += `<div style="font-size: 0.7rem; color: #b7c0cd; font-style: italic; margin-top: 10px; text-align: right;">${escapeHtml(trimmed.replace(/\*/g, ''))}</div>`;
+                                            }
+                                        });
+                                        html += renderFields();
+                                        return html;
+                                    } else {
+                                        // Standard description fallback
+                                        return `<div style="white-space: pre-wrap;">${escapeHtml(rawDesc)}</div>`;
+                                    }
+                                })()}
+                            </div>
+                        </div>` : ''}
+
                         <!-- BOTTOM SECTIONS: TIMELINE & PEOPLE -->
                         <div class="row g-4 mt-2">
                             <!-- TIMELINE -->
@@ -2967,6 +3037,7 @@
         const priorityFilter = document.getElementById('priorityFilter')?.value || "";
         const assigneeFilter = document.getElementById('assigneeFilter')?.value || "";
         const adminFilter = document.getElementById('adminAssignedFilter')?.value || "";
+        const formIdFilter = document.getElementById('formIdFilter')?.value || "";
 
         const cards = document.querySelectorAll('.task-card');
 
@@ -2984,6 +3055,10 @@
             // 2. Priority
             const cardPriority = card.dataset.priority || "";
             const matchesPriority = !priorityFilter || cardPriority === priorityFilter;
+
+            // 3. Form ID (Facebook Leads)
+            const cardFormId = card.dataset.formId || "";
+            const matchesFormId = !formIdFilter || cardFormId === formIdFilter;
 
             // 3. Assignee
             const cardAssigneeId = card.dataset.assignedToId || "";
@@ -3030,7 +3105,7 @@
             }
 
             // Combine all
-            if (matchesSearch && matchesPriority && matchesAssignee && matchesAssignor) {
+            if (matchesSearch && matchesPriority && matchesAssignee && matchesAssignor && matchesFormId) {
                 card.style.display = "block";
                 card.classList.remove('d-none');
             } else {

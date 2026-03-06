@@ -65,6 +65,7 @@
      data-assigned-by-admin="@(Model.AssignedByUser?.Email != null && Model.AssignedByUser.Email.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "true" : "false")"
      data-review-status="@reviewStatusInt"
      data-external-lead-id="@Model.ExternalLeadId"
+     data-form-id="@Model.FormId"
      onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@Model.Id)">
 
     <!-- TOP ROW: Due Date & Priority (left) + Task ID & Review Status (right) -->
