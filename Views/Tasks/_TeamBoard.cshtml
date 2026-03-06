@@ -1438,6 +1438,8 @@
         }
     })();
 
+    let _digiBackfillDone = false;
+
     function openViewDataModal() {
         // Always reset filters so fresh data is shown on open
         selectedCountries.clear();
@@ -1449,11 +1451,41 @@
         if (filterBadge) filterBadge.classList.add('d-none');
         if (resetBtn) resetBtn.classList.add('d-none');
 
+        // Auto-backfill Digi Leads custom fields on first open
+        const teamName = '@Model.TeamName';
+        if (teamName === 'Digi Leads' && !_digiBackfillDone) {
+            _digiBackfillDone = true;
+            fetch('/api/Tasks/BackfillDigiLeads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                console.log('Backfill result:', data);
+                if (data.success && data.message && !data.message.includes('0 of')) {
+                    // Data was backfilled — reload to show it
+                    location.reload();
+                    return;
+                }
+                // No new data to backfill, just show modal
+                showViewDataModalNow();
+            })
+            .catch(err => {
+                console.error('Backfill error:', err);
+                showViewDataModalNow();
+            });
+        } else {
+            showViewDataModalNow();
+        }
+    }
+
+    function showViewDataModalNow() {
         var myModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
         myModal.show();
         // Default sort by Newest on open
         setTimeout(() => sortTableData('desc'), 200);
     }
+
 
     function resetViewDataFilter() {
         selectedCountries.clear();
@@ -1595,15 +1627,11 @@
             return;
         }
 
-        const taskIds = [];
-        document.querySelectorAll('.task-data-row').forEach(row => {
-            if (row.style.display !== 'none') {
-                taskIds.push(parseInt(row.dataset.taskId));
-            }
-        });
+        const selectedRows = document.querySelectorAll('.task-checkbox:checked');
+        const taskIds = Array.from(selectedRows).map(cb => parseInt(cb.closest('.task-data-row').dataset.taskId));
 
         if (taskIds.length === 0) {
-            alert('No tasks filtered to assign.');
+            alert('Please select at least one task to assign.');
             return;
         }
 
@@ -1617,17 +1645,23 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    showToast(`Successfully assigned ${data.count} tasks.`, 'success');
+                    if (typeof showToast === 'function') {
+                        showToast(`Successfully assigned ${data.count} tasks.`, 'success');
+                    } else {
+                        alert(`Successfully assigned ${data.count} tasks.`);
+                    }
+                    
                     // Update UI in the table
                     const userName = document.querySelector(`#bulkAssignUserSelect option[value="${userId}"]`).text;
-                    document.querySelectorAll('.task-data-row').forEach(row => {
-                        if (row.style.display !== 'none') {
-                            const assigneeSpan = row.querySelector('.assignee-name');
-                            if (assigneeSpan) assigneeSpan.innerText = userName;
-                            const avatar = row.querySelector('.avatar-xs');
-                            if (avatar) avatar.innerText = userName[0].toUpperCase();
-                        }
+                    selectedRows.forEach(cb => {
+                        const row = cb.closest('.task-data-row');
+                        const assigneeSpan = row.querySelector('.assignee-name');
+                        if (assigneeSpan) assigneeSpan.innerText = userName;
+                        const avatar = row.querySelector('.avatar-table-xs');
+                        if (avatar) avatar.innerText = userName[0].toUpperCase();
+                        cb.checked = false; // Uncheck after assign
                     });
+                    document.getElementById('selectAllTasks').checked = false;
                 } else {
                     alert('Failed to assign tasks.');
                 }
@@ -1637,6 +1671,52 @@
                 alert('An error occurred during bulk assignment.');
             });
     }
+
+    function toggleSelectAll(mainCb) {
+        document.querySelectorAll('.task-checkbox').forEach(cb => {
+            const row = cb.closest('.task-data-row');
+            if (row && row.style.display !== 'none') {
+                cb.checked = mainCb.checked;
+            }
+        });
+    }
+
+    function quickAssignTask(taskId, userId, el) {
+        let userName = el.innerText;
+        if (userName.includes('] ')) userName = userName.split('] ')[1];
+        
+        fetch(`/Tasks/AssignTask?taskId=${taskId}&userId=${userId}`, {
+            method: 'POST'
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                if (typeof showToast === 'function') {
+                    showToast(`Assigned to ${userName}`, 'success');
+                }
+                const row = el.closest('.task-data-row');
+                if (row) {
+                    const assigneeSpan = row.querySelector('.assignee-name');
+                    if (assigneeSpan) assigneeSpan.innerText = userName;
+                    const avatar = row.querySelector('.avatar-table-xs');
+                    if (avatar) avatar.innerText = userName[0].toUpperCase();
+                }
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Error assigning task', 'error');
+                } else {
+                    alert(data.message || 'Error assigning task');
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            if (typeof showToast === 'function') {
+                showToast('Network error', 'error');
+            }
+        });
+    }
+
 </script>
 
 <!-- 📊 VIEW DATA MODAL (EXCEL-LIKE) -->
@@ -1721,27 +1801,85 @@
                             // ─── Pre-compute: only show custom fields that have at least one non-empty value ───
                             var allTasks = Model.Columns.SelectMany(c => c.Tasks ?? new List<TaskItem>()).ToList();
 
-                            // Fields ordered exactly by their Excel import sequence (Order property)
-                            var activeFields = Model.CustomFields
-                                .OrderBy(f => f.Order)
-                                .Where(f => allTasks.Any(t =>
-                                    t.CustomFieldValues != null &&
-                                    t.CustomFieldValues.Any(v => v.FieldId == f.Id && !string.IsNullOrWhiteSpace(v.Value))))
-                                .ToList();
+                            // ─── Legacy Data Extraction Helper ───
+                            // Description format from FormatLeadDescription:
+                            //   **Name:** Azeem Chaudhary          (top-level properties)
+                            //   - **Full Name:** Azeem Chaudhary   (questionnaire fields)
+                            string ExtractFromDesc(string? desc, string fieldName) {
+                                if (string.IsNullOrEmpty(desc)) return "-";
+                                
+                                // Build a mapping of field name aliases to try
+                                var aliases = new List<string> { fieldName };
+                                
+                                // Add common aliases
+                                var fn = fieldName.Trim().ToLower();
+                                if (fn == "full name" || fn == "fullname") { aliases.Add("Full Name"); aliases.Add("Name"); }
+                                if (fn == "phone") { aliases.Add("Phone"); }
+                                if (fn == "email") { aliases.Add("Email"); }
+                                if (fn == "company name") { aliases.Add("Company Name"); }
+                                if (fn == "country") { aliases.Add("Country"); }
+                                if (fn == "what best describes your business") { aliases.Add("What Best Describes Your Business"); }
+                                if (fn == "what are you looking to launch") { aliases.Add("What Are You Looking To Launch"); }
+                                
+                                // Try each alias with the exact markdown format from FormatLeadDescription
+                                foreach (var alias in aliases) {
+                                    // Match pattern: **Alias:** Value  OR  - **Alias:** Value
+                                    var pattern = $@"\*\*{System.Text.RegularExpressions.Regex.Escape(alias)}:\*\*\s*(.+)";
+                                    var match = System.Text.RegularExpressions.Regex.Match(desc, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+                                    if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value)) {
+                                        return match.Groups[1].Value.Trim();
+                                    }
+                                }
+                                
+                                return "-";
+                            }
 
-                            // Standard field visibility: hide Title/Description if there's no meaningful content
+                            // Fields logic: for "Digi Leads", we ensure requested headers are always visible
+                            var requestedDigiFields = new[] { "Full Name", "Phone", "Email", "Company Name", "Country", "What Best Describes Your Business", "What Are You Looking To Launch" };
+                            
+                            // For Digi Leads, we want a SPECIFIC order independently of database ID
+                            var activeFields = new List<UserRoles.Models.TaskCustomField>();
+
+                            if (Model.TeamName == "Digi Leads") {
+                                foreach(var reqName in requestedDigiFields) {
+                                    var existing = Model.CustomFields.FirstOrDefault(f => f.FieldName?.Trim().ToLower() == reqName.Trim().ToLower());
+                                    if (existing != null) {
+                                        activeFields.Add(existing);
+                                    } else {
+                                        // Create a "ghost" field if it doesn't exist in DB yet
+                                        activeFields.Add(new UserRoles.Models.TaskCustomField { 
+                                            FieldName = reqName, 
+                                            Id = -1, // Virtual ID
+                                            TeamName = "Digi Leads",
+                                            IsActive = true 
+                                        });
+                                    }
+                                }
+                            } else {
+                                activeFields = Model.CustomFields
+                                    .OrderBy(f => f.Order)
+                                    .Where(f => allTasks.Any(t =>
+                                            t.CustomFieldValues != null &&
+                                            t.CustomFieldValues.Any(v => v.FieldId == f.Id && !string.IsNullOrWhiteSpace(v.Value))))
+                                    .ToList();
+                            }
+
+                            // Standard field visibility
                             bool hasTitle       = allTasks.Any(t => !string.IsNullOrWhiteSpace(t.Title));
                             bool hasDesc        = allTasks.Any(t => !string.IsNullOrWhiteSpace(t.Description));
                             bool hasDueDate     = allTasks.Any(t => t.DueDate.HasValue);
                             bool hasAssigned    = allTasks.Any(t => t.AssignedToUser != null);
                             bool hasCreatedBy   = allTasks.Any(t => t.CreatedByUser != null);
 
-                            int totalCols = 1 /* ID */ + activeFields.Count
+                            int totalCols = 1 /* Selection */ + 1 /* ID */ + activeFields.Count
                                 + (hasTitle ? 1 : 0) + (hasDesc ? 1 : 0) + 1 /* Priority */ + (hasDueDate ? 1 : 0)
                                 + (hasAssigned ? 1 : 0) + (hasCreatedBy ? 1 : 0) + 1 /* Created At */ + 1 /* CURRENT STAGE */;
                         }
                         <thead class="sticky-top shadow-sm">
                             <tr class="header-row">
+                                <th class="text-center" style="width: 40px;">
+                                    <input type="checkbox" id="selectAllTasks" class="form-check-input" onclick="toggleSelectAll(this)">
+                                </th>
                                 <th class="text-center" style="width: 60px;">ID</th>
                                 @if (hasAssigned) { <th style="min-width: 200px;">ASSIGNED TO</th> }
 
@@ -1814,6 +1952,9 @@
                                             data-is-unassigned="true"
                                             style="background-color: @rowBgColor !important; @rowBorder">
                                             
+                                            <td class="text-center">
+                                                <input type="checkbox" class="form-check-input task-checkbox">
+                                            </td>
                                             <td class="text-center fw-bold text-muted">@task.Id</td>
 
                                             @if (hasAssigned)
@@ -1824,16 +1965,48 @@
                                                         var assigneeRole = task.AssignedToUserId != null ? Model.UserRolesMap.GetValueOrDefault(task.AssignedToUserId, "User") : "";
                                                         var assigneeName = task.AssignedToUser?.Name ?? "Unassigned";
                                                     }
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="avatar-table-xs me-2 bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center">
-                                                            @(string.IsNullOrEmpty(assigneeName) ? "?" : assigneeName[0].ToString().ToUpper())
+                                                    <div class="d-flex align-items-center justify-content-between">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="avatar-table-xs me-2 bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center">
+                                                                @(string.IsNullOrEmpty(assigneeName) ? "?" : assigneeName[0].ToString().ToUpper())
+                                                            </div>
+                                                            <div class="d-flex flex-column">
+                                                                <span class="assignee-name fw-bold">@assigneeName</span>
+                                                                <span class="text-muted" style="font-size: 0.65rem;">
+                                                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-1 me-1">@assigneeTeam</span>
+                                                                    <span class="text-info">@assigneeRole</span>
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        <div class="d-flex flex-column">
-                                                            <span class="assignee-name fw-bold">@assigneeName</span>
-                                                            <span class="text-muted" style="font-size: 0.65rem;">
-                                                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-1 me-1">@assigneeTeam</span>
-                                                                <span class="text-info">@assigneeRole</span>
-                                                            </span>
+                                                        
+                                                        <div class="dropdown ms-2">
+                                                            <button class="btn btn-link p-0 text-muted" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Quick Assign">
+                                                                <i class="bi bi-person-plus"></i>
+                                                            </button>
+                                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 200px; font-size: 0.8rem;">
+                                                                <li class="dropdown-header">QUICK ASSIGN</li>
+                                                                @if (Model.ManagementUsers != null && Model.ManagementUsers.Any())
+                                                                {
+                                                                    <li><hr class="dropdown-divider"></li>
+                                                                    <li class="dropdown-header small text-primary">MANAGEMENT</li>
+                                                                    @foreach (var u in Model.ManagementUsers)
+                                                                    {
+                                                                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="quickAssignTask(@task.Id, '@u.Id', this)">[@u.RoleName] @u.Name</a></li>
+                                                                    }
+                                                                }
+                                                                @foreach (var group in Model.TeamGroups)
+                                                                {
+                                                                    <li><hr class="dropdown-divider"></li>
+                                                                    <li class="dropdown-header small text-info">@group.TeamName.ToUpper()</li>
+                                                                    @foreach (var u in group.Users)
+                                                                    {
+                                                                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="quickAssignTask(@task.Id, '@u.Id', this)">
+                                                                            @for (int i = 0; i < u.Level; i++) { @Html.Raw("&nbsp;&nbsp;") }
+                                                                            [@u.RoleName] @u.Name
+                                                                        </a></li>
+                                                                    }
+                                                                }
+                                                            </ul>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -1916,6 +2089,9 @@
                                             data-is-unassigned="false"
                                             style="background-color: @rowBgColor !important; @rowBorder">
                                             
+                                            <td class="text-center">
+                                                <input type="checkbox" class="form-check-input task-checkbox">
+                                            </td>
                                             <td class="text-center fw-bold text-muted">@task.Id</td>
 
                                             @if (hasAssigned)
@@ -1926,16 +2102,48 @@
                                                         var assigneeRole = task.AssignedToUserId != null ? Model.UserRolesMap.GetValueOrDefault(task.AssignedToUserId, "User") : "";
                                                         var assigneeName = task.AssignedToUser?.Name ?? "Unassigned";
                                                     }
-                                                    <div class="d-flex align-items-center">
-                                                        <div class="avatar-table-xs me-2 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
-                                                            @(string.IsNullOrEmpty(assigneeName) ? "?" : assigneeName[0].ToString().ToUpper())
+                                                    <div class="d-flex align-items-center justify-content-between">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="avatar-table-xs me-2 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center">
+                                                                @(string.IsNullOrEmpty(assigneeName) ? "?" : assigneeName[0].ToString().ToUpper())
+                                                            </div>
+                                                            <div class="d-flex flex-column">
+                                                                <span class="assignee-name fw-bold">@assigneeName</span>
+                                                                <span class="text-muted" style="font-size: 0.65rem;">
+                                                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-1 me-1">@assigneeTeam</span>
+                                                                    <span class="text-info">@assigneeRole</span>
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                        <div class="d-flex flex-column">
-                                                            <span class="assignee-name fw-bold">@assigneeName</span>
-                                                            <span class="text-muted" style="font-size: 0.65rem;">
-                                                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-1 me-1">@assigneeTeam</span>
-                                                                <span class="text-info">@assigneeRole</span>
-                                                            </span>
+
+                                                        <div class="dropdown ms-2">
+                                                            <button class="btn btn-link p-0 text-muted" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Quick Assign">
+                                                                <i class="bi bi-person-plus"></i>
+                                                            </button>
+                                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="min-width: 200px; font-size: 0.8rem;">
+                                                                <li class="dropdown-header">QUICK ASSIGN</li>
+                                                                @if (Model.ManagementUsers != null && Model.ManagementUsers.Any())
+                                                                {
+                                                                    <li><hr class="dropdown-divider"></li>
+                                                                    <li class="dropdown-header small text-primary">MANAGEMENT</li>
+                                                                    @foreach (var u in Model.ManagementUsers)
+                                                                    {
+                                                                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="quickAssignTask(@task.Id, '@u.Id', this)">[@u.RoleName] @u.Name</a></li>
+                                                                    }
+                                                                }
+                                                                @foreach (var group in Model.TeamGroups)
+                                                                {
+                                                                    <li><hr class="dropdown-divider"></li>
+                                                                    <li class="dropdown-header small text-info">@group.TeamName.ToUpper()</li>
+                                                                    @foreach (var u in group.Users)
+                                                                    {
+                                                                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="quickAssignTask(@task.Id, '@u.Id', this)">
+                                                                            @for (int i = 0; i < u.Level; i++) { @Html.Raw("&nbsp;&nbsp;") }
+                                                                            [@u.RoleName] @u.Name
+                                                                        </a></li>
+                                                                    }
+                                                                }
+                                                            </ul>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -1944,14 +2152,25 @@
                                             @foreach (var field in activeFields)
                                             {
                                                 var fv = task.CustomFieldValues?.FirstOrDefault(v => v.FieldId == field.Id);
+                                                string cellValue = fv?.Value ?? "-";
+                                                
+                                                if ((cellValue == "-" || string.IsNullOrEmpty(cellValue)) && Model.TeamName == "Digi Leads") {
+                                                    cellValue = ExtractFromDesc(task.Description, field.FieldName ?? "");
+                                                    
+                                                    // Extra fallback for Full Name since it's usually stored in Title
+                                                    if ((cellValue == "-" || string.IsNullOrEmpty(cellValue)) && (field.FieldName?.Trim().ToLower() == "full name" || field.FieldName?.Trim().ToLower() == "fullname")) {
+                                                        cellValue = task.Title ?? "-";
+                                                    }
+                                                }
+
                                                 var isCountry = field.FieldName?.Trim().ToLower() == "country";
                                                 <td class="small @(isCountry ? "country-cell" : "")" 
                                                     data-field-id="@field.Id" 
                                                     data-field-name="@field.FieldName"
-                                                    data-full-text="@(fv?.Value ?? "-")"
+                                                    data-full-text="@cellValue"
                                                     onclick="showFieldDetail(this)"
                                                     style="cursor: pointer;">
-                                                    @(fv?.Value ?? "-")
+                                                    @cellValue
                                                 </td>
                                             }
 

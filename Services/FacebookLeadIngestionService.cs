@@ -195,6 +195,11 @@ namespace UserRoles.Services
                         };
 
                         dbContext.TaskItems.Add(task);
+                        await dbContext.SaveChangesAsync(stoppingToken); // Save first to get TaskId
+
+                        // Map to Custom Fields
+                        await MapLeadToCustomFields(dbContext, task, leadDto, stoppingToken);
+
                         newLeadsToBroadcast.Add(task);
                     }
                     else
@@ -275,6 +280,9 @@ namespace UserRoles.Services
                 dbContext.TaskItems.Add(task);
                 await dbContext.SaveChangesAsync(stoppingToken);
 
+                // Populate Lead Data into Custom Fields for Digi Leads Team
+                await MapLeadToCustomFields(dbContext, task, leadDto, stoppingToken);
+
                 // Broadcast locally
                 await hubContext.Clients.Group("Digi Leads").SendAsync("NewLeadsDetected", new
                 {
@@ -282,6 +290,65 @@ namespace UserRoles.Services
                     columnId = column.Id
                 }, stoppingToken);
             }
+        }
+
+        private async Task MapLeadToCustomFields(AppDbContext dbContext, TaskItem task, FacebookLeadDto leadDto, CancellationToken stoppingToken)
+        {
+            var fieldsToMap = new List<(string Name, string Value, int Order)>
+            {
+                ("Full Name", leadDto.Name, 1),
+                ("Phone", leadDto.Phone, 2),
+                ("Email", leadDto.Email, 3),
+                ("Company Name", GetLeadFieldValue(leadDto, "company_name"), 4),
+                ("Country", GetLeadFieldValue(leadDto, "country"), 5),
+                ("What Best Describes Your Business", GetLeadFieldValue(leadDto, "what_best_describes_your_business?"), 6),
+                ("What Are You Looking To Launch", GetLeadFieldValue(leadDto, "what_are_you_looking_to_launch?"), 7)
+            };
+
+            foreach (var (name, value, order) in fieldsToMap)
+            {
+                if (string.IsNullOrEmpty(value)) continue;
+
+                var field = await dbContext.TaskCustomFields
+                    .FirstOrDefaultAsync(f => f.TeamName == "Digi Leads" && f.FieldName == name, stoppingToken);
+
+                if (field == null)
+                {
+                    field = new TaskCustomField
+                    {
+                        TeamName = "Digi Leads",
+                        FieldName = name,
+                        FieldType = "String",
+                        Order = order,
+                        IsActive = true
+                    };
+                    dbContext.TaskCustomFields.Add(field);
+                    await dbContext.SaveChangesAsync(stoppingToken);
+                }
+                else if (field.Order != order)
+                {
+                    field.Order = order;
+                    await dbContext.SaveChangesAsync(stoppingToken);
+                }
+
+                dbContext.TaskFieldValues.Add(new TaskFieldValue
+                {
+                    TaskId = task.Id,
+                    FieldId = field.Id,
+                    Value = value
+                });
+            }
+
+            await dbContext.SaveChangesAsync(stoppingToken);
+        }
+
+        private string? GetLeadFieldValue(FacebookLeadDto lead, string key)
+        {
+            if (lead.Fields != null && lead.Fields.TryGetValue(key, out var val))
+            {
+                return val?.ToString();
+            }
+            return null;
         }
 
         private string FormatLeadDescription(FacebookLeadDto lead, string formId)
