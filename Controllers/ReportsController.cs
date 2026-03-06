@@ -18,11 +18,13 @@ namespace UserRoles.Controllers
     {
         private readonly AppDbContext _context;
         private readonly UserManager<Users> _userManager;
+        private readonly ILogger<ReportsController> _logger;
 
-        public ReportsController(AppDbContext context, UserManager<Users> userManager)
+        public ReportsController(AppDbContext context, UserManager<Users> userManager, ILogger<ReportsController> logger)
         {
             _context = context;
             _userManager = userManager;
+            _logger = logger;
         }
 
         /* ================= ENTRY ================= */

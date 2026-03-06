@@ -18,15 +18,18 @@ namespace UserRoles.Controllers
         private readonly AppDbContext _context;
         private readonly UserManager<Users> _userManager;
         private readonly IHubContext<TaskHub> _hubContext;
+        private readonly ILogger<TaskPermissionsController> _logger;
 
         public TaskPermissionsController(
             AppDbContext context,
             UserManager<Users> userManager,
-            IHubContext<TaskHub> hubContext)
+            IHubContext<TaskHub> hubContext,
+            ILogger<TaskPermissionsController> logger)
         {
             _context = context;
             _userManager = userManager;
             _hubContext = hubContext;
+            _logger = logger;
         }
 
         [Authorize(Roles = "Admin")]
@@ -38,7 +41,7 @@ namespace UserRoles.Controllers
             var users = await _userManager.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
             var perms = await _context.BoardPermissions
                 .AsNoTracking()
-                .Where(p => p.TeamName.ToLower().Trim() == team.ToLower().Trim())
+                .Where(p => EF.Functions.ILike(p.TeamName, team.Trim()))
                 .ToListAsync();
 
             var userRolesData = await (from ur in _context.UserRoles
@@ -52,7 +55,7 @@ namespace UserRoles.Controllers
                 .ToDictionary(g => g.Key, g => g.Select(ur => ur.RoleName).ToList());
 
             var teamColumns = await _context.TeamColumns
-                .Where(c => c.TeamName.ToLower().Trim() == team.ToLower().Trim())
+                .Where(c => EF.Functions.ILike(c.TeamName, team.Trim()))
                 .OrderBy(c => c.Order)
                 .ToListAsync();
 
@@ -147,7 +150,7 @@ namespace UserRoles.Controllers
                 return BadRequest();
 
             var allExisting = await _context.BoardPermissions
-                .Where(p => p.UserId == dto.UserId && p.TeamName.ToLower().Trim() == dto.TeamName.ToLower().Trim())
+                .Where(p => p.UserId == dto.UserId && EF.Functions.ILike(p.TeamName, dto.TeamName.Trim()))
                 .ToListAsync();
 
             var existing = allExisting.OrderByDescending(p => p.Id).FirstOrDefault();

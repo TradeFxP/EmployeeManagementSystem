@@ -1,10 +1,14 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 using UserRoles.Data;
+using UserRoles.Helpers;
 using UserRoles.Models;
 using UserRoles.Services;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
+using EmployeeManagementSystem.Middleware;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,8 +17,6 @@ QuestPDF.Settings.License = LicenseType.Community;
 
 
 
-System.Net.ServicePointManager.SecurityProtocol =
-    System.Net.SecurityProtocolType.Tls12;
 
 
 // ================= MVC =================
@@ -53,9 +55,41 @@ builder.Services.AddScoped<ITaskHistoryService, TaskHistoryService>();
 builder.Services.AddScoped<ITaskPermissionService, TaskPermissionService>();
 builder.Services.AddScoped<IUserHierarchyService, UserHierarchyService>();
 
+// ================= TASK & IMAGE SERVICES =================
+builder.Services.AddScoped<ITaskService, TaskService>();
+builder.Services.AddScoped<IImageProcessingService, ImageProcessingService>();
+
 // ================= FACEBOOK LEADS =================
 builder.Services.AddHttpClient<IFacebookLeadsService, FacebookLeadsService>();
 builder.Services.AddHostedService<FacebookLeadIngestionService>();
+
+// ================= PERFORMANCE =================
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
+builder.Services.AddMemoryCache();
+
+// ================= RATE LIMITING =================
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
+
+// ================= REQUEST SIZE LIMITS =================
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10 MB
+});
 
 // ================= COOKIE =================
 builder.Services.ConfigureApplicationCookie(options =>
@@ -77,6 +111,9 @@ var app = builder.Build();
 await SeedService.SeedDatabase(app.Services);
 
 // ================= PIPELINE =================
+app.UseGlobalExceptionHandler();
+app.UseSecurityHeaders();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -85,6 +122,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
 
+app.UseResponseCompression();
+app.UseRateLimiter();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 

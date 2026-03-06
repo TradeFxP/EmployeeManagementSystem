@@ -56,7 +56,7 @@ namespace UserRoles.Controllers
                 user,
                 model.Password,
                 model.RememberMe,
-                lockoutOnFailure: false
+                lockoutOnFailure: true
             );
 
             if (!result.Succeeded)

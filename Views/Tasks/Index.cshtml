@@ -35,6 +35,9 @@
     }
 </script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
 <style>
     .modal-action-buttons {
         display: flex;
@@ -1684,23 +1687,6 @@
             .catch(() => alert('Failed to add column'));
     });
 </script>
-
-@{
-    ViewData["Title"] = "Task Board";
-}
-
-
-<link rel="stylesheet" href="~/css/taskHistory.css" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-<script src="~/js/customFields.js"></script>
-<script src="~/js/taskHistory.js"></script>
-<script src="~/js/column_filter.js"></script>
-<script src="~/js/index_ui.js"></script>
-<script src="~/js/board-permissions.js?v=@DateTime.Now.Ticks"></script>
-
 <script>
     function enableColumnDrag() {
         if (!__isTasksAdmin) return;
@@ -1853,6 +1839,7 @@
         }
     });
 
+    // SignalR is now loaded at the top of the scripts section
     taskHubConnection.start()
         .then(() => {
             console.log("SignalR Connected");
@@ -2075,7 +2062,12 @@
             return;
         }
         // ? JOIN GROUP
-        if (taskHubConnection.state === signalR.HubConnectionState.Connected) {
+        const isConnected = typeof signalR !== "undefined" 
+            && typeof taskHubConnection !== "undefined" 
+            && taskHubConnection 
+            && taskHubConnection.state === signalR.HubConnectionState.Connected;
+
+        if (isConnected) {
             if (window.currentTeamName) {
                 taskHubConnection.invoke("LeaveTeamGroup", window.currentTeamName);
             }
@@ -3707,8 +3699,12 @@ async function clearColumnTasks(columnId) {
     </div>
 </div>
 
-<script src="~/js/tasks.js"></script>
+<link rel="stylesheet" href="~/css/taskHistory.css" />
+
 <script src="~/js/customFields.js"></script>
+<script src="~/js/column_filter.js"></script>
+<script src="~/js/index_ui.js"></script>
+<script src="~/js/tasks.js"></script>
 <script src="~/js/taskHistory.js"></script>
 <script src="~/js/move-requests.js"></script>
 <script src="~/js/board-permissions.js"></script>

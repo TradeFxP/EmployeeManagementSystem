@@ -1,13 +1,7 @@
 ﻿
 // ===============================
-// CSRF TOKEN HELPER (REQUIRED)
-// ===============================
-function getCsrfToken() {
-    const tokenInput = document.querySelector(
-        'input[name="__RequestVerificationToken"]'
-    );
-    return tokenInput ? tokenInput.value : '';
-}
+// CSRF token helper is now provided globally by ajax-utils.js (window.getAntiForgeryToken)
+
 
 window.drag = function (ev) {
     if (!window.__isAdmin) return;
@@ -98,7 +92,7 @@ window.drop = function (event, newParentId) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'RequestVerificationToken': getCsrfToken()
+            'RequestVerificationToken': window.getAntiForgeryToken()
         },
         body: JSON.stringify({
             userId: dragged.id,
@@ -126,52 +120,8 @@ window.drop = function (event, newParentId) {
         });
 };
 
-// ===============================
-// TOAST NOTIFICATION SYSTEM
-// ===============================
-function showOrgToast(message, type, duration) {
-    type = type || "success";
-    duration = duration || 5000;
+// Unified toast definitions are in ajax-utils.js
 
-    // Create toast container if not present
-    var container = document.getElementById("orgToastContainer");
-    if (!container) {
-        container = document.createElement("div");
-        container.id = "orgToastContainer";
-        container.className = "org-toast-container";
-        document.body.appendChild(container);
-    }
-
-    // Create individual toast
-    var toast = document.createElement("div");
-    toast.className = "org-toast org-toast-" + type;
-
-    // Icon based on type
-    var icon = type === "success" ? "✓" : type === "error" ? "✕" : "ℹ";
-
-    toast.innerHTML =
-        '<div class="org-toast-icon">' + icon + '</div>' +
-        '<div class="org-toast-message">' + message + '</div>' +
-        '<button class="org-toast-close" onclick="this.parentElement.remove()">×</button>' +
-        '<div class="org-toast-progress"><div class="org-toast-progress-bar" style="animation-duration: ' + duration + 'ms"></div></div>';
-
-    container.appendChild(toast);
-
-    // Trigger animation
-    requestAnimationFrame(function () {
-        toast.classList.add("org-toast-show");
-    });
-
-    // Auto-remove after duration
-    setTimeout(function () {
-        toast.classList.remove("org-toast-show");
-        toast.classList.add("org-toast-hide");
-        setTimeout(function () { toast.remove(); }, 400);
-    }, duration);
-}
-
-// Expose globally so the IIFE module can also use it
-window.showOrgToast = showOrgToast;
 
 (function () {
 
@@ -181,25 +131,8 @@ window.showOrgToast = showOrgToast;
     // Private drag state
     let __draggedUserId = null;
 
-    function showToast(text, type = 'success', timeout = 4500) {
-        // Create container if not present
-        let container = document.querySelector('.toast-container-fixed');
-        if (!container) {
-            container = document.createElement('div');
-            container.className = 'toast-container-fixed';
-            document.body.appendChild(container);
-        }
+    // Inner showToast now uses window.showToast from ajax-utils.js
 
-        const toast = document.createElement('div');
-        toast.className = `alert alert-${type} toast-message`;
-        toast.textContent = text;
-        container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.add('fade');
-            setTimeout(() => toast.remove(), 400);
-        }, timeout);
-    }
 
     // Utility: inject HTML into container and execute inline scripts contained in the HTML
     function injectHtmlWithScripts(container, html) {
@@ -628,7 +561,10 @@ window.showOrgToast = showOrgToast;
 
                 const res = await fetch('/Users/DeleteUser', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': window.getAntiForgeryToken()
+                    },
                     body: fd.toString()
                 });
 

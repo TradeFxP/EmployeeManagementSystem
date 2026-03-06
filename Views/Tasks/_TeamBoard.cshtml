@@ -373,15 +373,15 @@
                 <div class="kanban-tasks" data-column-id="@column.Id">
                     @foreach (var task in column.Tasks)
                     {
-                        @await Html.PartialAsync("_TaskCard", task, new ViewDataDictionary(ViewData) {
-                { "ColumnName", column.ColumnName },
-                { "TeamSettings", Model.TeamSettings },
-                { "UserPermissions", Model.UserPermissions },
-                { "ColumnPermission", colPerm },
-                { "TeamGroups", Model.TeamGroups },
-                { "ManagementUsers", Model.ManagementUsers },
-                { "UserRolesMap", Model.UserRolesMap }
-                })
+                        <partial name="_TaskCard" model="task" view-data='new ViewDataDictionary(ViewData) {
+                                { "ColumnName", column.ColumnName },
+                                { "TeamSettings", Model.TeamSettings },
+                                { "UserPermissions", Model.UserPermissions },
+                                { "ColumnPermission", colPerm },
+                                { "TeamGroups", Model.TeamGroups },
+                                { "ManagementUsers", Model.ManagementUsers },
+                                { "UserRolesMap", Model.UserRolesMap }
+                            }' />
                     }
                 </div>
             </div>

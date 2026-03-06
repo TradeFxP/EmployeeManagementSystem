@@ -201,9 +201,9 @@
                                         <td>
                                     @if (task.DueDate.HasValue)
                                     {
-                                                    <div class="d-flex align-items-center text-danger small fw-bold">
+                                                    <div class="d-flex align-items-center text-danger small fw-bold text-nowrap">
                                                         <i class="bi bi-calendar-event me-2"></i>
-                                            @task.DueDate.Value.ToString("MMM dd, yyyy")
+                                                        @task.DueDate.Value.ToString("MMM dd, yyyy")
                                                     </div>
                                     }
                                     else

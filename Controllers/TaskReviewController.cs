@@ -21,19 +21,22 @@ namespace UserRoles.Controllers
         private readonly ITaskHistoryService _historyService;
         private readonly IHubContext<TaskHub> _hubContext;
         private readonly ITaskPermissionService _permissions;
-
+        private readonly ILogger<TaskReviewController> _logger;
+ 
         public TaskReviewController(
             AppDbContext context,
             UserManager<Users> userManager,
             ITaskHistoryService historyService,
             IHubContext<TaskHub> hubContext,
-            ITaskPermissionService permissions)
+            ITaskPermissionService permissions,
+            ILogger<TaskReviewController> logger)
         {
             _context = context;
             _userManager = userManager;
             _historyService = historyService;
             _hubContext = hubContext;
             _permissions = permissions;
+            _logger = logger;
         }
 
         [HttpPost]
@@ -64,7 +67,7 @@ namespace UserRoles.Controllers
                 await _historyService.LogReviewPassed(task.Id, user.Id, model.ReviewNote);
 
                 var completedCol = await _context.TeamColumns
-                    .FirstOrDefaultAsync(c => c.TeamName == task.TeamName && c.ColumnName.ToLower().Trim() == "completed");
+                    .FirstOrDefaultAsync(c => c.TeamName == task.TeamName && EF.Functions.ILike(c.ColumnName, "completed"));
 
                 if (completedCol != null)
                 {

@@ -37,7 +37,8 @@ function deleteReport(reportId) {
     fetch("/Reports/DeleteInline", {
         method: "POST",
         headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
+            "Content-Type": "application/x-www-form-urlencoded",
+            "RequestVerificationToken": window.getAntiForgeryToken()
         },
         body: new URLSearchParams({ id: reportId }).toString()
     })

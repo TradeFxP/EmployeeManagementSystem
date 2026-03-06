@@ -1,7 +1,11 @@
 // board-permissions.js - Management of board permissions for administrators
 
-let rawBoardPermissions = []; // Store raw data for filtering
-let currentTeamName = "";
+if (typeof window.rawBoardPermissions === 'undefined') {
+    window.rawBoardPermissions = []; // Store raw data for filtering
+}
+if (typeof window.currentTeamPermissionsName === 'undefined') {
+    window.currentTeamPermissionsName = "";
+}
 
 async function openBoardPermissionModal(teamName) {
     const modalEl = document.getElementById('boardPermissionModal');

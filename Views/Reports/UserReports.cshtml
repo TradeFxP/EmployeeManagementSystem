@@ -549,23 +549,8 @@
             counter.textContent = (max - e.target.value.length) + " chars remaining"; // Shortened text
         });
 
-        // Toast Helper
-         function showToast(text, type = 'success', timeout = 3000) {
-            let container = document.querySelector('.toast-container-fixed');
-            if (!container) {
-                container = document.createElement('div');
-                container.className = 'toast-container-fixed';
-                document.body.appendChild(container); // Ensure it's in body
-            }
-            const toast = document.createElement('div');
-            toast.className = 'alert alert-' + type + ' toast-message shadow-lg border-0 d-flex align-items-center gap-2';
-            toast.innerHTML = (type === 'success' ? '<i class="bi bi-check-circle-fill"></i> ' : '<i class="bi bi-exclamation-triangle-fill"></i> ') + text;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.add('fade');
-                setTimeout(() => toast.remove(), 400);
-            }, timeout);
-        }
+        // Toast Helper is now in ajax-utils.js
+
 
         // AJAX Delete
         async function deleteReport(id, userId) {

@@ -18,16 +18,19 @@ namespace UserRoles.Controllers
         private readonly UserManager<Users> _userManager;
         private readonly IHubContext<TaskHub> _hubContext;
         private readonly ITaskHistoryService _historyService;
+        private readonly ILogger<ProjectController> _logger; // Added ILogger field
 
         public ProjectController(AppDbContext context, 
             UserManager<Users> userManager, 
             IHubContext<TaskHub> hubContext,
-            ITaskHistoryService historyService)
+            ITaskHistoryService historyService,
+            ILogger<ProjectController> logger) // Added ILogger to constructor
         {
             _context = context;
             _userManager = userManager;
             _hubContext = hubContext;
             _historyService = historyService;
+            _logger = logger; // Initialized _logger
         }
 
         // ==================== INDEX ====================
@@ -160,7 +163,10 @@ namespace UserRoles.Controllers
 
             _context.Projects.Add(project);
             await _context.SaveChangesAsync();
-
+ 
+            _logger.LogInformation("Project created: {ProjectName} (ID: {ProjectId}) by user {UserId}", 
+                project.Name, project.Id, user.Id);
+ 
             return Ok(new { success = true, id = project.Id, name = project.Name });
         }
 
@@ -199,7 +205,10 @@ namespace UserRoles.Controllers
 
             _context.Epics.Add(epic);
             await _context.SaveChangesAsync();
-
+ 
+            _logger.LogInformation("Epic created: {EpicTitle} ({WorkItemId}) in project {ProjectId}", 
+                epic.Title, epic.WorkItemId, model.ProjectId);
+ 
             return Ok(new { success = true, id = epic.Id, workItemId = epic.WorkItemId });
         }
 
@@ -513,6 +522,9 @@ namespace UserRoles.Controllers
 
             _context.Epics.Remove(epic);
             await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("Epic deleted: {EpicId} ({WorkItemId})", epic.Id, epic.WorkItemId);
+            
             return Ok();
         }
 
@@ -763,7 +775,9 @@ namespace UserRoles.Controllers
             // EF Core will handle cascade delete if configured, or we rely on the loaded graph removal.
             _context.Projects.Remove(project);
             await _context.SaveChangesAsync();
-
+ 
+            _logger.LogWarning("Project DELETED: {ProjectName} (ID: {ProjectId}) by Admin", project.Name, projectId);
+ 
             return Ok();
         }
     }

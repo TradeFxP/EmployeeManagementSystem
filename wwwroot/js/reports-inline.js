@@ -91,7 +91,10 @@ window.deleteReport = async function (id, userId) {
     try {
         const res = await fetch('/Reports/DeleteInline', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'RequestVerificationToken': window.getAntiForgeryToken()
+            },
             body: new URLSearchParams({ id }).toString(),
             credentials: 'same-origin'
         });

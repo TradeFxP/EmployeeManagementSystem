@@ -14,11 +14,13 @@ namespace UserRoles.Controllers
     {
         private readonly AppDbContext _context;
         private readonly ITaskPermissionService _permissions;
-
-        public TaskColumnsController(AppDbContext context, ITaskPermissionService permissions)
+        private readonly ILogger<TaskColumnsController> _logger;
+ 
+        public TaskColumnsController(AppDbContext context, ITaskPermissionService permissions, ILogger<TaskColumnsController> logger)
         {
             _context = context;
             _permissions = permissions;
+            _logger = logger;
         }
 
         [HttpPost]

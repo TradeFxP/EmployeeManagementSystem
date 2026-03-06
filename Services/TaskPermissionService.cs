@@ -30,7 +30,7 @@ namespace UserRoles.Services
             if (appUser == null) return false;
 
             var perms = await _context.BoardPermissions
-                .Where(p => p.UserId == appUser.Id && p.TeamName.ToLower().Trim() == teamName.ToLower().Trim())
+                .Where(p => p.UserId == appUser.Id && EF.Functions.ILike(p.TeamName, teamName.Trim()))
                 .OrderByDescending(p => p.Id)
                 .FirstOrDefaultAsync();
 

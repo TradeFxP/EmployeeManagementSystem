@@ -494,7 +494,10 @@ async function addNewCustomField() {
         const teamName = document.getElementById('kanbanBoard')?.dataset.teamName;
         const response = await fetch('/TaskCustomFields/CreateCustomField', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': window.getAntiForgeryToken()
+            },
             body: JSON.stringify({
                 fieldName: name,
                 fieldType: 'Text', // Default to Text for inline simplicity
@@ -519,7 +522,10 @@ async function renameCustomField(id, currentName) {
     try {
         const response = await fetch('/TaskCustomFields/UpdateCustomField', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': window.getAntiForgeryToken()
+            },
             body: JSON.stringify({
                 fieldId: id,
                 fieldName: newName
@@ -541,7 +547,10 @@ async function deleteCustomFieldInline(id) {
     try {
         const response = await fetch('/TaskCustomFields/DeleteCustomField', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': window.getAntiForgeryToken()
+            },
             body: JSON.stringify(id)
         });
 
@@ -870,7 +879,10 @@ async function loadFieldsList(team) {
                         try {
                             const response = await fetch('/TaskCustomFields/ReorderCustomFields', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'RequestVerificationToken': window.getAntiForgeryToken()
+                                },
                                 body: JSON.stringify(ids)
                             });
                             if (response.ok) {

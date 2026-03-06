@@ -52,7 +52,7 @@ namespace UserRoles.Controllers
             if (user == null) return Unauthorized();
 
             var boardPerm = await _context.BoardPermissions
-                .FirstOrDefaultAsync(p => p.UserId == user.Id && p.TeamName.ToLower().Trim() == task.TeamName.ToLower().Trim());
+                .FirstOrDefaultAsync(p => p.UserId == user.Id && EF.Functions.ILike(p.TeamName, task.TeamName.Trim()));
 
             if (boardPerm == null)
             {
@@ -106,7 +106,7 @@ namespace UserRoles.Controllers
             if (!isAdmin && !isManager) return Forbid();
 
             var allPerms = await _context.BoardPermissions
-                .Where(p => p.TeamName.ToLower().Trim() == teamName.ToLower().Trim() && !string.IsNullOrEmpty(p.MoveRequestsJson))
+                .Where(p => EF.Functions.ILike(p.TeamName, teamName.Trim()) && !string.IsNullOrEmpty(p.MoveRequestsJson))
                 .ToListAsync();
 
             var allRequests = new List<object>();
@@ -180,7 +180,7 @@ namespace UserRoles.Controllers
                     task.CurrentColumnEntryAt = DateTime.UtcNow;
 
                     var toCol = await _context.TeamColumns.FindAsync(request.ToColumnId);
-                    if (toCol != null && (toCol.ColumnName.ToLower().Trim() == "completed" || toCol.ColumnName.ToLower().Trim() == "done"))
+                    if (toCol != null && (toCol.ColumnName.Trim().Equals("completed", StringComparison.OrdinalIgnoreCase) || toCol.ColumnName.Trim().Equals("done", StringComparison.OrdinalIgnoreCase)))
                     {
                         task.Status = TaskStatusEnum.Complete;
                         task.CompletedByUserId = request.RequestedByUserId;

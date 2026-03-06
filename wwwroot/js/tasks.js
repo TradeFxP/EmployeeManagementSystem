@@ -66,7 +66,10 @@ function deleteTask(taskId) {
 
     fetch('/Tasks/DeleteTask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify(taskId)
     })
         .then(res => {
@@ -243,7 +246,10 @@ async function submitCreateTask() {
     try {
         const response = await fetch("/Tasks/CreateTask", {
             method: "POST",
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                "RequestVerificationToken": window.getAntiForgeryToken()
+            },
             body: JSON.stringify({
                 columnId: parseInt(columnId),
                 title: title,
@@ -847,12 +853,8 @@ function openArchivedTaskDetail(taskId) {
 // UTILITY FUNCTIONS
 // ═══════════════════════════════════════════════
 
-function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.appendChild(document.createTextNode(str));
-    return div.innerHTML;
-}
+// Unified escapeHtml is now in ajax-utils.js
+
 
 function formatDate(dateStr) {
     if (!dateStr) return '';
@@ -877,95 +879,8 @@ function formatDate(dateStr) {
     }
 }
 
-function showToast(message, type) {
-    type = type || 'info';
-    // Remove existing toasts
-    document.querySelectorAll('.premium-toast').forEach(t => t.remove());
+// Unified showToast is now in ajax-utils.js
 
-    const icons = {
-        success: 'bi-check-circle-fill',
-        danger: 'bi-exclamation-triangle-fill',
-        warning: 'bi-exclamation-circle-fill',
-        info: 'bi-info-circle-fill'
-    };
-    const bgColors = {
-        success: 'linear-gradient(135deg, #00C851, #007E33)',
-        danger: 'linear-gradient(135deg, #ff4444, #CC0000)',
-        warning: 'linear-gradient(135deg, #ffbb33, #FF8800)',
-        info: 'linear-gradient(135deg, #33b5e5, #0099CC)'
-    };
-
-    const toast = document.createElement('div');
-    toast.className = 'premium-toast';
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 10000;
-        padding: 14px 20px;
-        border-radius: 12px;
-        color: #fff;
-        font-weight: 600;
-        font-size: 14px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-        animation: toastSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        max-width: 420px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        backdrop-filter: blur(10px);
-        background: ${bgColors[type] || bgColors.info};
-    `;
-
-    const icon = document.createElement('i');
-    icon.className = `bi ${icons[type] || icons.info}`;
-    icon.style.fontSize = '18px';
-
-    const text = document.createElement('span');
-    text.style.flex = '1';
-    text.textContent = message;
-
-    const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '&times;';
-    closeBtn.style.cssText = 'background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 0 0 8px;opacity:0.8;';
-    closeBtn.onclick = () => {
-        toast.style.animation = 'toastSlideOut 0.3s ease-in forwards';
-        setTimeout(() => toast.remove(), 300);
-    };
-
-    // Progress bar
-    const progress = document.createElement('div');
-    progress.style.cssText = 'position:absolute;bottom:0;left:0;height:3px;background:rgba(255,255,255,0.4);border-radius:0 0 12px 12px;animation:toastProgress 5s linear forwards;';
-
-    toast.appendChild(icon);
-    toast.appendChild(text);
-    toast.appendChild(closeBtn);
-    toast.appendChild(progress);
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-        toast.style.animation = 'toastSlideOut 0.3s ease-in forwards';
-        setTimeout(() => toast.remove(), 300);
-    }, 5000);
-}
-
-// Add toast animations
-const toastStyle = document.createElement('style');
-toastStyle.textContent = `
-    @keyframes toastSlideIn {
-        from { transform: translateX(100%) scale(0.95); opacity: 0; }
-        to { transform: translateX(0) scale(1); opacity: 1; }
-    }
-    @keyframes toastSlideOut {
-        from { transform: translateX(0) scale(1); opacity: 1; }
-        to { transform: translateX(100%) scale(0.95); opacity: 0; }
-    }
-    @keyframes toastProgress {
-        from { width: 100%; }
-        to { width: 0%; }
-    }
-`;
-document.head.appendChild(toastStyle);
 
 function deleteArchivedTask(event, taskId) {
     if (event) event.stopPropagation();
@@ -1034,7 +949,10 @@ function moveTaskFromEditModal() {
 
     fetch('/Tasks/MoveTask', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify({
             taskId: taskId,
             columnId: targetColumnId

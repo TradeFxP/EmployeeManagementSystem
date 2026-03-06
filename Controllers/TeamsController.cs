@@ -14,10 +14,12 @@ namespace UserRoles.Controllers
     public class TeamsController : Controller
     {
         private readonly AppDbContext _context;
-
-        public TeamsController(AppDbContext context)
+        private readonly ILogger<TeamsController> _logger;
+ 
+        public TeamsController(AppDbContext context, ILogger<TeamsController> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // GET: /Teams/GetAll

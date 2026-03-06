@@ -16,7 +16,7 @@ namespace UserRoles.Models
         [ForeignKey("ManagerId")]
         public Users? Manager { get; set; }
 
-        public ICollection<Users> TeamMembers { get; set; }
+        public ICollection<Users> TeamMembers { get; set; } = new List<Users>();
 
         // ================= PASSWORD RESET =================
         public int PasswordResetCount { get; set; } = 0;
@@ -47,11 +47,6 @@ namespace UserRoles.Models
         /// </summary>
         public DateTime? EmailChangeCodeExpiry { get; set; }
         public bool IsDeleted { get; set; } = false;
-
-        public Users()
-        {
-            TeamMembers = new List<Users>();
-        }
 
     }
 }

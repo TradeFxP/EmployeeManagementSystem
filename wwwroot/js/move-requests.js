@@ -41,7 +41,10 @@ function confirmSubmitMoveRequest() {
 
     fetch('/TaskMoveRequests/SubmitMoveRequest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify({ taskId, toColumnId })
     })
         .then(res => res.json())
@@ -199,7 +202,10 @@ function confirmHandleMoveRequest() {
 
     fetch('/TaskMoveRequests/HandleMoveRequest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
         body: JSON.stringify({ requestId, approved, adminReply })
     })
         .then(res => res.json())
