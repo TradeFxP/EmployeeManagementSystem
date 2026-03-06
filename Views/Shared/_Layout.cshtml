@@ -229,9 +229,11 @@
                     function performLogout() {
                         const logoutForm = document.getElementById('logoutForm');
                         if (logoutForm) {
-                            logoutForm.submit();
+                            // Append a hidden input to signal idle timeout if needed, 
+                            // or just redirect manually to Login with param
+                            window.location.href = '/Account/Login?logout=idle';
                         } else {
-                            window.location.href = '/Account/Login';
+                            window.location.href = '/Account/Login?logout=idle';
                         }
                     }
 

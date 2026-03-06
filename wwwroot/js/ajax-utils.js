@@ -174,3 +174,22 @@ window.escapeHtml = escapeHtml;
 window.getAntiForgeryToken = getAntiForgeryToken;
 window.ajaxPost = ajaxPost;
 window.ajaxGet = ajaxGet;
+
+// ═══════════════════════════════════════════════════════
+//  GLOBAL AJAX SETUP (AUTH REDIRECTS)
+// ═══════════════════════════════════════════════════════
+$.ajaxSetup({
+    complete: function (xhr) {
+        // Check for custom header from AjaxRedirectMiddleware
+        const redirectUrl = xhr.getResponseHeader('X-Ajax-Redirect');
+        if (redirectUrl) {
+            window.location.href = redirectUrl + (redirectUrl.includes('?') ? '&' : '?') + 'logout=idle';
+            return;
+        }
+
+        // Fallback for standard 401s if middleware is bypassed
+        if (xhr.status === 401) {
+            window.location.href = '/Account/Login?logout=idle';
+        }
+    }
+});

@@ -32,8 +32,13 @@ namespace UserRoles.Controllers
         /* ===================== LOGIN ===================== */
 
         [HttpGet]
-        public IActionResult Login(string? returnUrl = null)
+        public IActionResult Login(string? returnUrl = null, string? logout = null)
         {
+            if (logout == "idle")
+            {
+                ViewBag.LogoutMessage = "Session expired due to inactivity. Please login again.";
+            }
+
             ViewData["ReturnUrl"] = returnUrl;
             return View();
         }

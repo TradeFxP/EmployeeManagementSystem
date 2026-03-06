@@ -113,6 +113,7 @@ await SeedService.SeedDatabase(app.Services);
 // ================= PIPELINE =================
 app.UseGlobalExceptionHandler();
 app.UseSecurityHeaders();
+app.UseMiddleware<EmployeeManagementSystem.Middleware.AjaxRedirectMiddleware>();
 
 if (!app.Environment.IsDevelopment())
 {
