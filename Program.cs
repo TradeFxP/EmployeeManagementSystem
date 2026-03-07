@@ -74,15 +74,32 @@ builder.Services.AddMemoryCache();
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-            factory: _ => new FixedWindowRateLimiterOptions
+    {
+        var isAuth = context.User.Identity?.IsAuthenticated ?? false;
+        var userName = context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: userName,
+            factory: _ => new SlidingWindowRateLimiterOptions
             {
-                AutoReplenishment = true,
-                PermitLimit = 100,
-                Window = TimeSpan.FromMinutes(1)
-            }));
+                PermitLimit = isAuth ? 500 : 100, // Higher limit for logged in users
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6, // Smoother distribution
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            });
+    });
+
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.Headers.RetryAfter = "10"; // Recommend retry after 10 seconds
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString();
+        }
+    };
 });
 
 // ================= REQUEST SIZE LIMITS =================
@@ -121,12 +138,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseStatusCodePagesWithReExecute("/Home/Error/{0}");
-
 app.UseResponseCompression();
-app.UseRateLimiter();
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseStaticFiles(); // Move before RateLimiter so assets don't consume quota
+app.UseRateLimiter();
 
 app.UseRouting();
 

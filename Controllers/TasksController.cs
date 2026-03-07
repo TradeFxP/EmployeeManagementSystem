@@ -167,7 +167,7 @@ namespace UserRoles.Controllers
                 FieldName = fv.Field?.FieldName,
                 FieldType = fv.Field?.FieldType,
                 Value = fv.Field?.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var dt)
-                        ? dt.ToString("dd MMM yyyy, hh:mm tt")
+                        ? dt.ToString("dd-MM-yyyy, HH:mm:ss")
                         : fv.Value
             }).ToList();
 
@@ -186,11 +186,11 @@ namespace UserRoles.Controllers
                 AssignedBy = task.AssignedByUser?.UserName,
                 ReviewedBy = task.ReviewedByUser?.UserName,
                 CompletedBy = task.CompletedByUser?.UserName,
-                CreatedAtFormatted = task.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
-                AssignedAtFormatted = task.AssignedAt?.ToString("dd MMM yyyy, hh:mm tt"),
-                ReviewedAtFormatted = task.ReviewedAt?.ToString("dd MMM yyyy, hh:mm tt"),
-                CompletedAtFormatted = task.CompletedAt?.ToString("dd MMM yyyy, hh:mm tt"),
-                DueDateFormatted = task.DueDate?.ToString("dd MMM, hh:mm tt"),
+                CreatedAtFormatted = task.CreatedAt.ToString("dd-MM-yyyy, HH:mm:ss"),
+                AssignedAtFormatted = task.AssignedAt?.ToString("dd-MM-yyyy, HH:mm:ss"),
+                ReviewedAtFormatted = task.ReviewedAt?.ToString("dd-MM-yyyy, HH:mm:ss"),
+                CompletedAtFormatted = task.CompletedAt?.ToString("dd-MM-yyyy, HH:mm:ss"),
+                DueDateFormatted = task.DueDate?.ToString("dd-MM-yyyy, HH:mm:ss"),
                 CustomFields = customFields
             });
         }

@@ -10,6 +10,7 @@
         // For Facebook Leads integration
         public string? ExternalLeadId { get; set; }
         public string? FormId { get; set; }
+        public string? MetaCreatedAt { get; set; }
 
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;

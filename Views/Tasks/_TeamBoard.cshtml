@@ -38,6 +38,30 @@
                     </button>
                 }
             </div>
+            @if (Model.TeamName == "Digi Leads")
+            {
+                <div class="d-flex align-items-center gap-2 animate__animated animate__fadeIn">
+                    <div class="input-group input-group-sm shadow-sm" style="width: 210px;" id="leadDateFilterGroup">
+                        <span class="input-group-text bg-white border-end-0 text-primary" style="cursor: pointer;" data-toggle>
+                            <i class="bi bi-calendar3"></i>
+                        </span>
+                        <input type="text" id="leadDateFilter" class="form-control border-start-0 border-end-0 ps-1" 
+                               placeholder="Filter by Date" readonly style="cursor: pointer; background-color: #fff;" data-input />
+                        <button class="btn btn-white border-top border-bottom border-start-0 border-end-0 text-muted px-2" 
+                                type="button" onclick="setLeadDateToday()" title="Select Today">
+                            <span style="font-size: 0.7rem; font-weight: 700;">TODAY</span>
+                        </button>
+                        <button class="btn btn-white border-top border-bottom border-end border-start-0 text-danger" 
+                                type="button" onclick="clearLeadDateFilter()" title="Clear Filter">
+                            <i class="bi bi-x-circle-fill"></i>
+                        </button>
+                    </div>
+                    <div id="leadDateCountSection" class="d-none badge bg-primary rounded-pill px-2 py-1 shadow-sm" 
+                         style="font-size: 0.75rem; transition: all 0.3s ease;">
+                        <i class="bi bi-funnel-fill me-1"></i> <span id="leadDateCountBadge">0</span> leads
+                    </div>
+                </div>
+            }
         }
 
         @if (User.IsInRole("Admin"))
@@ -2403,5 +2427,25 @@
             opacity: 0.4;
             transform: scale(0.95);
         }
+    }
+    .btn-white {
+        background-color: #fff;
+        color: #6c757d;
+        border: 1px solid #dee2e6;
+    }
+
+    .btn-white:hover {
+        background-color: #f8f9fa;
+        color: #212529;
+    }
+
+    #leadDateFilter {
+        font-weight: 500;
+        color: #495057;
+    }
+
+    #leadDateFilter::placeholder {
+        color: #adb5bd;
+        font-weight: 400;
     }
 </style>
