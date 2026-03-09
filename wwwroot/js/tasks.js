@@ -380,9 +380,20 @@ async function openEditTaskModal(taskId) {
             if (group) group.style.display = visible ? 'block' : 'none';
         });
 
+        // Restricted Lead Fields for Digi Leads and Sales1
+        const isAdmin = window.isAdmin === true || window.currentUserRole === 'Admin';
+        const isLeadTeam = team === 'Digi Leads' || team === 'sales1';
+        if (isLeadTeam && !isAdmin) {
+            if (descEl) descEl.readOnly = true;
+            if (titleEl) titleEl.readOnly = true;
+        } else {
+            if (descEl) descEl.readOnly = false;
+            if (titleEl) titleEl.readOnly = false;
+        }
+
         // Render custom fields
         if (typeof renderCustomFieldInputs === 'function') {
-            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
+            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team, task.description);
         }
 
         const modalEl = document.getElementById('editTaskModal');
