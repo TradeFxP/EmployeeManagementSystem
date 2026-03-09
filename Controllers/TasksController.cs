@@ -167,7 +167,7 @@ namespace UserRoles.Controllers
                 FieldName = fv.Field?.FieldName,
                 FieldType = fv.Field?.FieldType,
                 Value = fv.Field?.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var dt)
-                        ? dt.ToString("dd MMM yyyy, hh:mm tt")
+                        ? dt.ToString("dd-MM-yyyy, HH:mm:ss")
                         : fv.Value
             }).ToList();
 
@@ -186,11 +186,11 @@ namespace UserRoles.Controllers
                 AssignedBy = task.AssignedByUser?.UserName,
                 ReviewedBy = task.ReviewedByUser?.UserName,
                 CompletedBy = task.CompletedByUser?.UserName,
-                CreatedAtFormatted = task.CreatedAt.ToString("dd MMM yyyy, hh:mm tt"),
-                AssignedAtFormatted = task.AssignedAt?.ToString("dd MMM yyyy, hh:mm tt"),
-                ReviewedAtFormatted = task.ReviewedAt?.ToString("dd MMM yyyy, hh:mm tt"),
-                CompletedAtFormatted = task.CompletedAt?.ToString("dd MMM yyyy, hh:mm tt"),
-                DueDateFormatted = task.DueDate?.ToString("dd MMM, hh:mm tt"),
+                CreatedAtFormatted = task.CreatedAt.ToString("dd-MM-yyyy, HH:mm:ss"),
+                AssignedAtFormatted = task.AssignedAt?.ToString("dd-MM-yyyy, HH:mm:ss"),
+                ReviewedAtFormatted = task.ReviewedAt?.ToString("dd-MM-yyyy, HH:mm:ss"),
+                CompletedAtFormatted = task.CompletedAt?.ToString("dd-MM-yyyy, HH:mm:ss"),
+                DueDateFormatted = task.DueDate?.ToString("dd-MM-yyyy, HH:mm:ss"),
                 CustomFields = customFields
             });
         }
@@ -488,6 +488,118 @@ namespace UserRoles.Controllers
         {
             var history = await _historyService.GetTaskHistory(taskId);
             return Ok(history);
+        }
+        // ═══════════════════════════════════════════════════════
+        //  BACKFILL DIGI LEADS CUSTOM FIELDS
+        // ═══════════════════════════════════════════════════════
+
+        [HttpPost("/api/Tasks/BackfillDigiLeads"), Authorize]
+        public async Task<IActionResult> BackfillDigiLeads()
+        {
+            // 1. Get all Digi Leads tasks
+            var tasks = await _context.TaskItems
+                .Where(t => t.TeamName == "Digi Leads" && !t.IsArchived)
+                .Include(t => t.CustomFieldValues)
+                .ToListAsync();
+
+            // 2. Ensure custom fields exist
+            var fieldDefs = new (string Name, int Order)[]
+            {
+                ("Full Name", 1), ("Phone", 2), ("Email", 3),
+                ("Company Name", 4), ("Country", 5),
+                ("What Best Describes Your Business", 6),
+                ("What Are You Looking To Launch", 7)
+            };
+
+            var dbFields = new Dictionary<string, TaskCustomField>();
+            foreach (var (name, order) in fieldDefs)
+            {
+                var field = await _context.TaskCustomFields
+                    .FirstOrDefaultAsync(f => f.TeamName == "Digi Leads" && f.FieldName == name);
+                if (field == null)
+                {
+                    field = new TaskCustomField
+                    {
+                        TeamName = "Digi Leads", FieldName = name,
+                        FieldType = "String", Order = order, IsActive = true
+                    };
+                    _context.TaskCustomFields.Add(field);
+                    await _context.SaveChangesAsync();
+                }
+                dbFields[name] = field;
+            }
+
+            // 3. Backfill values for each task
+            int updated = 0;
+            foreach (var task in tasks)
+            {
+                if (string.IsNullOrEmpty(task.Description)) continue;
+
+                var existingFieldIds = task.CustomFieldValues?
+                    .Where(v => !string.IsNullOrWhiteSpace(v.Value))
+                    .Select(v => v.FieldId)
+                    .ToHashSet() ?? new HashSet<int>();
+
+                // Build extraction map: field name → aliases to search in description
+                var extractionMap = new Dictionary<string, string[]>
+                {
+                    ["Full Name"]  = new[] { "Full Name", "Name" },
+                    ["Phone"]      = new[] { "Phone" },
+                    ["Email"]      = new[] { "Email" },
+                    ["Company Name"] = new[] { "Company Name" },
+                    ["Country"]    = new[] { "Country" },
+                    ["What Best Describes Your Business"] = new[] { "What Best Describes Your Business" },
+                    ["What Are You Looking To Launch"]    = new[] { "What Are You Looking To Launch" }
+                };
+
+                bool taskModified = false;
+                foreach (var kvp in extractionMap)
+                {
+                    var field = dbFields[kvp.Key];
+                    if (existingFieldIds.Contains(field.Id)) continue; // Already has data
+
+                    string? value = null;
+                    foreach (var alias in kvp.Value)
+                    {
+                        value = ExtractFieldFromDescription(task.Description, alias);
+                        if (value != null) break;
+                    }
+
+                    // Fallback: for Full Name use Title
+                    if (value == null && kvp.Key == "Full Name")
+                        value = task.Title;
+
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        _context.TaskFieldValues.Add(new TaskFieldValue
+                        {
+                            TaskId = task.Id,
+                            FieldId = field.Id,
+                            Value = value
+                        });
+                        taskModified = true;
+                    }
+                }
+                if (taskModified) updated++;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = $"Backfilled {updated} of {tasks.Count} Digi Leads tasks." });
+        }
+
+        /// <summary>Extracts a value from the lead description markdown using the pattern **Key:** Value</summary>
+        private string? ExtractFieldFromDescription(string description, string fieldName)
+        {
+            // Match: **FieldName:** Value  (with optional leading "- ")
+            var pattern = $@"\*\*{System.Text.RegularExpressions.Regex.Escape(fieldName)}:\*\*\s*(.+)";
+            var match = System.Text.RegularExpressions.Regex.Match(
+                description, pattern,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+            if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value))
+                return match.Groups[1].Value.Trim();
+
+            return null;
         }
     }
 }

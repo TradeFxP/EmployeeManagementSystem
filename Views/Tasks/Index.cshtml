@@ -37,6 +37,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
     .modal-action-buttons {
@@ -2103,6 +2105,11 @@
                     fetchVirtualLeads();
                 }
 
+                // Initialize plugins/filters for Digi Leads
+                if (typeof initDigiLeadsFilters === 'function') {
+                    initDigiLeadsFilters();
+                }
+
                 // Execute scripts from the dynamically loaded content
                 executeDynamicScripts(container);
 
@@ -2399,14 +2406,46 @@
                                                          </div>`;
                                             } else if (trimmed.includes(':**')) {
                                                 const parts = trimmed.split(':**');
-                                                const key = parts[0].trim('*', ' ');
-                                                const val = parts[1].trim();
+                                                const key = parts[0].replace(/\*/g, '').trim();
+                                                let val = parts[1].trim();
+                                                
+                                                // Standardize date format if value looks like an ISO date
+                                                if ((key.toLowerCase().includes('date') || key.toLowerCase().includes('created at')) && val.includes('T')) {
+                                                    try {
+                                                        const d = new Date(val);
+                                                        if (!isNaN(d.getTime())) {
+                                                            const day = String(d.getDate()).padStart(2, '0');
+                                                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                            const year = d.getFullYear();
+                                                            const hours = String(d.getHours()).padStart(2, '0');
+                                                            const mins = String(d.getMinutes()).padStart(2, '0');
+                                                            const secs = String(d.getSeconds()).padStart(2, '0');
+                                                            val = `${day}-${month}-${year}, ${hours}:${mins}:${secs}`;
+                                                        }
+                                                    } catch(e) {}
+                                                }
                                                 fieldsInRow.push({ key, val });
                                                 if (fieldsInRow.length === 3) html += renderFields();
                                             } else if (trimmed.startsWith('- **') && trimmed.includes(':**')) {
                                                 const parts = trimmed.split(':**');
-                                                const key = parts[0].replace('- **', '').trim();
-                                                const val = parts[1].trim();
+                                                const key = parts[0].replace('- **', '').replace(/\*/g, '').trim();
+                                                let val = parts[1].trim();
+
+                                                // Standardize date format if value looks like an ISO date
+                                                if ((key.toLowerCase().includes('date') || key.toLowerCase().includes('created at')) && val.includes('T')) {
+                                                    try {
+                                                        const d = new Date(val);
+                                                        if (!isNaN(d.getTime())) {
+                                                            const day = String(d.getDate()).padStart(2, '0');
+                                                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                            const year = d.getFullYear();
+                                                            const hours = String(d.getHours()).padStart(2, '0');
+                                                            const mins = String(d.getMinutes()).padStart(2, '0');
+                                                            const secs = String(d.getSeconds()).padStart(2, '0');
+                                                            val = `${day}-${month}-${year}, ${hours}:${mins}:${secs}`;
+                                                        }
+                                                    } catch(e) {}
+                                                }
                                                 fieldsInRow.push({ key, val });
                                                 if (fieldsInRow.length === 3) html += renderFields();
                                             } else if (trimmed.startsWith('*Synced on')) {
@@ -2560,7 +2599,18 @@
                                         ${points.map(p => `
                                             <tr>
                                                 <td class="fw-700">${escapeHtml(p.u || 'Unknown')} <small class="d-block text-muted opacity-50">${escapeHtml(p.r || 'Member')}</small></td>
-                                                <td class="text-muted small">${p.d ? new Date(p.d).toLocaleString() : 'N/A'}</td>
+                                                <td class="text-muted small">${(() => {
+                                                    if (!p.d) return 'N/A';
+                                                    const d = new Date(p.d);
+                                                    if (isNaN(d.getTime())) return p.d;
+                                                    const day = String(d.getDate()).padStart(2, '0');
+                                                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                                                    const year = d.getFullYear();
+                                                    const hours = String(d.getHours()).padStart(2, '0');
+                                                    const mins = String(d.getMinutes()).padStart(2, '0');
+                                                    const secs = String(d.getSeconds()).padStart(2, '0');
+                                                    return `${day}-${month}-${year}, ${hours}:${mins}:${secs}`;
+                                                })()}</td>
                                                 <td>${escapeHtml(p.t || '')}</td>
                                             </tr>
                                         `).join('')}
@@ -3038,6 +3088,7 @@
         const assigneeFilter = document.getElementById('assigneeFilter')?.value || "";
         const adminFilter = document.getElementById('adminAssignedFilter')?.value || "";
         const formIdFilter = document.getElementById('formIdFilter')?.value || "";
+        const dateFilter = document.getElementById('leadDateFilter')?.value || "";
 
         const cards = document.querySelectorAll('.task-card');
 
@@ -3060,11 +3111,34 @@
             const cardFormId = card.dataset.formId || "";
             const matchesFormId = !formIdFilter || cardFormId === formIdFilter;
 
-            // 3. Assignee
+            // 4. Assignee
             const cardAssigneeId = card.dataset.assignedToId || "";
             const matchesAssignee = !assigneeFilter || cardAssigneeId === assigneeFilter;
 
-            // 4. Filter by Assignor
+            // 5. Lead Creation Date Filter
+            let matchesDate = true;
+            if (dateFilter) {
+                const metaDateStr = card.dataset.metaCreatedAt || ""; 
+                const createdDateStr = card.dataset.createdAt || "";
+                
+                // Prefer MetaCreatedAt, fallback to CreatedAt
+                const targetDateStr = metaDateStr || createdDateStr;
+
+                if (targetDateStr) {
+                    // targetDateStr could be ISO (2024-03-07T...) or other
+                    const cardDate = targetDateStr.split('T')[0]; // YYYY-MM-DD
+                    
+                    // dateFilter is DD-MM-YYYY
+                    const parts = dateFilter.split('-');
+                    const formattedFilter = `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD
+                    
+                    matchesDate = (cardDate === formattedFilter);
+                } else {
+                    matchesDate = false;
+                }
+            }
+
+            // 6. Filter by Assignor
             const cardAssignorId = card.dataset.assignedByUserId || "";
             const currentAssigneeId = card.dataset.assignedToId || "";
             const rolesMap = window.userRolesMap || {};
@@ -3105,7 +3179,7 @@
             }
 
             // Combine all
-            if (matchesSearch && matchesPriority && matchesAssignee && matchesAssignor && matchesFormId) {
+            if (matchesSearch && matchesPriority && matchesAssignee && matchesAssignor && matchesFormId && matchesDate) {
                 card.style.display = "block";
                 card.classList.remove('d-none');
             } else {
@@ -3113,6 +3187,19 @@
                 card.classList.add('d-none');
             }
         });
+
+        // Update lead count badge for Digi Leads if date filter is active
+        const countBadge = document.getElementById('leadDateCountBadge');
+        const countSection = document.getElementById('leadDateCountSection');
+        if (countBadge && countSection) {
+            const visibleLeads = Array.from(cards).filter(c => !c.classList.contains('d-none')).length;
+            countBadge.innerText = visibleLeads;
+            if (dateFilter) {
+                countSection.classList.remove('d-none');
+            } else {
+                countSection.classList.add('d-none');
+            }
+        }
 
         // ✅ Update the count badges to reflect the current filtered view
         updateColumnCounts();

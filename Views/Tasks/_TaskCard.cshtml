@@ -66,6 +66,7 @@
      data-review-status="@reviewStatusInt"
      data-external-lead-id="@Model.ExternalLeadId"
      data-form-id="@Model.FormId"
+     data-meta-created-at="@Model.MetaCreatedAt"
      onclick="if (!this._isDragging && !event.target.closest('.task-actions, .task-assign-container, button, select, input')) focusTask(@Model.Id)">
 
     <!-- TOP ROW: Due Date & Priority (left) + Task ID & Review Status (right) -->
@@ -89,7 +90,7 @@
                               title="Due Date" 
                               style="font-size: 0.7rem; white-space: nowrap;">
                             <i class="bi bi-calendar-event text-danger"></i>
-                    @finalDueDate.Value.ToString("dd MMM yyyy, hh:mm tt")
+                    @finalDueDate.Value.ToString("dd-MM-yyyy, HH:mm:ss")
                         </span>
             }
 
@@ -188,7 +189,7 @@
                                     <span class="cf-label">@fv.Field.FieldName:</span>
                     @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
                     {
-                                                <span>@sdt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</span>
+                                                <span>@sdt.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</span>
                     }
                     else if (fv.Field.FieldType == "Image" && !string.IsNullOrEmpty(fv.Value))
                     {
@@ -259,21 +260,21 @@
             {
                                 <div class="assigned-row"><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
             }
-                    <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+                    <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</div>
                 </div>
     }
 
     @if (Model.ReviewedByUser != null && Model.ReviewedAt != null)
     {
                 <div class="task-meta mt-1">
-                    <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@(string.IsNullOrEmpty(Model.ReviewedByUser?.Name) ? Model.ReviewedByUser?.UserName : Model.ReviewedByUser.Name)</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+                    <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@(string.IsNullOrEmpty(Model.ReviewedByUser?.Name) ? Model.ReviewedByUser?.UserName : Model.ReviewedByUser.Name)</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</div>
                 </div>
     }
 
     @if (Model.CompletedByUser != null && Model.CompletedAt != null)
     {
                 <div class="task-meta mt-1">
-                    <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@(string.IsNullOrEmpty(Model.CompletedByUser?.Name) ? Model.CompletedByUser?.UserName : Model.CompletedByUser.Name)</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</div>
+                    <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@(string.IsNullOrEmpty(Model.CompletedByUser?.Name) ? Model.CompletedByUser?.UserName : Model.CompletedByUser.Name)</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</div>
                 </div>
     }
 

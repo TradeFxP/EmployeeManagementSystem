@@ -119,37 +119,40 @@ namespace UserRoles.Services
 
             if (column == null)
             {
-                _logger.LogWarning("DIAGNOSTIC: No 'To Do' column found for team 'Digi Leads'. Board might not be initialized properly. Skipping ingestion.");
+                _logger.LogWarning("DIAGNOSTIC: No 'To Do' column found for team 'Digi Leads'. Skipping ingestion.");
                 return;
             }
-            _logger.LogInformation("DIAGNOSTIC: Target column found for ingestion: {ColumnName} (ID: {ColumnId})", column.ColumnName, column.Id);
 
-            // 2. Find a default admin user to assign leads to
-            var adminUser = await userManager.FindByEmailAsync("admin@gmail.com");
-            if (adminUser == null)
-            {
-                // Fallback to any admin
-                adminUser = (await userManager.GetUsersInRoleAsync("Admin")).FirstOrDefault();
-            }
+            // 2. Find a default admin user
+            var adminUser = await userManager.FindByEmailAsync("admin@gmail.com") 
+                         ?? (await userManager.GetUsersInRoleAsync("Admin")).FirstOrDefault();
 
             if (adminUser == null)
             {
-                _logger.LogWarning("DIAGNOSTIC: No admin user found to assign leads. Please ensure at least one user has the 'Admin' role. Skipping ingestion.");
+                _logger.LogWarning("DIAGNOSTIC: No admin user found to assign leads. Skipping ingestion.");
                 return;
             }
-            _logger.LogInformation("DIAGNOSTIC: Leads will be assigned to user: {UserName} (ID: {UserId})", adminUser.UserName, adminUser.Id);
+
+            // 3. Cache existing Lead IDs and Custom Fields to minimize DB hits in the loop
+            var existingLeadIds = new HashSet<string>(
+                await dbContext.TaskItems
+                    .Where(t => t.TeamName == "Digi Leads" && t.ExternalLeadId != null)
+                    .Select(t => t.ExternalLeadId!)
+                    .ToListAsync(stoppingToken)
+            );
+
+            var customFields = await dbContext.TaskCustomFields
+                .Where(f => f.TeamName == "Digi Leads")
+                .ToListAsync(stoppingToken);
 
             if (_formIds == null || !_formIds.Any())
             {
-                // Refresh Form IDs in case config changed
                 _formIds = _configuration.GetSection("FacebookLeads:FormIds").Get<string[]>() ?? Array.Empty<string>();
             }
 
-            if (!_formIds.Any())
-            {
-                _logger.LogWarning("No Facebook Form IDs configured. Skipping ingestion.");
-                return;
-            }
+            if (!_formIds.Any()) return;
+
+            var newLeadsData = new List<(TaskItem Task, FacebookLeadDto Lead)>();
 
             foreach (var formId in _formIds)
             {
@@ -158,75 +161,65 @@ namespace UserRoles.Services
                 _logger.LogInformation("Polling leads for Form ID: {FormId}", formId);
                 var leads = await leadsService.FetchLeadsAsync(formId);
                 
-                if (leads == null)
-                {
-                    _logger.LogWarning("DIAGNOSTIC: API returned null for Form ID: {FormId}", formId);
-                    continue;
-                }
-
-                _logger.LogInformation("DIAGNOSTIC: Found {Count} leads from API for Form ID: {FormId}", leads.Count, formId);
-                if (!leads.Any()) continue;
-
-                var newLeadsToBroadcast = new List<TaskItem>();
+                if (leads == null || !leads.Any()) continue;
 
                 foreach (var leadDto in leads)
                 {
                     string externalId = leadDto.Id.ToString();
-                    bool alreadyExists = await dbContext.TaskItems.AnyAsync(t => t.ExternalLeadId == externalId, stoppingToken);
+                    if (existingLeadIds.Contains(externalId)) continue;
 
-                    if (!alreadyExists)
+                    var task = new TaskItem
                     {
-                        var task = new TaskItem
-                        {
-                            ExternalLeadId = externalId,
-                            FormId = formId,
-                            Title = leadDto.Name ?? $"Lead {externalId}",
-                            Description = FormatLeadDescription(leadDto, formId),
-                            TeamName = "Digi Leads",
-                            ColumnId = column.Id,
-                            Priority = Models.Enums.TaskPriority.Medium,
-                            Status = Models.Enums.TaskStatus.ToDo,
-                            CreatedByUserId = adminUser.Id,
-                            CreatedAt = DateTime.UtcNow,
-                            AssignedToUserId = adminUser.Id,
-                            AssignedByUserId = adminUser.Id,
-                            AssignedAt = DateTime.UtcNow,
-                            CurrentColumnEntryAt = DateTime.UtcNow
-                        };
+                        ExternalLeadId = externalId,
+                        FormId = formId,
+                        Title = leadDto.Name ?? $"Lead {externalId}",
+                        Description = FormatLeadDescription(leadDto, formId),
+                        MetaCreatedAt = leadDto.MetaCreatedAt,
+                        TeamName = "Digi Leads",
+                        ColumnId = column.Id,
+                        Priority = Models.Enums.TaskPriority.Medium,
+                        Status = Models.Enums.TaskStatus.ToDo,
+                        CreatedByUserId = adminUser.Id,
+                        CreatedAt = DateTime.UtcNow,
+                        AssignedToUserId = adminUser.Id,
+                        AssignedByUserId = adminUser.Id,
+                        AssignedAt = DateTime.UtcNow,
+                        CurrentColumnEntryAt = DateTime.UtcNow
+                    };
 
-                        dbContext.TaskItems.Add(task);
-                        newLeadsToBroadcast.Add(task);
-                    }
-                    else
-                    {
-                        _logger.LogDebug("DIAGNOSTIC: Lead {ExternalId} already exists in database. Skipping.", externalId);
-                    }
+                    dbContext.TaskItems.Add(task);
+                    newLeadsData.Add((task, leadDto));
+                    existingLeadIds.Add(externalId);
                 }
+            }
 
-                if (newLeadsToBroadcast.Any())
+            if (newLeadsData.Any())
+            {
+                // 1. Save all tasks first to generate Task IDs
+                await dbContext.SaveChangesAsync(stoppingToken);
+
+                // 2. Map all new leads to custom fields using cached fields
+                foreach (var (task, leadDto) in newLeadsData)
                 {
-                    await dbContext.SaveChangesAsync(stoppingToken);
-                    _logger.LogInformation("Saved {Count} new leads for form {FormId}.", newLeadsToBroadcast.Count, formId);
-
-                    // Broadcast to SignalR
-                    try
-                    {
-                        await hubContext.Clients.Group("Digi Leads").SendAsync("NewLeadsDetected", new
-                        {
-                            leads = newLeadsToBroadcast.Select(t => new { 
-                                id = t.Id, 
-                                title = t.Title, 
-                                externalLeadId = t.ExternalLeadId,
-                                formId = t.FormId
-                            }),
-                            columnId = column.Id
-                        }, stoppingToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to broadcast NewLeadsDetected for form {FormId}.", formId);
-                    }
+                    await MapLeadToCustomFields(dbContext, task, leadDto, customFields, stoppingToken);
                 }
+
+                // 3. Final save for all custom field values
+                await dbContext.SaveChangesAsync(stoppingToken);
+                
+                _logger.LogInformation("Successfully ingested {Count} new leads.", newLeadsData.Count);
+
+                // 4. Broadcast via SignalR
+                await hubContext.Clients.Group("Digi Leads").SendAsync("NewLeadsDetected", new
+                {
+                    leads = newLeadsData.Select(d => new { 
+                        id = d.Task.Id, 
+                        title = d.Task.Title, 
+                        externalLeadId = d.Task.ExternalLeadId, 
+                        formId = d.Task.FormId 
+                    }),
+                    columnId = column.Id
+                }, stoppingToken);
             }
         }
 
@@ -260,6 +253,7 @@ namespace UserRoles.Services
                     FormId = formId,
                     Title = leadDto.Name ?? $"Lead {externalId}",
                     Description = FormatLeadDescription(leadDto, formId),
+                    MetaCreatedAt = leadDto.MetaCreatedAt,
                     TeamName = "Digi Leads",
                     ColumnId = column.Id,
                     Priority = Models.Enums.TaskPriority.Medium,
@@ -275,6 +269,14 @@ namespace UserRoles.Services
                 dbContext.TaskItems.Add(task);
                 await dbContext.SaveChangesAsync(stoppingToken);
 
+                // Re-fetch or pass cached fields if we want to optimize real-time too
+                var cachedFields = await dbContext.TaskCustomFields
+                    .Where(f => f.TeamName == "Digi Leads")
+                    .ToListAsync(stoppingToken);
+
+                await MapLeadToCustomFields(dbContext, task, leadDto, cachedFields, stoppingToken);
+                await dbContext.SaveChangesAsync(stoppingToken);
+
                 // Broadcast locally
                 await hubContext.Clients.Group("Digi Leads").SendAsync("NewLeadsDetected", new
                 {
@@ -282,6 +284,60 @@ namespace UserRoles.Services
                     columnId = column.Id
                 }, stoppingToken);
             }
+        }
+
+        private async Task MapLeadToCustomFields(AppDbContext dbContext, TaskItem task, FacebookLeadDto leadDto, List<TaskCustomField> cachedFields, CancellationToken stoppingToken)
+        {
+            var fieldsToMap = new List<(string Name, string Value, int Order)>
+            {
+                ("Full Name", leadDto.Name, 1),
+                ("Phone", leadDto.Phone, 2),
+                ("Email", leadDto.Email, 3),
+                ("Company Name", GetLeadFieldValue(leadDto, "company_name"), 4),
+                ("Country", GetLeadFieldValue(leadDto, "country"), 5),
+                ("What Best Describes Your Business", GetLeadFieldValue(leadDto, "what_best_describes_your_business?"), 6),
+                ("What Are You Looking To Launch", GetLeadFieldValue(leadDto, "what_are_you_looking_to_launch?"), 7)
+            };
+
+            foreach (var (name, value, order) in fieldsToMap)
+            {
+                if (string.IsNullOrEmpty(value)) continue;
+
+                var field = cachedFields.FirstOrDefault(f => f.FieldName == name);
+
+                if (field == null)
+                {
+                    field = new TaskCustomField
+                    {
+                        TeamName = "Digi Leads",
+                        FieldName = name,
+                        FieldType = "String",
+                        Order = order,
+                        IsActive = true
+                    };
+                    dbContext.TaskCustomFields.Add(field);
+                    cachedFields.Add(field);
+                    // We must save to get the FieldId if it's new, but we can do it once per new field type discovery.
+                    // For the sake of minimizing connections, discovers are rare.
+                    await dbContext.SaveChangesAsync(stoppingToken); 
+                }
+
+                dbContext.TaskFieldValues.Add(new TaskFieldValue
+                {
+                    TaskId = task.Id,
+                    FieldId = field.Id,
+                    Value = value
+                });
+            }
+        }
+
+        private string? GetLeadFieldValue(FacebookLeadDto lead, string key)
+        {
+            if (lead.Fields != null && lead.Fields.TryGetValue(key, out var val))
+            {
+                return val?.ToString();
+            }
+            return null;
         }
 
         private string FormatLeadDescription(FacebookLeadDto lead, string formId)

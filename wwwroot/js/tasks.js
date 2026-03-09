@@ -1,6 +1,13 @@
 // tasks.js
 // Single responsibility: load boards into right panel
 
+// Initialize on page load in case board is already present
+$(document).ready(function () {
+    if (typeof initDigiLeadsFilters === 'function') {
+        initDigiLeadsFilters();
+    }
+});
+
 $(document).ready(function () {
 
     let currentBoardXhr = null;
@@ -35,6 +42,11 @@ $(document).ready(function () {
             success: function (html) {
                 $("#taskBoardContainer").html(html);
                 currentBoardXhr = null;
+
+                // Initialize plugins for the new board
+                if (typeof initDigiLeadsFilters === 'function') {
+                    initDigiLeadsFilters();
+                }
             },
             error: function (xhr, status, error) {
                 if (status === 'abort') return;
@@ -47,6 +59,55 @@ $(document).ready(function () {
     });
 
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Digi Leads - Calendar Filter Functions
+// ─────────────────────────────────────────────────────────────────────────────
+function initDigiLeadsFilters() {
+    const dateFilterGroup = document.getElementById('leadDateFilterGroup');
+    if (dateFilterGroup) {
+        flatpickr(dateFilterGroup, {
+            wrap: true, // This allows the calendar icon (data-toggle) and input (data-input) to trigger the picker
+            dateFormat: "d-m-Y",
+            allowInput: true,
+            disableMobile: "true", // Better UI on desktop
+            onChange: function (selectedDates, dateStr, instance) {
+                if (typeof filterBoardTasks === 'function') {
+                    filterBoardTasks();
+                }
+            }
+        });
+    }
+}
+
+function setLeadDateToday() {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    const dateStr = `${day}-${month}-${year}`;
+
+    const input = document.getElementById('leadDateFilter');
+    if (input && input._flatpickr) {
+        input._flatpickr.setDate(dateStr, true);
+    }
+}
+
+function clearLeadDateFilter() {
+    const group = document.getElementById('leadDateFilterGroup');
+    const input = document.getElementById('leadDateFilter');
+    const fp = (group && group._flatpickr) || (input && input._flatpickr);
+
+    if (fp) {
+        fp.clear();
+    } else if (input) {
+        input.value = "";
+    }
+
+    if (typeof filterBoardTasks === 'function') {
+        filterBoardTasks();
+    }
+}
 
 
 // Task creation is handled by submitCreateTask function in this file.
@@ -319,9 +380,20 @@ async function openEditTaskModal(taskId) {
             if (group) group.style.display = visible ? 'block' : 'none';
         });
 
+        // Restricted Lead Fields for Digi Leads and Sales1
+        const isAdmin = window.isAdmin === true || window.currentUserRole === 'Admin';
+        const isLeadTeam = team === 'Digi Leads' || team === 'sales1';
+        if (isLeadTeam && !isAdmin) {
+            if (descEl) descEl.readOnly = true;
+            if (titleEl) titleEl.readOnly = true;
+        } else {
+            if (descEl) descEl.readOnly = false;
+            if (titleEl) titleEl.readOnly = false;
+        }
+
         // Render custom fields
         if (typeof renderCustomFieldInputs === 'function') {
-            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team);
+            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team, task.description);
         }
 
         const modalEl = document.getElementById('editTaskModal');
