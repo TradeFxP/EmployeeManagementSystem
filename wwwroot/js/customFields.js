@@ -4,6 +4,30 @@ window.customFieldsCache = window.customFieldsCache || null;
 
 // â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+/** Extracts a value from the lead description markdown using the pattern **Key:** Value */
+function extractLeadField(description, fieldName) {
+    if (!description) return null;
+
+    // Normalize field name for matching (e.g., FULL_NAME -> Full Name)
+    const normalizedSearchName = fieldName.replace(/_/g, ' ').trim();
+    const escapedName = normalizedSearchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Try matching both original and normalized name, case-insensitive
+    // Patterns: **Full Name:** or **FULL_NAME:**
+    const patterns = [
+        new RegExp(`\\*\\*${escapedName}:\\*\\*\\s*(.+)`, 'im'),
+        new RegExp(`\\*\\*${fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\*\\*\\s*(.+)`, 'im')
+    ];
+
+    for (const pattern of patterns) {
+        const match = description.match(pattern);
+        if (match && match[1]) {
+            return match[1].trim();
+        }
+    }
+    return null;
+}
+
 /** Bust the cache and re-render fields in whichever modals are currently open. */
 async function refreshOpenModals() {
     window.customFieldsCache = null;
@@ -49,7 +73,7 @@ async function loadCustomFields(team) {
 }
 
 // Render custom field inputs in a form - NOW ASYNC
-async function renderCustomFieldInputs(containerId, existingValues = {}, team = null) {
+async function renderCustomFieldInputs(containerId, existingValues = {}, team = null, description = null) {
     const container = document.getElementById(containerId);
     if (!container) {
         console.error('Container not found:', containerId);
@@ -92,7 +116,27 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
 
     console.log(`Rendering ${fields.length} custom fields`);
 
+    const isLeadTeam = team === 'Digi Leads' || team === 'sales1';
+    const isAdmin = window.isAdmin === true || window.currentUserRole === 'Admin';
+    const leadFields = [
+        "Full Name", "FULL_NAME",
+        "Phone", "PHONE",
+        "Email", "EMAIL",
+        "Company Name", "COMPANY_NAME",
+        "Country", "COUNTRY",
+        "What Best Describes Your Business", "LEAD TYPE",
+        "What Are You Looking To Launch", "BUSINESS_TYPE"
+    ];
+
     fields.forEach(field => {
+        // For Lead Teams, if value is missing from DB, try to extract from description
+        if (isLeadTeam && description && (!existingValues[field.id] || existingValues[field.id].length === 0)) {
+            const extracted = extractLeadField(description, field.fieldName);
+            if (extracted) {
+                existingValues[field.id] = extracted;
+            }
+        }
+
         const fieldGroup = document.createElement('div');
         fieldGroup.className = 'field-group position-relative p-0';
 
@@ -407,6 +451,9 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                         return `<input type="hidden" data-field-id="${field.id}" value="${val}" />`;
                     }).join('');
 
+                    const isLeadField = isLeadTeam && leadFields.some(lf => field.fieldName.toUpperCase() === lf.toUpperCase() || field.fieldName.replace(/ /g, '_').toUpperCase() === lf.toUpperCase());
+                    const canEditRemarks = isAdmin || !isLeadField;
+
                     input.innerHTML = `
                         <div class="remarks-split-container d-flex flex-column flex-md-row gap-3 p-3 bg-white border border-secondary-subtle rounded-3 shadow-sm" style="min-height: 250px;">
 
@@ -422,7 +469,7 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
                                 </div>
                             </div>
                             <!-- Left: Input Area (40%) -->
-                            <div class="remarks-input-side" style="flex: 0 0 40%; border-right: 1px solid #f1f5f9; padding-right: 15px;">
+                            <div class="remarks-input-side ${canEditRemarks ? '' : 'd-none'}" style="flex: 0 0 40%; border-right: 1px solid #f1f5f9; padding-right: 15px;">
                                 <div class="mb-2">
                                     <label class="x-small fw-bold text-muted mb-1" style="font-size: 10px; text-transform: uppercase;">New Remark Point</label>
                                     <textarea class="form-control border-light-subtle bg-light shadow-none" 
@@ -469,8 +516,26 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         if (field.fieldType !== 'Image') {
             input.id = `field_${field.id}`;
             input.value = existingValues[field.id] || '';
+
+            // Restricted Lead Fields
+            const isLeadField = isLeadTeam && leadFields.some(lf => field.fieldName.toUpperCase() === lf.toUpperCase() || field.fieldName.replace(/ /g, '_').toUpperCase() === lf.toUpperCase());
+
+            if (isLeadField && !isAdmin) {
+                input.disabled = true;
+                input.title = "Lead data can only be edited by administrators";
+            }
+
             fieldGroup.appendChild(input);
         } else {
+            // For Image fields, if we want to restrict uploads
+            const isLeadField = isLeadTeam && leadFields.some(lf => field.fieldName.toUpperCase() === lf.toUpperCase() || field.fieldName.replace(/ /g, '_').toUpperCase() === lf.toUpperCase());
+
+            if (isLeadField && !isAdmin) {
+                const uploadInput = input.querySelector('input[type="file"]');
+                if (uploadInput) uploadInput.disabled = true;
+                const delBtns = input.querySelectorAll('.btn-outline-danger');
+                delBtns.forEach(b => b.classList.add('d-none'));
+            }
             fieldGroup.appendChild(input);
         }
 

@@ -22,13 +22,21 @@ namespace UserRoles.Services
             _configuration = configuration;
         }
 
-        public async Task<List<FacebookLeadDto>> FetchLeadsAsync()
+        public async Task<List<FacebookLeadDto>> FetchLeadsAsync(string? formId = null)
         {
             try
             {
-                string apiUrl = _configuration["FacebookLeads:ApiUrl"] ?? "";
+                string baseUrl = _configuration["FacebookLeads:BaseUrl"] ?? "https://crmsocial.metagensoft.com/api/facebook/leads";
+                string apiUrl = string.IsNullOrEmpty(formId) ? baseUrl : $"{baseUrl}?formId={formId}";
+
                 _logger.LogInformation("Fetching leads from Facebook API: {Url}", apiUrl);
                 var leads = await _httpClient.GetFromJsonAsync<List<FacebookLeadDto>>(apiUrl);
+                
+                if (leads != null && !string.IsNullOrEmpty(formId))
+                {
+                    foreach(var lead in leads) lead.FormId = formId;
+                }
+
                 return leads ?? new List<FacebookLeadDto>();
             }
             catch (Exception ex)
