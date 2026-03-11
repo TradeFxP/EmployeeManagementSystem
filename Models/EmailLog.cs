@@ -41,10 +41,24 @@ namespace UserRoles.Models
         public Users? SentByUser { get; set; }
 
         /// <summary>
-        /// Categorizes the email: AccountCreated, PasswordReset, AdminEmailChange, Other
+        /// Links the communication log to a specific lead/task.
+        /// </summary>
+        public int? TaskId { get; set; }
+
+        [ForeignKey("TaskId")]
+        public TaskItem? Task { get; set; }
+
+        /// <summary>
+        /// Categorizes the email: AccountCreated, PasswordReset, AdminEmailChange, WhatsApp, Other
         /// </summary>
         [Required]
         [MaxLength(50)]
         public string EmailType { get; set; } = "Other";
+
+        /// <summary>
+        /// The sender email address used for this communication.
+        /// </summary>
+        [MaxLength(256)]
+        public string? FromEmail { get; set; }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace UserRoles.Services
+namespace UserRoles.Services
 {
     public interface IEmailService
     {
@@ -15,6 +15,20 @@
             string subject,
             string htmlBody,
             string emailType = "Other",
-            string? sentByUserId = null);
+            string? sentByUserId = null,
+            int? taskId = null);
+
+        /// <summary>
+        /// Sends an email via SMTP (Outlook) and logs the result.
+        /// </summary>
+        Task SendEmailSmtpAsync(
+            string toEmail,
+            string subject,
+            string htmlBody,
+            string emailType = "Other",
+            string? sentByUserId = null,
+            string? fromEmail = null,
+            string? fromName = null,
+            int? taskId = null);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -31,7 +31,8 @@ namespace UserRoles.Services
             string subject,
             string htmlBody,
             string emailType = "Other",
-            string? sentByUserId = null)
+            string? sentByUserId = null,
+            int? taskId = null)
         {
             var log = new EmailLog
             {
@@ -39,6 +40,7 @@ namespace UserRoles.Services
                 Subject = subject,
                 EmailType = emailType,
                 SentByUserId = sentByUserId,
+                TaskId = taskId,
                 SentAt = DateTime.UtcNow
             };
 
@@ -148,6 +150,76 @@ namespace UserRoles.Services
                     _logger.LogError(dbEx,
                         "Failed to save email log for {ToEmail}. Status: {Status}",
                         toEmail, log.Status);
+                }
+            }
+        }
+        public async Task SendEmailSmtpAsync(
+            string toEmail,
+            string subject,
+            string htmlBody,
+            string emailType = "Other",
+            string? sentByUserId = null,
+            string? fromEmail = null,
+            string? fromName = null,
+            int? taskId = null)
+        {
+            var log = new EmailLog
+            {
+                ToEmail = toEmail,
+                Subject = subject,
+                EmailType = emailType,
+                SentByUserId = sentByUserId,
+                TaskId = taskId,
+                FromEmail = fromEmail,
+                SentAt = DateTime.UtcNow
+            };
+
+            try
+            {
+                _logger.LogInformation("Sending SMTP email via {Server}:{Port} using user credentials for {Username}", _settings.Outlook.SmtpServer, _settings.Outlook.Port, _settings.Outlook.Username);
+
+                using (var client = new System.Net.Mail.SmtpClient(_settings.Outlook.SmtpServer, _settings.Outlook.Port))
+                {
+                    client.EnableSsl = _settings.Outlook.UseStartTls || _settings.Outlook.UseSsl;
+                    client.Credentials = new System.Net.NetworkCredential(_settings.Outlook.Username, _settings.Outlook.Password);
+
+                    var senderAddress = fromEmail ?? _settings.FromAddress;
+                    var senderName = fromName ?? _settings.FromName;
+
+                    _logger.LogInformation("SMTP From: {FromAddress} ({FromName}), To: {ToEmail}", senderAddress, senderName, toEmail);
+
+                    var mailMessage = new System.Net.Mail.MailMessage
+                    {
+                        From = new System.Net.Mail.MailAddress(senderAddress, senderName),
+                        Subject = subject,
+                        Body = htmlBody,
+                        IsBodyHtml = true,
+                    };
+                    mailMessage.To.Add(toEmail);
+
+                    await client.SendMailAsync(mailMessage);
+                }
+
+                log.Status = "Sent";
+                _logger.LogInformation("Email sent successfully via SMTP to {ToEmail}", toEmail);
+            }
+            catch (Exception ex)
+            {
+                log.Status = "Failed";
+                log.ErrorMessage = ex.Message.Length > 2000 ? ex.Message.Substring(0, 2000) : ex.Message;
+                _logger.LogError(ex, "Failed to send email via SMTP to {ToEmail}", toEmail);
+                throw; // Re-throw so the controller knows it failed
+            }
+            finally
+            {
+                try
+                {
+                    _context.EmailLogs.Add(log);
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception dbEx)
+                {
+                    _logger.LogError(dbEx, "Failed to save SMTP email log");
                 }
             }
         }

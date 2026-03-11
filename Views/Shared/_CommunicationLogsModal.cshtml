@@ -1,0 +1,43 @@
+<div class="modal fade" id="communicationLogsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+            <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-clock-history me-2"></i> Communication Logs
+                    <span id="logTeamNameTitle" style="font-size: 0.9em; opacity: 0.8; font-weight: normal; margin-left: 8px;"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background-color: #f8fafc;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i> Showing all email and WhatsApp communications for leads on this board.</p>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshCommunicationLogs()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+                </div>
+                
+                <div class="table-responsive bg-white rounded shadow-sm border" style="max-height: 400px;">
+                    <table class="table table-hover table-striped mb-0" id="communicationLogsTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="border-top: none;">Date & Time</th>
+                                <th style="border-top: none;">Lead Name</th>
+                                <th style="border-top: none;">Action</th>
+                                <th style="border-top: none;">From</th>
+                                <th style="border-top: none;">To</th>
+                                <th style="border-top: none;">Status</th>
+                                <th style="border-top: none;">Sent By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="communicationLogsTbody">
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading logs...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

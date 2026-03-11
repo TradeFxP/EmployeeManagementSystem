@@ -1,4 +1,4 @@
-﻿@using UserRoles.ViewModels
+@using UserRoles.ViewModels
 @using UserRoles.Models
 @inject Microsoft.AspNetCore.Identity.UserManager<Users> UserManager
 
@@ -8,7 +8,7 @@
     ViewData["Title"] = "Tasks";
     var userTeams = ViewBag.UserTeams as List<string> ?? new List<string>();
     var isAdmin = User.IsInRole("Admin");
-    var isManager = User.IsInRole("Manager");
+    var isManager = User.IsInRole("Manager");   
     var isSubManager = User.IsInRole("Sub-Manager") || User.IsInRole("SubManager");
     var canAssign = isAdmin || isManager || isSubManager;
 }
@@ -306,6 +306,133 @@
         padding: 2px 8px;
         border-radius: 4px;
         display: inline-block;
+    }
+
+    /* ---- QUICK ASSIGN UI ---- */
+
+    .quick-assign-wrapper {
+        position: relative !important;
+        display: inline-block !important;
+        z-index: 1050;
+    }
+
+    /* The dropdown popup: FIXED position to escape ALL overflow constraints */
+    .quick-assign-dropdown {
+        position: fixed !important;
+        width: 300px;
+        background: #fff;
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 -8px 30px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.05);
+        z-index: 99999 !important;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .quick-assign-dropdown.show {
+        display: flex;
+        animation: qaFadeIn 0.15s ease-out;
+    }
+
+    @@keyframes qaFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Search bar inside the dropdown */
+    .quick-assign-search {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+        flex-shrink: 0;
+    }
+
+    .quick-assign-search .form-control {
+        border-radius: 6px !important;
+        font-size: 0.85rem;
+        padding: 6px 10px;
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1;
+    }
+
+    .quick-assign-search .form-control:focus {
+        border-color: #3b82f6;
+    }
+
+    /* The user list: strict height for ~2 items + scroll */
+    .quick-assign-list {
+        overflow-y: auto;
+        max-height: 120px;
+        background: white;
+    }
+
+    .quick-assign-group {
+        padding: 6px 12px 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        background: #f8fafc;
+        border-bottom: 1px solid #f1f5f9;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .quick-assign-item {
+        padding: 8px 12px;
+        display: block;
+        cursor: pointer;
+        transition: background 0.12s;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.85rem;
+        color: #334155;
+    }
+
+    .quick-assign-item:last-child {
+        border-bottom: none;
+    }
+
+    .quick-assign-item:hover {
+        background: #eff6ff;
+        color: #1e40af;
+    }
+
+    .quick-assign-item.selected {
+        background: #3b82f6;
+        color: white;
+    }
+
+    .quick-assign-name {
+        font-weight: 500;
+        font-size: 0.85rem;
+        color: inherit;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .quick-assign-empty-state {
+        padding: 20px 12px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.8rem;
+    }
+
+    .quick-assign-empty-state i {
+        font-size: 1.5rem;
+        display: block;
+        margin-bottom: 6px;
+        opacity: 0.5;
+    }
+
+    /* Prevent footer button resizing */
+    .modal-footer .btn {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
     }
 </style>
 
@@ -616,6 +743,7 @@
 
                 <div class="modal-body">
                     <input type="hidden" id="taskColumnId" />
+                    <input type="hidden" id="taskAssignedToUserId" />
 
                     <div class="mb-3" id="groupCreateTaskTitle">
                         <label class="form-label mb-1" id="labelCreateTaskTitle">Title</label>
@@ -659,14 +787,58 @@
                     @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SubManager") || User.IsInRole("User"))
                     {
                         <div class="me-auto d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-secondary px-3 fw-bold" style="border-radius: 8px;"
+                            <button class="btn btn-sm btn-outline-secondary px-3 fw-bold flex-shrink-0" style="border-radius: 8px; height: 38px; min-width: 140px;"
                                 onclick="openManageFieldsModal(); event.preventDefault();">
                                 <i class="bi bi-gear me-1"></i> Manage Fields
                             </button>
-                            <button class="btn btn-sm btn-outline-primary px-3 fw-bold" style="border-radius: 8px;"
+                            <button class="btn btn-sm btn-outline-primary px-3 fw-bold flex-shrink-0" style="border-radius: 8px; height: 38px; min-width: 110px;"
                                 onclick="addNewCustomField(); event.preventDefault();">
                                 <i class="bi bi-plus-lg me-1"></i> Add Field
                             </button> 
+
+                            <div class="quick-assign-wrapper">
+                                <button type="button" class="btn btn-sm btn-outline-info p-1" id="btnQuickAssign" style="border-radius: 8px;"
+                                    title="Quick Assign" onclick="toggleQuickAssign(); event.preventDefault();">
+                                    <i class="bi bi-person-plus fs-5"></i>
+                                </button>
+                                
+                                <div class="quick-assign-dropdown" id="quickAssignDropdown">
+                                    <!-- Search bar inside the dropdown -->
+                                    <div class="quick-assign-search">
+                                        <input type="text" id="quickAssignSearchInput" class="form-control" placeholder="Search member..." oninput="filterQuickAssignList()">
+                                    </div>
+                                    <!-- User list -->
+                                    <div class="quick-assign-list" id="quickAssignList">
+                                        @if (Model != null)
+                                        {
+                                            @if (Model.ManagementUsers != null && Model.ManagementUsers.Any())
+                                            {
+                                                <div class="quick-assign-group">Management</div>
+                                                @foreach (var u in Model.ManagementUsers)
+                                                {
+                                                    <div class="quick-assign-item" onclick="selectQuickAssignUser('@u.Id', '@u.Name', '@u.RoleName')" data-name="@u.Name" data-role="@u.RoleName" data-team="Management">
+                                                        <span class="quick-assign-name">[@u.RoleName] @u.Name</span>
+                                                    </div>
+                                                }
+                                            }
+
+                                            @if (Model.TeamGroups != null)
+                                            {
+                                                @foreach (var group in Model.TeamGroups)
+                                                {
+                                                    <div class="quick-assign-group">@group.TeamName Team</div>
+                                                    @foreach (var u in group.Users)
+                                                    {
+                                                        <div class="quick-assign-item" onclick="selectQuickAssignUser('@u.Id', '@u.Name', '@u.RoleName')" data-name="@u.Name" data-role="@u.RoleName" data-team="@group.TeamName">
+                                                            <span class="quick-assign-name">[@u.RoleName] @u.Name</span>
+                                                        </div>
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     }
                     <button class="btn btn-secondary px-4 fw-bold" style="border-radius: 8px;" data-bs-dismiss="modal">Cancel</button>
@@ -3804,6 +3976,50 @@ async function clearColumnTasks(columnId) {
     </div>
 </div>
 
+<!-- PER-TASK COMMUNICATION LOGS MODAL -->
+<div class="modal fade" id="taskCommLogsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+            <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff;">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-chat-left-text me-2"></i> Task Communication Logs
+                    <span id="taskCommLogTitle" style="font-size: 0.85em; opacity: 0.8; font-weight: normal; margin-left: 8px;"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="background-color: #f8fafc;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i> All email and WhatsApp interactions for this task.</p>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshTaskCommLogs()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
+                </div>
+
+                <div class="table-responsive bg-white rounded shadow-sm border" style="max-height: 400px;">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="border-top: none;">Date & Time</th>
+                                <th style="border-top: none;">Action</th>
+                                <th style="border-top: none;">From</th>
+                                <th style="border-top: none;">To</th>
+                                <th style="border-top: none;">Status</th>
+                                <th style="border-top: none;">Sent By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="taskCommLogsTbody">
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                    Loading logs...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- MOVE REQUESTS MANAGEMENT MODAL (Admin/Manager) -->
 <div class="modal fade" id="moveRequestsModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -3866,7 +4082,7 @@ async function clearColumnTasks(columnId) {
 <script src="~/js/customFields.js"></script>
 <script src="~/js/column_filter.js"></script>
 <script src="~/js/index_ui.js"></script>
-<script src="~/js/tasks.js"></script>
+<script src="~/js/taskHistory.js"></script>
 <script src="~/js/taskHistory.js"></script>
 <script src="~/js/move-requests.js"></script>
 <script src="~/js/board-permissions.js"></script>

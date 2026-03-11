@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -54,15 +54,22 @@ namespace UserRoles.Controllers
             var user = await _userManager.GetUserAsync(User);
             if (user == null) return RedirectToAction("Login", "Account");
 
-            if (User.IsInRole("Admin")) return View();
+            var roles = await _userManager.GetRolesAsync(user);
+            var model = await _taskService.GetQuickAssignModelAsync(user.Id, roles);
 
-            var userTeams = await _context.UserTeams
-                .Where(t => t.UserId == user.Id && t.TeamName != "Development")
-                .Select(t => t.TeamName)
-                .Distinct()
-                .ToListAsync();
-            ViewBag.UserTeams = userTeams;
-            return View();
+            if (!User.IsInRole("Admin"))
+            {
+                var userTeams = await _context.UserTeams
+                    .AsNoTracking()
+                    .Where(t => t.UserId == user.Id && t.TeamName != "Development")
+                    .Select(t => t.TeamName)
+                    .Distinct()
+                    .ToListAsync();
+                ViewBag.UserTeams = userTeams;
+                model.AvailableTeams = userTeams;
+            }
+
+            return View(model);
         }
 
         // ═══════════════════════════════════════════════════════

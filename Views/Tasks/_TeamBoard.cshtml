@@ -1,4 +1,4 @@
-﻿@using UserRoles.ViewModels
+@using UserRoles.ViewModels
 @using Microsoft.AspNetCore.Identity
 @using UserRoles.Models
 @inject UserManager<Users> UserManager
@@ -24,6 +24,10 @@
         User.IsInRole("SubManager"))
         {
             <div class="btn-group gap-2">
+                <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="openCommunicationLogsModal('@Model.TeamName')"
+                    title="View Communication Logs">
+                    <i class="bi bi-clock-history me-1"></i> Communication Logs
+                </button>
                 <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="openMoveRequestsModal('@Model.TeamName')"
                     title="View Column Move Requests">
                     <i class="bi bi-mailbox me-1"></i> Move Requests

@@ -368,6 +368,11 @@
             <i class="bi bi-pencil-square"></i>
         </button>
 
+        <button class="action-btn action-btn-info" title="Communication Logs"
+                onclick="openTaskCommLogsModal(@Model.Id); event.stopPropagation();">
+            <i class="bi bi-chat-left-text"></i>
+        </button>
+
         @if (!User.IsInRole("Admin"))
         {
             <button class="action-btn action-btn-primary action-btn-request-move" title="Request Task Move"
