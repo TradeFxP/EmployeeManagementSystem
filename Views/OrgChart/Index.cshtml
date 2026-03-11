@@ -1,10 +1,11 @@
-﻿@using UserRoles.Models;
+@using UserRoles.Models;
 @{
     var admin = ViewBag.Admin as Users;
     var managers = ViewBag.Managers as List<Users> ?? new List<Users>();
     var subManagers = ViewBag.SubManagers as Dictionary<string, List<Users>> ?? new Dictionary<string, List<Users>>();
     var subManagerUsers = ViewBag.SubManagerUsers as Dictionary<string, List<Users>> ?? new Dictionary<string, List<Users>>();
     var adminUsers = ViewBag.AdminUsers as List<Users> ?? new List<Users>();
+    var otherAdmins = ViewBag.OtherAdmins as List<Users> ?? new List<Users>();
     var currentRole = (ViewBag.CurrentRole as string) ?? "User";
 }
 
@@ -100,6 +101,90 @@
                     </div>
                 </div>
             }
+ 
+            @* ================= OTHER ADMIN NODES ================= *@
+            @foreach (var oAdmin in otherAdmins)
+            {
+                <div class="tree-item admin-root">
+                    <div class="tree-content role-admin"
+                         onclick="toggleNode(this, 'children-@oAdmin.Id')"
+                         ondragover="allowDrop(event)"
+                         ondrop="drop(event, '@oAdmin.Id')">
+ 
+                        <span class="tree-toggle-icon">▶</span>
+ 
+                        <div class="node-info">
+                            <span class="node-name">@oAdmin.Name</span>
+                            <span class="node-role">Administrator</span>
+                        </div>
+ 
+                        <div class="node-actions d-flex align-items-center">
+                            <!-- Hover actions -->
+                            <div class="hover-actions">
+                                <button class="action-btn" onclick="openEditModal('@oAdmin.Id','@oAdmin.Name','@oAdmin.Email','Admin'); event.stopPropagation();">✎</button>
+                                @if (currentRole == "Admin")
+                                {
+                                    <button class="action-btn" onclick="openDeleteModal('@oAdmin.Id','@oAdmin.Name','Admin'); event.stopPropagation();">🗑</button>
+                                }
+                                    <button class="action-btn" onclick="loadReports('@oAdmin.Id'); event.stopPropagation();">📊</button>
+                                    <button class="action-btn role-change-btn" title="Change Role" onclick="openRoleModal('@oAdmin.Id','@oAdmin.Name','Admin'); event.stopPropagation();">🔄</button>
+                                </div>
+ 
+                            @if (currentRole == "Admin")
+                            {
+                                <button class="action-btn add-btn"
+                                        onclick="openAddModal('', '@oAdmin.Id'); event.stopPropagation();"
+                                        title="Add Manager/User">
+                                    +
+                                </button>
+                            }
+                        </div>
+                    </div>
+ 
+                    <div id="children-@oAdmin.Id" class="tree-children" style="display: none;">
+                        @* Users under this Admin *@
+                        @if (subManagerUsers.ContainsKey(oAdmin.Id))
+                        {
+                            foreach (var user in subManagerUsers[oAdmin.Id])
+                            {
+                                <div class="tree-item leaf">
+                                    <div class="tree-content role-user"
+                                         draggable="true"
+                                         ondragstart="drag(event)"
+                                         data-id="@user.Id"
+                                         data-role="User">
+                                        <div class="node-info">
+                                            <span class="node-name">@user.Name</span>
+                                        </div>
+ 
+                                        <div class="node-actions">
+                                            <button class="action-btn"
+                                                    onclick="openEditModal('@user.Id','@user.Name','@user.Email','User'); event.stopPropagation();">
+                                                ✎
+                                            </button>
+                                            @if (currentRole == "Admin")
+                                            {
+                                                <button class="action-btn"
+                                                        onclick="openDeleteModal('@user.Id','@user.Name','User'); event.stopPropagation();">
+                                                    🗑
+                                                </button>
+                                                <button class="action-btn role-change-btn"
+                                                        title="Change Role"
+                                                        onclick="openRoleModal('@user.Id','@user.Name','User'); event.stopPropagation();">🔄</button>
+                                            }
+                                            <button class="action-btn"
+                                                    onclick="loadReports('@user.Id'); event.stopPropagation();">
+                                                📊
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            }
+ 
 
 
             @* ================= MANAGER NODES (SIBLINGS) ================= *@
@@ -345,6 +430,7 @@
                     <label class="form-label fw-semibold">Parent Manager</label>
                     <select id="rcParentId" class="form-select">
                         <option value="">-- Select Manager --</option>
+                        <option value="ADMIN">Admin (Root)</option>
                         @{
                             var allMgrs = ViewBag.Managers as List<UserRoles.Models.Users> ?? new List<UserRoles.Models.Users>();
                         }

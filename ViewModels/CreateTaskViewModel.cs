@@ -1,4 +1,4 @@
-﻿using UserRoles.Models.Enums;
+using UserRoles.Models.Enums;
 
 namespace UserRoles.ViewModels
 {
@@ -20,5 +20,6 @@ namespace UserRoles.ViewModels
         public Dictionary<int, List<string>>? CustomFieldValues { get; set; }
 
         public DateTime? DueDate { get; set; }
+        public string? AssignedToUserId { get; set; }
     }
 }

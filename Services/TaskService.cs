@@ -76,7 +76,7 @@ namespace UserRoles.Services
                 Priority = model.Priority,
                 Status = TaskStatusEnum.ToDo,
                 CreatedByUserId = userId,
-                AssignedToUserId = userId,
+                AssignedToUserId = string.IsNullOrEmpty(model.AssignedToUserId) ? userId : model.AssignedToUserId,
                 AssignedByUserId = userId,
                 AssignedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow,
@@ -157,11 +157,14 @@ namespace UserRoles.Services
             {
                 if (principal.IsInRole("Admin") || await _permissions.AuthorizeBoardAction(principal, task.TeamName, "AssignTask"))
                 {
-                    if (task.AssignedToUserId != model.AssignedToUserId)
+                    if (task.AssignedToUserId == model.AssignedToUserId)
                     {
-                        await _historyService.LogAssignment(task.Id, model.AssignedToUserId, userId);
-                        task.AssignedToUserId = model.AssignedToUserId;
+                        var u = await _userManager.FindByIdAsync(model.AssignedToUserId);
+                        return ServiceResult.Fail($"The task is already assigned to {u?.Name ?? u?.UserName ?? "this user"}.");
                     }
+
+                    await _historyService.LogAssignment(task.Id, model.AssignedToUserId, userId);
+                    task.AssignedToUserId = model.AssignedToUserId;
                 }
             }
 
@@ -244,6 +247,11 @@ namespace UserRoles.Services
             var assignToUser = await _userManager.FindByIdAsync(userId);
             if (assignToUser == null) return ServiceResult<AssignResult>.Fail("Invalid user");
 
+            if (taskToUpdate.AssignedToUserId == assignToUser.Id)
+            {
+                return ServiceResult<AssignResult>.Fail($"The task is already assigned to {assignToUser.Name ?? assignToUser.UserName}.");
+            }
+
             var currentUser = await _userManager.FindByIdAsync(currentUserId);
             if (currentUser == null) return ServiceResult<AssignResult>.Fail("Unauthorized", 401);
 
@@ -321,9 +329,13 @@ namespace UserRoles.Services
             var assigneeTeam = (await _context.UserTeams.FirstOrDefaultAsync(ut => ut.UserId == userId))?.TeamName ?? "N/A";
             var assigneeRole = await GetPrimaryRole(assignToUser);
 
+            int updatedCount = 0;
             foreach (var task in tasks)
             {
                 if (!principal.IsInRole("Admin") && !await _permissions.AuthorizeBoardAction(principal, task.TeamName, "AssignTask"))
+                    continue;
+
+                if (task.AssignedToUserId == assignToUser.Id)
                     continue;
 
                 task.AssignedToUserId = assignToUser.Id;
@@ -332,6 +344,7 @@ namespace UserRoles.Services
                 task.UpdatedAt = DateTime.UtcNow;
 
                 await _historyService.LogAssignment(task.Id, assignToUser.Id, currentUser.Id);
+                updatedCount++;
 
                 await BroadcastSafe(task.TeamName, "TaskAssigned", new
                 {
@@ -345,7 +358,7 @@ namespace UserRoles.Services
             }
 
             await _context.SaveChangesAsync();
-            return ServiceResult<int>.Ok(tasks.Count);
+            return ServiceResult<int>.Ok(updatedCount);
         }
 
         // ════════════════════════════════════════════════════════
@@ -552,6 +565,23 @@ namespace UserRoles.Services
                 UserTeamsMap = userTeamsMap,
                 TeamGroups = teamGroups,
                 ManagementUsers = managementUsers
+            };
+        }
+
+        public async Task<TeamBoardViewModel> GetQuickAssignModelAsync(string userId, IList<string> viewerRoles)
+        {
+            var allUsers = await _userManager.Users.AsNoTracking().OrderBy(u => u.Name).ToListAsync();
+            var userRolesMap = await GetUserRolesMapAsync();
+            var feUserRolesMap = BuildFeUserRolesMap(allUsers, userRolesMap);
+
+            // Use an empty team name or "Global" for initial grouping
+            var (teamGroups, managementUsers) = await BuildTeamGroupsAsync(allUsers, feUserRolesMap, string.Empty);
+
+            return new TeamBoardViewModel
+            {
+                ManagementUsers = managementUsers,
+                TeamGroups = teamGroups,
+                UserRolesMap = feUserRolesMap
             };
         }
 

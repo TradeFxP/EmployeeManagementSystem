@@ -2,27 +2,71 @@
 
 window.customFieldsCache = window.customFieldsCache || null;
 
-// â”€â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ——— helpers ——————————————————————————————————————————————————————————
 
-/** Extracts a value from the lead description markdown using the pattern **Key:** Value */
+// Mapping of Normalized Field Keys (UPPER_UNDERSCORE) to possible Description Keys (values)
+const LEAD_FIELD_MAPPING = {
+    "FULL_NAME": ["Full Name", "Name", "FULL_NAME"],
+    "PHONE": ["Phone", "Phone Number", "PHONE"],
+    "EMAIL": ["Email", "Email Address", "EMAIL"],
+    "COUNTRY": ["Country", "COUNTRY"],
+    "COMPANY_NAME": ["Company Name", "Company", "COMPANY_NAME"],
+    "LEAD_TYPE": ["What Best Describes Your Business", "Lead Type", "LEAD TYPE", "What Best Describes Your Business?"],
+    "BUSINESS_TYPE": ["What Are You Looking To Launch", "Business Type", "BUSINESS_TYPE", "What Are You Looking To Launch?"],
+    "LAUNCH_TYPE": ["What Are You Looking To Launch", "Launch Type", "LAUNCH_TYPE"],
+    "YEARS_OF_EXPERIENCE_IN_FOREX": ["Years Of Experience In Forex", "Years Of Experience", "YEARS_OF_EXPERIENCE_IN_FOREX", "EXPERIENCE"],
+    "YEARS_OF_EXPERIENCE": ["Years Of Experience In Forex", "Years Of Experience", "YEARS_OF_EXPERIENCE"],
+    "MEETING_PLATFORM": ["Meeting Platform", "MEETING_PLATFORM"],
+    "WHAT_BEST_DESCRIBES_YOUR_BUSINESS": ["What Best Describes Your Business", "Lead Type", "What Best Describes Your Business?"],
+    "WHAT_ARE_YOU_LOOKING_TO_LAUNCH": ["What Are You Looking To Launch", "Business Type", "What Are You Looking To Launch?"],
+    "YEAR_OF_EXPERIENCE_IN_FOREX": ["Years Of Experience In Forex", "Experience"]
+};
+
+/** Extracts a value from the lead description markdown using a primary key or multiple alternative keys */
 function extractLeadField(description, fieldName) {
     if (!description) return null;
 
-    // Normalize field name for matching (e.g., FULL_NAME -> Full Name)
-    const normalizedSearchName = fieldName.replace(/_/g, ' ').trim();
-    const escapedName = normalizedSearchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchNames = [fieldName];
+    // Add alternatives based on normalized field name (strip non-alphanumeric for mapping lookup)
+    const normalizedKey = fieldName.toUpperCase().replace(/[^A-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 
-    // Try matching both original and normalized name, case-insensitive
-    // Patterns: **Full Name:** or **FULL_NAME:**
-    const patterns = [
-        new RegExp(`\\*\\*${escapedName}:\\*\\*\\s*(.+)`, 'im'),
-        new RegExp(`\\*\\*${fieldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\*\\*\\s*(.+)`, 'im')
-    ];
+    if (LEAD_FIELD_MAPPING[normalizedKey]) {
+        searchNames.push(...LEAD_FIELD_MAPPING[normalizedKey]);
+    }
 
-    for (const pattern of patterns) {
-        const match = description.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
+    // Also try without underscores if there were any
+    const pureKey = fieldName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    for (const key in LEAD_FIELD_MAPPING) {
+        if (key.replace(/_/g, '') === pureKey) {
+            searchNames.push(...LEAD_FIELD_MAPPING[key]);
+        }
+    }
+
+    // Deduplicate and filter empty
+    const uniqueNames = [...new Set(searchNames.filter(n => n))];
+
+    for (const name of uniqueNames) {
+        const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Try complex markdown pattern: **Key:** Value or **Key** : Value
+        const patterns = [
+            new RegExp(`\\*\\*${escapedName}:?\\s*\\*\\*\\s*:?\\s*(.+)`, 'im'),
+            new RegExp(`\\*\\*${escapedName}:?\\*\\*\\s*:?\\s*(.+)`, 'im'),
+            new RegExp(`^${escapedName}\\s*:\\s*(.+)`, 'im'),
+            new RegExp(`^-\\s*\\*\\*${escapedName}:?\\*\\*\\s*:?\\s*(.+)`, 'im'),
+            new RegExp(`^-\\s*${escapedName}\\s*:\\s*(.+)`, 'im')
+        ];
+
+        for (const pattern of patterns) {
+            const match = description.match(pattern);
+            if (match && match[1] && !match[1].startsWith('**')) { // Avoid matching the next key
+                let val = match[1].trim();
+                // If it captured the rest of the description, truncate at next **
+                if (val.includes('**')) {
+                    val = val.split('**')[0].trim();
+                }
+                if (val.endsWith(':')) val = val.slice(0, -1).trim();
+                return val;
+            }
         }
     }
     return null;
@@ -124,8 +168,9 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         "Email", "EMAIL",
         "Company Name", "COMPANY_NAME",
         "Country", "COUNTRY",
-        "What Best Describes Your Business", "LEAD TYPE",
-        "What Are You Looking To Launch", "BUSINESS_TYPE"
+        "What Best Describes Your Business", "What_Best_Describes_Your_Business", "WHAT_BEST_DESCRIBES_YOUR_BUSINESS?",
+        "What Are You Looking To Launch", "What_Are_You_Looking_To_Launch", "WHAT_ARE_YOU_LOOKING_TO_LAUNCH?",
+        "Years Of Experience In Forex", "YEARS_OF_EXPERIENCE", "YEARS_OF_EXPERIENCE_IN_FOREX", "EXPERIENCE", "YEAR_OF_EXPERIENCE_IN_FOREX", "YEARS_OF_EXPERIENCE_IN_FOREX?"
     ];
 
     fields.forEach(field => {
@@ -517,10 +562,11 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
             input.id = `field_${field.id}`;
             input.value = existingValues[field.id] || '';
 
-            // Restricted Lead Fields
+            // Restricted Lead Fields only in Edit Modal
             const isLeadField = isLeadTeam && leadFields.some(lf => field.fieldName.toUpperCase() === lf.toUpperCase() || field.fieldName.replace(/ /g, '_').toUpperCase() === lf.toUpperCase());
+            const isEditModal = containerId === 'editCustomFieldsContainer';
 
-            if (isLeadField && !isAdmin) {
+            if (isLeadField && !isAdmin && isEditModal) {
                 input.disabled = true;
                 input.title = "Lead data can only be edited by administrators";
             }
@@ -529,8 +575,9 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
         } else {
             // For Image fields, if we want to restrict uploads
             const isLeadField = isLeadTeam && leadFields.some(lf => field.fieldName.toUpperCase() === lf.toUpperCase() || field.fieldName.replace(/ /g, '_').toUpperCase() === lf.toUpperCase());
+            const isEditModal = containerId === 'editCustomFieldsContainer';
 
-            if (isLeadField && !isAdmin) {
+            if (isLeadField && !isAdmin && isEditModal) {
                 const uploadInput = input.querySelector('input[type="file"]');
                 if (uploadInput) uploadInput.disabled = true;
                 const delBtns = input.querySelectorAll('.btn-outline-danger');

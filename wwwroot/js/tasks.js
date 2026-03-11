@@ -317,6 +317,7 @@ async function submitCreateTask() {
                 description: description,
                 priority: parseInt(priority),
                 dueDate: dueDate,
+                assignedToUserId: document.getElementById("taskAssignedToUserId")?.value || null,
                 customFieldValues: customFieldValues
             })
         });
@@ -326,10 +327,20 @@ async function submitCreateTask() {
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
 
-            if (typeof showToast === 'function') showToast("✅ Task created successfully!", "success");
+            if (typeof showToast === 'function') {
+                const assignedName = document.getElementById("taskAssignedToUserId")?.getAttribute("data-assigned-name");
+                const msg = assignedName
+                    ? `✅ Task created and assigned to ${assignedName}!`
+                    : "✅ Task created successfully!";
+                showToast(msg, "success");
+            }
 
             // Reload board
-            if (window.loadTeamBoard && window.currentTeamName) {
+            const assignedTeam = document.getElementById("taskAssignedToTeam")?.value;
+            if (assignedTeam && window.loadTeamBoard && assignedTeam !== window.currentTeamName) {
+                if (typeof showToast === 'function') showToast(`Switching to ${assignedTeam} board...`, 'info');
+                window.loadTeamBoard(assignedTeam);
+            } else if (window.loadTeamBoard && window.currentTeamName) {
                 window.loadTeamBoard(window.currentTeamName, true);
             }
         } else {
@@ -432,17 +443,32 @@ async function loadSalesCommunicationButtons(team, task) {
         const wsBtn = document.getElementById('whatsappBtn');
 
         if (wsBtn) {
-            wsBtn.onclick = (e) => {
+            wsBtn.onclick = async (e) => {
                 e.preventDefault();
+                try {
+                    await fetch(`/Communication/LogWhatsApp?taskId=${task.id}`, { method: 'POST' });
+                } catch (err) {
+                    console.error("Failed to log WhatsApp click", err);
+                }
                 window.open(`/Communication/WhatsApp/${task.id}`, '_blank');
             };
         }
 
-        const emBtn = document.getElementById('emailDropdown');
+        const zohoDirectBtn = document.getElementById('zohoDirectBtn');
 
-        if (emBtn) {
+        if (zohoDirectBtn) {
+            zohoDirectBtn.onclick = (e) => {
+                e.preventDefault();
+                if (typeof openEmailTemplateModal === "function") {
+                    openEmailTemplateModal(task.id);
+                }
+            };
+        }
+
+        // Dropdown options
+        if (true) {
             const gmailOpt = document.getElementById('gmailOption');
-            const outlookOpt = document.getElementById('outlookOption');
+            const zohoOpt = document.getElementById('zohoOption');
             const defaultOpt = document.getElementById('defaultMailOption');
 
             if (gmailOpt) {
@@ -451,9 +477,14 @@ async function loadSalesCommunicationButtons(team, task) {
                 };
             }
 
-            if (outlookOpt) {
-                outlookOpt.onclick = (e) => {
-                    window.open(`/Communication/Email?id=${task.id}&type=outlook`, '_blank');
+            if (zohoOpt) {
+                zohoOpt.onclick = (e) => {
+                    e.preventDefault();
+                    if (typeof openEmailTemplateModal === 'function') {
+                        openEmailTemplateModal(task.id);
+                    } else {
+                        window.open(`/Communication/Email?id=${task.id}&type=zoho`, '_blank');
+                    }
                 };
             }
 
@@ -1082,4 +1113,590 @@ function handleNewLeadsUpdate(data) {
 /**
  * Renders a virtual lead card that matches _TaskCard.cshtml appearance
  */
+
+// ═══════════════════════════════════════════════
+// OUTLOOK EMAIL TEMPLATE LOGIC
+// ═══════════════════════════════════════════════
+
+function openEmailTemplateModal(taskId) {
+    document.getElementById('emailTemplateTaskId').value = taskId;
+    const templateSelect = document.getElementById('templateSelect');
+    const previewContainer = document.getElementById('emailPreviewContainer');
+    const previewEmpty = document.getElementById('emailPreviewEmpty');
+    const btnNext = document.getElementById('btnNextStep');
+
+    // Reset steps
+    const step1 = document.getElementById('emailStep1');
+    const step2 = document.getElementById('emailStep2');
+    const footer1 = document.getElementById('footerStep1');
+    const footer2 = document.getElementById('footerStep2');
+
+    if (step1) step1.classList.remove('d-none');
+    if (step2) step2.classList.add('d-none');
+    if (footer1) footer1.classList.remove('d-none');
+    if (footer2) footer2.classList.add('d-none');
+
+    // Reset UI
+    if (templateSelect) templateSelect.innerHTML = '<option value="" disabled selected>-- Choose a Template --</option>';
+    if (previewContainer) previewContainer.classList.add('d-none');
+    if (previewEmpty) {
+        previewEmpty.classList.remove('d-none');
+        previewEmpty.innerHTML = '<i class="bi bi-envelope-paper display-4 text-light"></i><p class="mt-2">Select a template to view the content.</p>';
+    }
+    if (btnNext) btnNext.disabled = true;
+
+    // Fetch templates
+    fetch('/Communication/GetEmailTemplates')
+        .then(res => res.json())
+        .then(templates => {
+            if (templates && templates.length > 0) {
+                templates.forEach(t => {
+                    const option = document.createElement('option');
+                    option.value = t;
+                    option.textContent = t.replace(/_/g, ' ');
+                    templateSelect.appendChild(option);
+                });
+            } else {
+                templateSelect.innerHTML = '<option value="" disabled>No templates found</option>';
+            }
+        })
+        .catch(err => console.error("Error fetching templates:", err));
+
+    const modalEl = document.getElementById('emailTemplateModal');
+    if (modalEl) {
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const templateSelect = document.getElementById('templateSelect');
+    const previewFrame = document.getElementById('emailPreviewFrame');
+    const previewContainer = document.getElementById('emailPreviewContainer');
+    const previewLoading = document.getElementById('emailPreviewLoading');
+    const previewEmpty = document.getElementById('emailPreviewEmpty');
+
+    const btnNext = document.getElementById('btnNextStep');
+    const btnBack = document.getElementById('btnBackStep');
+    const btnSend = document.getElementById('btnConfirmSendEmail');
+
+    let currentPreviewData = null;
+
+    if (templateSelect) {
+        templateSelect.addEventListener('change', function () {
+            const templateName = this.value;
+            const taskId = document.getElementById('emailTemplateTaskId').value;
+
+            if (!templateName || !taskId) return;
+
+            // Show loading
+            previewContainer.classList.add('d-none');
+            previewEmpty.classList.add('d-none');
+            previewLoading.classList.remove('d-none');
+            if (btnNext) btnNext.disabled = true;
+            currentPreviewData = null;
+
+            fetch(`/Communication/GetTemplatePreview?taskId=${taskId}&templateName=${encodeURIComponent(templateName)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) throw new Error(data.message || "Failed to load preview");
+
+                    previewLoading.classList.add('d-none');
+                    previewContainer.classList.remove('d-none');
+
+                    // Write HTML to iframe
+                    const doc = previewFrame.contentWindow.document;
+                    doc.open();
+                    doc.write(data.html);
+                    doc.close();
+
+                    currentPreviewData = data;
+                    if (btnNext) btnNext.disabled = false;
+                })
+                .catch(err => {
+                    console.error("Preview error:", err);
+                    previewLoading.classList.add('d-none');
+                    previewEmpty.classList.remove('d-none');
+                    previewEmpty.innerHTML = `<i class="bi bi-exclamation-triangle text-danger display-4"></i><p class="text-danger mt-2">${err.message || 'Error loading preview'}</p>`;
+                });
+        });
+    }
+
+    if (btnNext) {
+        btnNext.addEventListener('click', function () {
+            if (!currentPreviewData) return;
+
+            // Populate Step 2 confirmation details
+            document.getElementById('confirmFromEmail').textContent = currentPreviewData.fromEmail || 'Unknown';
+            document.getElementById('confirmToEmail').textContent = currentPreviewData.toEmail || 'Unknown';
+            document.getElementById('confirmTemplateName').textContent = templateSelect.options[templateSelect.selectedIndex].text;
+
+            // Switch UI to Step 2
+            document.getElementById('emailStep1').classList.add('d-none');
+            document.getElementById('footerStep1').classList.add('d-none');
+            document.getElementById('emailStep2').classList.remove('d-none');
+            document.getElementById('footerStep2').classList.remove('d-none');
+        });
+    }
+
+    if (btnBack) {
+        btnBack.addEventListener('click', function () {
+            // Switch UI back to Step 1
+            document.getElementById('emailStep2').classList.add('d-none');
+            document.getElementById('footerStep2').classList.add('d-none');
+            document.getElementById('emailStep1').classList.remove('d-none');
+            document.getElementById('footerStep1').classList.remove('d-none');
+        });
+    }
+
+    if (btnSend) {
+        btnSend.addEventListener('click', function () {
+            const taskId = document.getElementById('emailTemplateTaskId').value;
+            const templateName = templateSelect.value;
+            if (!taskId || !templateName) return;
+
+            // Loading state
+            const icon = document.getElementById('sendEmailIcon');
+            const text = document.getElementById('sendEmailText');
+            icon.className = 'spinner-border spinner-border-sm';
+            text.textContent = 'Sending...';
+            btnSend.disabled = true;
+            if (btnBack) btnBack.disabled = true;
+
+            const token = window.getAntiForgeryToken ? window.getAntiForgeryToken() : '';
+
+            fetch(`/Communication/SendTemplateEmail?taskId=${taskId}&templateName=${encodeURIComponent(templateName)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': token
+                }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (typeof showToast === 'function') showToast(data.message, 'success');
+                        const modalEl = document.getElementById('emailTemplateModal');
+                        const modal = bootstrap.Modal.getInstance(modalEl);
+                        if (modal) modal.hide();
+                    } else {
+                        if (typeof showToast === 'function') showToast(data.message || 'Failed to send email', 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    if (typeof showToast === 'function') showToast('An error occurred while sending', 'danger');
+                })
+                .finally(() => {
+                    icon.className = 'bi bi-send-fill';
+                    text.textContent = 'Confirm & Send Mail';
+                    btnSend.disabled = false;
+                    if (btnBack) btnBack.disabled = false;
+                });
+        });
+    }
+});
+
 // End of tasks.js
+
+// ═══════════════════════════════════════════════
+// QUICK ASSIGN FUNCTIONS
+// ═══════════════════════════════════════════════
+
+function toggleQuickAssign() {
+    const dropdown = document.getElementById('quickAssignDropdown');
+    const searchContainer = document.getElementById('quickAssignSearchContainer');
+    const searchInput = document.getElementById('quickAssignSearchInput');
+    const btn = document.getElementById('btnQuickAssign');
+
+    if (!dropdown || !btn || !searchContainer) return;
+
+    const isHidden = searchContainer.classList.contains('d-none');
+
+    if (isHidden) {
+        // SHOW search bar
+        searchContainer.classList.remove('d-none');
+        // Small delay to allow transition after d-none removal
+        setTimeout(() => searchContainer.classList.add('show'), 10);
+        
+        // SHOW dropdown (positioning handled by CSS absolute)
+        dropdown.classList.add('show');
+        filterQuickAssignList(true);
+        setTimeout(() => {
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.setAttribute('autocomplete', 'off');
+            }
+        }, 100);
+    } else {
+        // HIDE everything
+        searchContainer.classList.remove('show');
+        // Wait for transition before adding d-none
+        setTimeout(() => {
+            searchContainer.classList.add('d-none');
+            if (searchInput) searchInput.value = '';
+            filterQuickAssignList(true);
+        }, 250);
+        dropdown.classList.remove('show');
+    }
+}
+
+function filterQuickAssignList(showAll = false) {
+    const searchInput = document.getElementById('quickAssignSearchInput');
+    const search = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    const list = document.getElementById('quickAssignList');
+    if (!list) return;
+
+    const items = list.querySelectorAll('.quick-assign-item');
+    const groups = list.querySelectorAll('.quick-assign-group');
+
+    // Clear any existing empty state
+    const existingEmpty = list.querySelector('.quick-assign-empty-state');
+    if (existingEmpty) existingEmpty.remove();
+
+    let totalVisible = 0;
+
+    items.forEach(item => {
+        const name = (item.dataset.name || '').toLowerCase();
+        const role = (item.dataset.role || '').toLowerCase();
+        const team = (item.dataset.team || '').toLowerCase();
+
+        const visible = showAll || search.length === 0 || name.includes(search) || role.includes(search) || team.includes(search);
+
+        item.style.display = visible ? 'block' : 'none';
+        if (visible) totalVisible++;
+    });
+
+    // Hide/Show group headers based on item visibility
+    groups.forEach(group => {
+        let hasVisibleItems = false;
+        let next = group.nextElementSibling;
+        while (next && next.classList.contains('quick-assign-item')) {
+            if (next.style.display !== 'none') {
+                hasVisibleItems = true;
+                break;
+            }
+            next = next.nextElementSibling;
+        }
+        group.style.display = hasVisibleItems ? 'block' : 'none';
+    });
+
+    if (totalVisible === 0 && search.length > 0) {
+        const noResults = document.createElement('div');
+        noResults.className = 'quick-assign-empty-state';
+        noResults.innerHTML = '<i class="bi bi-person-x"></i>No results for "' + search + '"';
+        list.appendChild(noResults);
+    }
+}
+
+function selectQuickAssignUser(id, name, role, team) {
+    const input = document.getElementById('taskAssignedToUserId');
+    const teamInput = document.getElementById('taskAssignedToTeam');
+    const btn = document.getElementById('btnQuickAssign');
+    const dropdown = document.getElementById('quickAssignDropdown');
+    const badge = document.getElementById('quickAssignSelectedUserBadge');
+    const nameSpan = document.getElementById('quickAssignSelectedUserName');
+    const searchContainer = document.getElementById('quickAssignSearchContainer');
+
+    if (input) {
+        input.value = id;
+        input.setAttribute("data-assigned-name", name);
+    }
+    
+    if (teamInput) teamInput.value = team;
+
+    // Show selection badge
+    if (badge && nameSpan) {
+        nameSpan.textContent = name;
+        badge.classList.remove('d-none');
+        badge.classList.add('d-inline-flex');
+    }
+
+    // Hide search bar after selection
+    if (searchContainer) {
+        searchContainer.classList.remove('show');
+        setTimeout(() => searchContainer.classList.add('d-none'), 250);
+    }
+
+    // Switch to selected state icon
+    if (btn) {
+        btn.innerHTML = `<i class="bi bi-person-check-fill fs-5"></i>`;
+        btn.classList.remove('btn-outline-info');
+        btn.classList.add('btn-info', 'text-white');
+        btn.title = `Assigned to ${name}`;
+    }
+
+    // Close dropdown
+    if (dropdown) dropdown.classList.remove('show');
+
+    if (typeof showToast === 'function') showToast(`User ${name} selected! Click 'Create' to assign.`, 'info');
+}
+
+function clearQuickAssignSelection(event) {
+    if (event) event.stopPropagation();
+    
+    const input = document.getElementById('taskAssignedToUserId');
+    const teamInput = document.getElementById('taskAssignedToTeam');
+    const badge = document.getElementById('quickAssignSelectedUserBadge');
+    const btn = document.getElementById('btnQuickAssign');
+
+    if (input) {
+        input.value = '';
+        input.removeAttribute("data-assigned-name");
+    }
+    if (teamInput) teamInput.value = '';
+    
+    if (badge) {
+        badge.classList.add('d-none');
+        badge.classList.remove('d-inline-flex');
+    }
+
+    if (btn) {
+        btn.innerHTML = '<i class="bi bi-person-plus fs-5"></i>';
+        btn.classList.add('btn-outline-info');
+        btn.classList.remove('btn-info', 'text-white');
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('mousedown', function (e) {
+    const wrapper = e.target.closest('.quick-assign-wrapper');
+    if (!wrapper) {
+        const dropdown = document.getElementById('quickAssignDropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    }
+});
+
+// Reset assignment and HIDE everything when modal opens
+$(document).on('show.bs.modal', '#createTaskModal, #editTaskModal', function () {
+    const isCreate = this.id === 'createTaskModal';
+    const inputId = isCreate ? 'taskAssignedToUserId' : 'editTaskAssignedTo';
+    const input = document.getElementById(inputId);
+    const btnId = isCreate ? 'btnQuickAssign' : null; // Quick Assign only on Create for now? 
+    // Actually the logic should be generic if btnQuickAssign is shared.
+    
+    const btn = document.getElementById('btnQuickAssign');
+    const dropdown = document.getElementById('quickAssignDropdown');
+    const searchContainer = document.getElementById('quickAssignSearchContainer');
+    const searchInput = document.getElementById('quickAssignSearchInput');
+
+    if (input && isCreate) {
+        input.value = '';
+        input.removeAttribute("data-assigned-name");
+    }
+    
+    if (btn) {
+        btn.innerHTML = '<i class="bi bi-person-plus fs-5"></i>';
+        btn.classList.remove('btn-info', 'text-white');
+        btn.classList.add('btn-outline-info');
+        btn.title = 'Quick Assign';
+    }
+    
+    if (searchContainer) {
+        searchContainer.classList.remove('show');
+        searchContainer.classList.add('d-none');
+    }
+    
+    if (dropdown) dropdown.classList.remove('show');
+    if (searchInput) searchInput.value = '';
+
+    const badge = document.getElementById('quickAssignSelectedUserBadge');
+    if (badge) {
+        badge.classList.add('d-none');
+        badge.classList.remove('d-inline-flex');
+    }
+    
+    const teamInput = document.getElementById('taskAssignedToTeam');
+    if (teamInput) teamInput.value = '';
+
+    const list = document.getElementById('quickAssignList');
+    if (list) {
+        list.querySelectorAll('.quick-assign-item').forEach(i => i.style.display = 'none');
+        list.querySelectorAll('.quick-assign-group').forEach(g => g.style.display = 'none');
+    }
+});
+
+// ================= COMMUNICATION LOGS =================
+
+let currentLogsTeam = '';
+
+function openCommunicationLogsModal(teamName) {
+    currentLogsTeam = teamName;
+    const modalEl = document.getElementById('communicationLogsModal');
+    if (!modalEl) return;
+
+    document.getElementById('logTeamNameTitle').textContent = `(${teamName})`;
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    refreshCommunicationLogs();
+}
+
+function refreshCommunicationLogs() {
+    if (!currentLogsTeam) return;
+
+    const tbody = document.getElementById('communicationLogsTbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" class="text-center py-4 text-muted">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                Loading logs...
+            </td>
+        </tr>
+    `;
+
+    fetch(`/Communication/GetCommunicationLogs?teamName=${encodeURIComponent(currentLogsTeam)}`)
+        .then(res => {
+            if (!res.ok) throw new Error("Failed to fetch logs");
+            return res.json();
+        })
+        .then(logs => {
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-4 d-block mb-3"></i>
+                            No communication logs found for this team.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            logs.forEach(log => {
+                const dateObj = new Date(log.sentAt);
+                const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                const actionBadge = log.action === 'WhatsApp Click'
+                    ? '<span class="badge bg-success" style="font-size: 0.8rem;"><i class="bi bi-whatsapp me-1"></i> WhatsApp</span>'
+                    : '<span class="badge bg-primary" style="font-size: 0.8rem;"><i class="bi bi-envelope me-1"></i> Email</span>';
+
+
+                const statusBadge = log.status === 'Sent'
+                    ? '<span class="badge bg-success bg-opacity-75"><i class="bi bi-check-circle me-1"></i>Sent</span>'
+                    : log.status === 'Failed'
+                        ? '<span class="badge bg-danger bg-opacity-75"><i class="bi bi-x-circle me-1"></i>Failed</span>'
+                        : `<span class="badge bg-secondary bg-opacity-75">${log.status || '-'}</span>`;
+
+                html += `
+                    <tr>
+                        <td class="text-muted small">${dateStr}</td>
+                        <td class="fw-bold text-dark">${log.leadName || '-'}</td>
+                        <td>${actionBadge}</td>
+                        <td class="small text-truncate" style="max-width: 150px;" title="${log.fromInfo || ''}">${log.fromInfo || '-'}</td>
+                        <td class="small text-truncate" style="max-width: 150px;" title="${log.toInfo || ''}">${log.toInfo || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td class="small fw-medium"><i class="bi bi-person me-1 text-secondary"></i>${log.user || '-'}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        })
+        .catch(err => {
+            console.error("Error fetching logs:", err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i> Failed to load logs.
+                    </td>
+                </tr>
+            `;
+            if (typeof showToast === 'function') showToast("Failed to load communication logs", "danger");
+        });
+}
+
+// ================= PER-TASK COMMUNICATION LOGS =================
+
+let currentCommLogsTaskId = null;
+
+function openTaskCommLogsModal(taskId) {
+    currentCommLogsTaskId = taskId;
+    const modalEl = document.getElementById('taskCommLogsModal');
+    if (!modalEl) return;
+
+    document.getElementById('taskCommLogTitle').textContent = `(Task #${taskId})`;
+
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    refreshTaskCommLogs();
+}
+
+function refreshTaskCommLogs() {
+    if (!currentCommLogsTaskId) return;
+
+    const tbody = document.getElementById('taskCommLogsTbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="6" class="text-center py-4 text-muted">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                Loading logs...
+            </td>
+        </tr>
+    `;
+
+    fetch(`/Communication/GetTaskCommunicationLogs?taskId=${currentCommLogsTaskId}`)
+        .then(res => {
+            if (!res.ok) throw new Error("Failed to fetch logs");
+            return res.json();
+        })
+        .then(logs => {
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-4 d-block mb-3"></i>
+                            No communication logs found for this task.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            logs.forEach(log => {
+                const dateObj = new Date(log.sentAt);
+                const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                const actionBadge = log.action === 'WhatsApp Click'
+                    ? '<span class="badge bg-success" style="font-size: 0.8rem;"><i class="bi bi-whatsapp me-1"></i> WhatsApp</span>'
+                    : '<span class="badge bg-primary" style="font-size: 0.8rem;"><i class="bi bi-envelope me-1"></i> Email</span>';
+
+                const statusBadge = log.status === 'Sent'
+                    ? '<span class="badge bg-success bg-opacity-75"><i class="bi bi-check-circle me-1"></i>Sent</span>'
+                    : log.status === 'Failed'
+                        ? '<span class="badge bg-danger bg-opacity-75"><i class="bi bi-x-circle me-1"></i>Failed</span>'
+                        : `<span class="badge bg-secondary bg-opacity-75">${log.status || '-'}</span>`;
+
+                html += `
+                    <tr>
+                        <td class="text-muted small">${dateStr}</td>
+                        <td>${actionBadge}</td>
+                        <td class="small text-truncate" style="max-width: 150px;" title="${log.fromInfo || ''}">${log.fromInfo || '-'}</td>
+                        <td class="small text-truncate" style="max-width: 150px;" title="${log.toInfo || ''}">${log.toInfo || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td class="small fw-medium"><i class="bi bi-person me-1 text-secondary"></i>${log.user || '-'}</td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        })
+        .catch(err => {
+            console.error("Error fetching task logs:", err);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i> Failed to load logs.
+                    </td>
+                </tr>
+            `;
+        });
+}

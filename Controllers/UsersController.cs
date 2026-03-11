@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,19 +25,22 @@ namespace UserRoles.Controllers
         private readonly IEmailService _emailService;
         private readonly AppDbContext _context;
         private readonly IUserHierarchyService _hierarchyService;
-
+        private readonly SignInManager<Users> _signInManager;
+ 
         public UsersController(
             UserManager<Users> userManager,
             RoleManager<IdentityRole> roleManager,
             IEmailService emailService,
             AppDbContext context,
-            IUserHierarchyService hierarchyService)
+            IUserHierarchyService hierarchyService,
+            SignInManager<Users> signInManager)
         {
             _userManager = userManager;
             _roleManager = roleManager;
             _emailService = emailService;
             _context = context;
             _hierarchyService = hierarchyService;
+            _signInManager = signInManager;
         }
 
 
@@ -572,8 +575,13 @@ namespace UserRoles.Controllers
 
             // ================= DUPLICATE EMAIL =================
             var existing = await _userManager.FindByEmailAsync(email);
-            // Map addType to target role: "Manager" or "SubManager" -> Manager, otherwise User
-            string targetRole = (addType == "Manager" || addType == "SubManager") ? "Manager" : "User";
+            // Map addType to target role: "Admin" -> Admin, "Manager" or "SubManager" -> Manager, otherwise User
+            string targetRole = addType switch
+            {
+                "Admin" => "Admin",
+                "Manager" or "SubManager" => "Manager",
+                _ => "User"
+            };
 
             if (existing != null)
             {
@@ -667,7 +675,13 @@ namespace UserRoles.Controllers
             };
 
             // ================= HIERARCHY =================
-            if (targetRole == "Manager")
+            if (targetRole == "Admin")
+            {
+                // Admin has no parent
+                user.ParentUserId = null;
+                user.ManagerId = null;
+            }
+            else if (targetRole == "Manager")
             {
                 // Manager creation
                 if (!string.IsNullOrEmpty(managerId) && managerId.ToUpper() != "ADMIN")
@@ -893,98 +907,6 @@ namespace UserRoles.Controllers
                 return BadRequest(string.Join(", ", result.Errors.Select(e => e.Description)));
 
             return Ok();
-        }
-
-        // ================= CHANGE ROLE (Admin Only) =================
-        /// <summary>
-        /// Allows Admin to change a user's role between User, Manager, and SubManager.
-        /// Updates both Identity roles and the ParentUserId/ManagerId hierarchy fields.
-        /// Returns JSON { success, message } for AJAX.
-        /// </summary>
-        [Authorize(Roles = "Admin")]
-        [HttpPost]
-        [IgnoreAntiforgeryToken]
-        public async Task<IActionResult> ChangeRole(
-            [FromBody] ChangeRoleRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.UserId))
-                return BadRequest(new { success = false, message = "Invalid request." });
-
-            var user = await _userManager.FindByIdAsync(request.UserId);
-            if (user == null)
-                return NotFound(new { success = false, message = "User not found." });
-
-            // Safety: never change Admin role
-            var currentRoles = await _userManager.GetRolesAsync(user);
-            if (currentRoles.Contains("Admin"))
-                return BadRequest(new { success = false, message = "Cannot change the Admin role." });
-
-            string newRole = (request.NewRole ?? "").Trim();
-            if (newRole != "Manager" && newRole != "SubManager" && newRole != "User")
-                return BadRequest(new { success = false, message = "Invalid role specified." });
-
-            // -- 1. Remove all existing roles ------------------------------
-            if (currentRoles.Any())
-                await _userManager.RemoveFromRolesAsync(user, currentRoles);
-
-            // -- 2. Assign new Identity role -------------------------------
-            // SubManager uses Identity role "Manager" (same permissions level)
-            string identityRole = (newRole == "SubManager") ? "Manager" : newRole;
-
-            if (!await _roleManager.RoleExistsAsync(identityRole))
-                await _roleManager.CreateAsync(new IdentityRole(identityRole));
-
-            await _userManager.AddToRoleAsync(user, identityRole);
-
-            // -- 3. Update hierarchy fields --------------------------------
-            if (newRole == "Manager")
-            {
-                // Promote to top-level Manager (directly under Admin)
-                user.ParentUserId = null;
-                user.ManagerId = null;
-            }
-            else if (newRole == "SubManager")
-            {
-                // Must have a parent manager
-                string? parentId = request.ParentId;
-
-                if (string.IsNullOrWhiteSpace(parentId))
-                {
-                    // Attempt to find a default manager
-                    var defaultManager = (await _userManager.GetUsersInRoleAsync("Manager"))
-                        .FirstOrDefault(m => m.Id != user.Id && string.IsNullOrEmpty(m.ParentUserId));
-
-                    if (defaultManager == null)
-                        return BadRequest(new { success = false, message = "No available top-level manager found to assign as parent." });
-
-                    parentId = defaultManager.Id;
-                }
-
-                var parent = await _userManager.FindByIdAsync(parentId);
-                if (parent == null)
-                    return BadRequest(new { success = false, message = "Parent manager not found." });
-
-                user.ParentUserId = parentId;
-                user.ManagerId = parentId;
-            }
-            else // User
-            {
-                // Keep existing parent if present; otherwise leave under Admin (null)
-                // (Admin can reassign via drag-drop or Assign To button)
-            }
-
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
-            {
-                var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
-                return BadRequest(new { success = false, message = errors });
-            }
-
-            // -- 4. Refresh security stamp so session tokens are invalidated --
-            await _userManager.UpdateSecurityStampAsync(user);
-
-            string displayRole = newRole == "SubManager" ? "Sub-Manager" : newRole;
-            return Ok(new { success = true, message = $"Role changed to {displayRole} successfully." });
         }
 
 
@@ -1221,6 +1143,72 @@ namespace UserRoles.Controllers
             }
 
             return result;
+        }
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> ChangeRole([FromBody] ChangeRoleRequest model)
+        {
+            if (model == null || string.IsNullOrEmpty(model.UserId) || string.IsNullOrEmpty(model.NewRole))
+                return BadRequest(new { success = false, message = "Invalid request data." });
+
+            var user = await _userManager.FindByIdAsync(model.UserId);
+            if (user == null)
+                return NotFound(new { success = false, message = "User not found." });
+
+            // Safety: cannot change own role unless you want to lose access (usually blocked)
+            var currentUserId = _userManager.GetUserId(User);
+            if (user.Id == currentUserId)
+                return BadRequest(new { success = false, message = "You cannot change your own role." });
+
+            // Remove all current roles
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
+            if (!removeResult.Succeeded)
+                return BadRequest(new { success = false, message = "Failed to remove existing roles." });
+
+            // Determine Identity Role and Hierarchy
+            string targetIdentityRole = model.NewRole == "SubManager" ? "Manager" : model.NewRole;
+            
+            if (!await _roleManager.RoleExistsAsync(targetIdentityRole))
+                await _roleManager.CreateAsync(new IdentityRole(targetIdentityRole));
+
+            var addResult = await _userManager.AddToRoleAsync(user, targetIdentityRole);
+            if (!addResult.Succeeded)
+                return BadRequest(new { success = false, message = "Failed to add new role." });
+
+            // Normalize ParentId (ADMIN should be null in DB)
+            string? normalizedParentId = (model.ParentId?.ToUpper() == "ADMIN" || string.IsNullOrEmpty(model.ParentId)) ? null : model.ParentId;
+
+            // Update Hierarchy
+            if (model.NewRole == "Admin")
+            {
+                user.ParentUserId = null;
+                user.ManagerId = null;
+            }
+            else if (model.NewRole == "Manager")
+            {
+                user.ParentUserId = null;
+                user.ManagerId = null;
+            }
+            else if (model.NewRole == "SubManager")
+            {
+                if (string.IsNullOrEmpty(normalizedParentId))
+                    return BadRequest(new { success = false, message = "Parent Manager is required for Sub-Manager role." });
+                
+                user.ParentUserId = normalizedParentId;
+                user.ManagerId = normalizedParentId;
+            }
+            else // User
+            {
+                user.ParentUserId = normalizedParentId;
+                user.ManagerId = normalizedParentId;
+            }
+
+            // Force security stamp update to invalidate sessions
+            await _userManager.UpdateSecurityStampAsync(user);
+            await _userManager.UpdateAsync(user);
+
+            return Ok(new { success = true, message = $"User updated to {model.NewRole} successfully." });
         }
     }
 }
