@@ -329,14 +329,18 @@ async function submitCreateTask() {
 
             if (typeof showToast === 'function') {
                 const assignedName = document.getElementById("taskAssignedToUserId")?.getAttribute("data-assigned-name");
-                const msg = assignedName 
-                    ? `✅ Task created and assigned to ${assignedName}!` 
+                const msg = assignedName
+                    ? `✅ Task created and assigned to ${assignedName}!`
                     : "✅ Task created successfully!";
                 showToast(msg, "success");
             }
 
             // Reload board
-            if (window.loadTeamBoard && window.currentTeamName) {
+            const assignedTeam = document.getElementById("taskAssignedToTeam")?.value;
+            if (assignedTeam && window.loadTeamBoard && assignedTeam !== window.currentTeamName) {
+                if (typeof showToast === 'function') showToast(`Switching to ${assignedTeam} board...`, 'info');
+                window.loadTeamBoard(assignedTeam);
+            } else if (window.loadTeamBoard && window.currentTeamName) {
                 window.loadTeamBoard(window.currentTeamName, true);
             }
         } else {
@@ -450,11 +454,21 @@ async function loadSalesCommunicationButtons(team, task) {
             };
         }
 
-        const emBtn = document.getElementById('emailDropdown');
+        const zohoDirectBtn = document.getElementById('zohoDirectBtn');
 
-        if (emBtn) {
+        if (zohoDirectBtn) {
+            zohoDirectBtn.onclick = (e) => {
+                e.preventDefault();
+                if (typeof openEmailTemplateModal === "function") {
+                    openEmailTemplateModal(task.id);
+                }
+            };
+        }
+
+        // Dropdown options
+        if (true) {
             const gmailOpt = document.getElementById('gmailOption');
-            const outlookOpt = document.getElementById('outlookOption');
+            const zohoOpt = document.getElementById('zohoOption');
             const defaultOpt = document.getElementById('defaultMailOption');
 
             if (gmailOpt) {
@@ -463,13 +477,13 @@ async function loadSalesCommunicationButtons(team, task) {
                 };
             }
 
-            if (outlookOpt) {
-                outlookOpt.onclick = (e) => {
+            if (zohoOpt) {
+                zohoOpt.onclick = (e) => {
                     e.preventDefault();
                     if (typeof openEmailTemplateModal === 'function') {
                         openEmailTemplateModal(task.id);
                     } else {
-                        window.open(`/Communication/Email?id=${task.id}&type=outlook`, '_blank');
+                        window.open(`/Communication/Email?id=${task.id}&type=zoho`, '_blank');
                     }
                 };
             }
@@ -1251,7 +1265,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const token = window.getAntiForgeryToken ? window.getAntiForgeryToken() : '';
 
-            fetch(`/Communication/SendOutlookEmail?taskId=${taskId}&templateName=${encodeURIComponent(templateName)}`, {
+            fetch(`/Communication/SendTemplateEmail?taskId=${taskId}&templateName=${encodeURIComponent(templateName)}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1275,7 +1289,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .finally(() => {
                     icon.className = 'bi bi-send-fill';
-                    text.textContent = 'Confirm & Send via Outlook';
+                    text.textContent = 'Confirm & Send Mail';
                     btnSend.disabled = false;
                     if (btnBack) btnBack.disabled = false;
                 });
@@ -1291,21 +1305,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function toggleQuickAssign() {
     const dropdown = document.getElementById('quickAssignDropdown');
+    const searchContainer = document.getElementById('quickAssignSearchContainer');
     const searchInput = document.getElementById('quickAssignSearchInput');
     const btn = document.getElementById('btnQuickAssign');
-    
-    if (!dropdown || !btn) return;
-    
-    const isHidden = !dropdown.classList.contains('show');
-    
+
+    if (!dropdown || !btn || !searchContainer) return;
+
+    const isHidden = searchContainer.classList.contains('d-none');
+
     if (isHidden) {
-        // Calculate position: place dropdown ABOVE the button using fixed positioning
-        const btnRect = btn.getBoundingClientRect();
-        dropdown.style.left = btnRect.left + 'px';
-        dropdown.style.top = 'auto';
-        dropdown.style.bottom = (window.innerHeight - btnRect.top + 8) + 'px';
+        // SHOW search bar
+        searchContainer.classList.remove('d-none');
+        // Small delay to allow transition after d-none removal
+        setTimeout(() => searchContainer.classList.add('show'), 10);
         
-        // SHOW dropdown
+        // SHOW dropdown (positioning handled by CSS absolute)
         dropdown.classList.add('show');
         filterQuickAssignList(true);
         setTimeout(() => {
@@ -1315,7 +1329,14 @@ function toggleQuickAssign() {
             }
         }, 100);
     } else {
-        // HIDE dropdown
+        // HIDE everything
+        searchContainer.classList.remove('show');
+        // Wait for transition before adding d-none
+        setTimeout(() => {
+            searchContainer.classList.add('d-none');
+            if (searchInput) searchInput.value = '';
+            filterQuickAssignList(true);
+        }, 250);
         dropdown.classList.remove('show');
     }
 }
@@ -1328,7 +1349,7 @@ function filterQuickAssignList(showAll = false) {
 
     const items = list.querySelectorAll('.quick-assign-item');
     const groups = list.querySelectorAll('.quick-assign-group');
-    
+
     // Clear any existing empty state
     const existingEmpty = list.querySelector('.quick-assign-empty-state');
     if (existingEmpty) existingEmpty.remove();
@@ -1339,9 +1360,9 @@ function filterQuickAssignList(showAll = false) {
         const name = (item.dataset.name || '').toLowerCase();
         const role = (item.dataset.role || '').toLowerCase();
         const team = (item.dataset.team || '').toLowerCase();
-        
+
         const visible = showAll || search.length === 0 || name.includes(search) || role.includes(search) || team.includes(search);
-        
+
         item.style.display = visible ? 'block' : 'none';
         if (visible) totalVisible++;
     });
@@ -1368,26 +1389,77 @@ function filterQuickAssignList(showAll = false) {
     }
 }
 
-function selectQuickAssignUser(id, name, role) {
+function selectQuickAssignUser(id, name, role, team) {
     const input = document.getElementById('taskAssignedToUserId');
+    const teamInput = document.getElementById('taskAssignedToTeam');
     const btn = document.getElementById('btnQuickAssign');
     const dropdown = document.getElementById('quickAssignDropdown');
+    const badge = document.getElementById('quickAssignSelectedUserBadge');
+    const nameSpan = document.getElementById('quickAssignSelectedUserName');
+    const searchContainer = document.getElementById('quickAssignSearchContainer');
+
+    if (input) {
+        input.value = id;
+        input.setAttribute("data-assigned-name", name);
+    }
     
-    input.value = id;
-    input.setAttribute("data-assigned-name", name);
-    
+    if (teamInput) teamInput.value = team;
+
+    // Show selection badge
+    if (badge && nameSpan) {
+        nameSpan.textContent = name;
+        badge.classList.remove('d-none');
+        badge.classList.add('d-inline-flex');
+    }
+
+    // Hide search bar after selection
+    if (searchContainer) {
+        searchContainer.classList.remove('show');
+        setTimeout(() => searchContainer.classList.add('d-none'), 250);
+    }
+
     // Switch to selected state icon
-    btn.innerHTML = `<i class="bi bi-person-check-fill fs-5"></i>`;
-    btn.classList.remove('btn-outline-info');
-    btn.classList.add('btn-info', 'text-white');
-    btn.title = `Assigned to ${name}`;
-    
+    if (btn) {
+        btn.innerHTML = `<i class="bi bi-person-check-fill fs-5"></i>`;
+        btn.classList.remove('btn-outline-info');
+        btn.classList.add('btn-info', 'text-white');
+        btn.title = `Assigned to ${name}`;
+    }
+
     // Close dropdown
     if (dropdown) dropdown.classList.remove('show');
+
+    if (typeof showToast === 'function') showToast(`User ${name} selected! Click 'Create' to assign.`, 'info');
+}
+
+function clearQuickAssignSelection(event) {
+    if (event) event.stopPropagation();
+    
+    const input = document.getElementById('taskAssignedToUserId');
+    const teamInput = document.getElementById('taskAssignedToTeam');
+    const badge = document.getElementById('quickAssignSelectedUserBadge');
+    const btn = document.getElementById('btnQuickAssign');
+
+    if (input) {
+        input.value = '';
+        input.removeAttribute("data-assigned-name");
+    }
+    if (teamInput) teamInput.value = '';
+    
+    if (badge) {
+        badge.classList.add('d-none');
+        badge.classList.remove('d-inline-flex');
+    }
+
+    if (btn) {
+        btn.innerHTML = '<i class="bi bi-person-plus fs-5"></i>';
+        btn.classList.add('btn-outline-info');
+        btn.classList.remove('btn-info', 'text-white');
+    }
 }
 
 // Close dropdown when clicking outside
-document.addEventListener('mousedown', function(e) {
+document.addEventListener('mousedown', function (e) {
     const wrapper = e.target.closest('.quick-assign-wrapper');
     if (!wrapper) {
         const dropdown = document.getElementById('quickAssignDropdown');
@@ -1396,26 +1468,47 @@ document.addEventListener('mousedown', function(e) {
 });
 
 // Reset assignment and HIDE everything when modal opens
-$(document).on('show.bs.modal', '#createTaskModal', function () {
-    const input = document.getElementById('taskAssignedToUserId');
+$(document).on('show.bs.modal', '#createTaskModal, #editTaskModal', function () {
+    const isCreate = this.id === 'createTaskModal';
+    const inputId = isCreate ? 'taskAssignedToUserId' : 'editTaskAssignedTo';
+    const input = document.getElementById(inputId);
+    const btnId = isCreate ? 'btnQuickAssign' : null; // Quick Assign only on Create for now? 
+    // Actually the logic should be generic if btnQuickAssign is shared.
+    
     const btn = document.getElementById('btnQuickAssign');
     const dropdown = document.getElementById('quickAssignDropdown');
+    const searchContainer = document.getElementById('quickAssignSearchContainer');
     const searchInput = document.getElementById('quickAssignSearchInput');
-    
-    if (input) {
+
+    if (input && isCreate) {
         input.value = '';
         input.removeAttribute("data-assigned-name");
     }
+    
     if (btn) {
         btn.innerHTML = '<i class="bi bi-person-plus fs-5"></i>';
         btn.classList.remove('btn-info', 'text-white');
         btn.classList.add('btn-outline-info');
         btn.title = 'Quick Assign';
     }
+    
+    if (searchContainer) {
+        searchContainer.classList.remove('show');
+        searchContainer.classList.add('d-none');
+    }
+    
     if (dropdown) dropdown.classList.remove('show');
     if (searchInput) searchInput.value = '';
+
+    const badge = document.getElementById('quickAssignSelectedUserBadge');
+    if (badge) {
+        badge.classList.add('d-none');
+        badge.classList.remove('d-inline-flex');
+    }
     
-    // Reset all items to hidden
+    const teamInput = document.getElementById('taskAssignedToTeam');
+    if (teamInput) teamInput.value = '';
+
     const list = document.getElementById('quickAssignList');
     if (list) {
         list.querySelectorAll('.quick-assign-item').forEach(i => i.style.display = 'none');
@@ -1431,21 +1524,21 @@ function openCommunicationLogsModal(teamName) {
     currentLogsTeam = teamName;
     const modalEl = document.getElementById('communicationLogsModal');
     if (!modalEl) return;
-    
+
     document.getElementById('logTeamNameTitle').textContent = `(${teamName})`;
-    
+
     const modal = new bootstrap.Modal(modalEl);
     modal.show();
-    
+
     refreshCommunicationLogs();
 }
 
 function refreshCommunicationLogs() {
     if (!currentLogsTeam) return;
-    
+
     const tbody = document.getElementById('communicationLogsTbody');
     if (!tbody) return;
-    
+
     tbody.innerHTML = `
         <tr>
             <td colspan="5" class="text-center py-4 text-muted">
@@ -1454,7 +1547,7 @@ function refreshCommunicationLogs() {
             </td>
         </tr>
     `;
-    
+
     fetch(`/Communication/GetCommunicationLogs?teamName=${encodeURIComponent(currentLogsTeam)}`)
         .then(res => {
             if (!res.ok) throw new Error("Failed to fetch logs");
@@ -1472,22 +1565,22 @@ function refreshCommunicationLogs() {
                 `;
                 return;
             }
-            
+
             let html = '';
             logs.forEach(log => {
                 const dateObj = new Date(log.sentAt);
                 const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                
-                const actionBadge = log.action === 'WhatsApp Click' 
+
+                const actionBadge = log.action === 'WhatsApp Click'
                     ? '<span class="badge bg-success" style="font-size: 0.8rem;"><i class="bi bi-whatsapp me-1"></i> WhatsApp</span>'
                     : '<span class="badge bg-primary" style="font-size: 0.8rem;"><i class="bi bi-envelope me-1"></i> Email</span>';
-                
-                
+
+
                 const statusBadge = log.status === 'Sent'
                     ? '<span class="badge bg-success bg-opacity-75"><i class="bi bi-check-circle me-1"></i>Sent</span>'
                     : log.status === 'Failed'
-                    ? '<span class="badge bg-danger bg-opacity-75"><i class="bi bi-x-circle me-1"></i>Failed</span>'
-                    : `<span class="badge bg-secondary bg-opacity-75">${log.status || '-'}</span>`;
+                        ? '<span class="badge bg-danger bg-opacity-75"><i class="bi bi-x-circle me-1"></i>Failed</span>'
+                        : `<span class="badge bg-secondary bg-opacity-75">${log.status || '-'}</span>`;
 
                 html += `
                     <tr>
@@ -1501,7 +1594,7 @@ function refreshCommunicationLogs() {
                     </tr>
                 `;
             });
-            
+
             tbody.innerHTML = html;
         })
         .catch(err => {
@@ -1579,8 +1672,8 @@ function refreshTaskCommLogs() {
                 const statusBadge = log.status === 'Sent'
                     ? '<span class="badge bg-success bg-opacity-75"><i class="bi bi-check-circle me-1"></i>Sent</span>'
                     : log.status === 'Failed'
-                    ? '<span class="badge bg-danger bg-opacity-75"><i class="bi bi-x-circle me-1"></i>Failed</span>'
-                    : `<span class="badge bg-secondary bg-opacity-75">${log.status || '-'}</span>`;
+                        ? '<span class="badge bg-danger bg-opacity-75"><i class="bi bi-x-circle me-1"></i>Failed</span>'
+                        : `<span class="badge bg-secondary bg-opacity-75">${log.status || '-'}</span>`;
 
                 html += `
                     <tr>

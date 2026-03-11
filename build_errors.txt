@@ -1,8 +1,0 @@
-﻿C:\Users\chand\source\repos\TradeFxP\EmployeeManagementSystem\Controllers\CommunicationController.cs(202,17): error CS0103: The name '_logger' does not exist in the current context [C:\Users\chand\source\repos\TradeFxP\EmployeeManagementSystem\UserRoles.csproj]
-C:\Users\chand\source\repos\TradeFxP\EmployeeManagementSystem\Controllers\CommunicationController.cs(267,17): error CS0103: The name '_logger' does not exist in the current context [C:\Users\chand\source\repos\TradeFxP\EmployeeManagementSystem\UserRoles.csproj]
-
-Build FAILED.
-    109 Warning(s)
-    2 Error(s)
-
-Time Elapsed 00:00:08.15

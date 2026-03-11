@@ -1,4 +1,4 @@
-﻿
+
 // ===============================
 // CSRF token helper is now provided globally by ajax-utils.js (window.getAntiForgeryToken)
 
@@ -382,11 +382,24 @@ window.drop = function (event, newParentId) {
                 if (secondLabel) secondLabel.textContent = 'Sub Manager';
             }
 
+            // Show Admin option if current user is Admin
+            const adminTypeBlock = document.getElementById('addAdminTypeBlock');
+            if (adminTypeBlock) {
+                if (window.__isAdmin) {
+                    adminTypeBlock.classList.remove('d-none');
+                } else {
+                    adminTypeBlock.classList.add('d-none');
+                }
+            }
+
             // Helper declared here so it's available when openAddModal calls it.
             function updateTitleAndHiddenRole() {
                 try {
                     const addType = addModalEl.querySelector('input[name="addType"]:checked')?.value ?? 'User';
-                    if (addType === 'Manager') {
+                    if (addType === 'Admin') {
+                        if (modalTitle) modalTitle.innerText = 'Add Admin';
+                        if (roleInput) roleInput.value = 'Admin';
+                    } else if (addType === 'Manager') {
                         if (modalTitle) modalTitle.innerText = 'Add Manager';
                         if (roleInput) roleInput.value = 'Manager';
                     } else if (addType === 'SubManager') {
@@ -649,7 +662,7 @@ window.openRoleModal = function (userId, userName, currentRole) {
         // Badge colour
         const badge = document.getElementById('rcCurrentRoleBadge');
         if (badge) {
-            const colours = { User: 'bg-info', Manager: 'bg-success', SubManager: 'bg-warning text-dark' };
+            const colours = { Admin: 'bg-primary', User: 'bg-info', Manager: 'bg-success', SubManager: 'bg-warning text-dark' };
             badge.className = 'badge ms-2 ' + (colours[currentRole] || 'bg-secondary');
             badge.innerText = currentRole === 'SubManager' ? 'Sub-Manager' : currentRole;
         }
@@ -659,6 +672,7 @@ window.openRoleModal = function (userId, userName, currentRole) {
         if (roleSelect) {
             roleSelect.innerHTML = '<option value="">-- Select New Role --</option>';
             const allRoles = [
+                { value: 'Admin', label: 'Administrator' },
                 { value: 'Manager', label: 'Manager (Top-level)' },
                 { value: 'SubManager', label: 'Sub-Manager (under a Manager)' },
                 { value: 'User', label: 'User' }
@@ -692,7 +706,7 @@ window.onRoleModalRoleChange = function () {
     const newRole = document.getElementById('rcNewRole')?.value;
     const parentBlock = document.getElementById('rcParentBlock');
     if (parentBlock) {
-        parentBlock.style.display = (newRole === 'SubManager') ? 'block' : 'none';
+        parentBlock.style.display = (newRole === 'SubManager' || newRole === 'User') ? 'block' : 'none';
     }
 };
 

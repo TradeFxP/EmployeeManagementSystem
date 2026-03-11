@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using UserRoles.Models;
 
@@ -93,6 +93,12 @@ namespace UserRoles.Data
                 .HasOne(e => e.SentByUser)
                 .WithMany()
                 .HasForeignKey(e => e.SentByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.Entity<EmailLog>()
+                .HasOne(e => e.Task)
+                .WithMany()
+                .HasForeignKey(e => e.TaskId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<EmailLog>()

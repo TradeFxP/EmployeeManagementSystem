@@ -88,6 +88,11 @@ namespace UserRoles.Controllers
                 adminUsers = allUsers
                     .Where(u => roleMap[u.Id] == "User" && string.IsNullOrEmpty(u.ParentUserId))
                     .ToList();
+
+                // Other Admins (excluding current one)
+                ViewBag.OtherAdmins = allUsers
+                    .Where(u => u.Id != currentUserId && roleMap[u.Id] == "Admin")
+                    .ToList();
             }
             else // currentRole == "Manager"
             {

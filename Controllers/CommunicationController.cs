@@ -178,7 +178,7 @@ namespace UserRoles.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> SendOutlookEmail([FromQuery] int taskId, [FromQuery] string templateName)
+        public async Task<IActionResult> SendTemplateEmail([FromQuery] int taskId, [FromQuery] string templateName)
         {
             try
             {
@@ -200,17 +200,15 @@ namespace UserRoles.Controllers
                 var fromEmail = user?.Email ?? _settings.FromAddress;
                 var fromName = user?.Name ?? user?.UserName ?? _settings.FromName;
 
-                await _emailService.SendEmailSmtpAsync(
+                await _emailService.SendEmailAsync(
                     emailValue.Value,
                     subject,
                     htmlBody,
-                    "OutlookEmail",
+                    "TemplateEmail",
                     user?.Id,
-                    fromEmail,
-                    fromName,
                     taskId);
 
-                return Ok(new { success = true, message = "Email sent successfully via Outlook." });
+                return Ok(new { success = true, message = "Email sent successfully via Zoho." });
             }
             catch (Exception ex)
             {
