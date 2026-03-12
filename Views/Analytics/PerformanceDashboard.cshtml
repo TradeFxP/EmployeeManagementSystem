@@ -80,49 +80,7 @@
             <button class="btn-reset-new" onclick="resetDashboard()"><i class="bi bi-x"></i> Reset</button>
         </div>
 
-        <!-- ── KPI CARDS ── -->
-        <div class="kpi-grid">
-            <div class="kpi-card border-emerald">
-                <div class="kpi-info">
-                    <span class="kpi-label">TOTAL EMPLOYEES</span>
-                    <h2 class="kpi-value">@Model.KPIs.TotalEmployees</h2>
-                    <span class="kpi-change up"><i class="bi bi-caret-up-fill"></i> @Model.KPIs.TotalEmployeesChange%
-                        from prev month</span>
-                </div>
-                <i class="bi bi-people kpi-icon"></i>
-            </div>
-            <div class="kpi-card border-blue">
-                <div class="kpi-info">
-                    <span class="kpi-label">AVG RATING</span>
-                    <h2 class="kpi-value">@Model.KPIs.AvgRating<small>/5</small></h2>
-                    <span class="kpi-change up"><i class="bi bi-caret-up-fill"></i> @Model.KPIs.AvgRatingChange from
-                        prev month</span>
-                </div>
-                <i class="bi bi-star kpi-icon"></i>
-            </div>
-            <div class="kpi-card border-orange">
-                <div class="kpi-info">
-                    <span class="kpi-label">TOP PERFORMERS</span>
-                    <h2 class="kpi-value">@Model.KPIs.TopPerformers</h2>
-                    <span class="kpi-change up"><i class="bi bi-caret-up-fill"></i> @Model.KPIs.TopPerformersChange%
-                        from prev month</span>
-                </div>
-                <i class="bi bi-trophy kpi-icon text-orange"></i>
-            </div>
-            <div class="kpi-card border-purple">
-                <div class="kpi-info">
-                    <span class="kpi-label">NEEDS IMPROVEMENT</span>
-                    <h2 class="kpi-value">@Model.KPIs.NeedsImprovement</h2>
-                    <span class="kpi-change @(Model.KPIs.NeedsImprovementChange < 0 ? "down" : "up")">
-                        <i class="bi bi-caret-@(Model.KPIs.NeedsImprovementChange < 0 ? "down" : "up")-fill"></i>
-                        @Math.Abs(Model.KPIs.NeedsImprovementChange)% from prev month
-                    </span>
-                </div>
-                <i class="bi bi-exclamation-triangle kpi-icon text-purple"></i>
-            </div>
-        </div>
-
-        <!-- ── TREND CHART ── -->
+        <!-- ── TREND CHART (MOVED TO TOP) ── -->
         <div class="chart-section main-trend">
             <div class="chart-header">
                 <h3><i class="bi bi-graph-up"></i> Performance Trend by Team</h3>
@@ -144,8 +102,50 @@
             </div>
         </div>
 
+        <!-- ── KPI CARDS ── -->
+        <div class="kpi-grid">
+            <div class="kpi-card border-emerald">
+                <div class="kpi-info">
+                    <span class="kpi-label">TOTAL EMPLOYEES</span>
+                    <h2 class="kpi-value" id="kpiTotalEmployees">@Model.KPIs.TotalEmployees</h2>
+                    <span class="kpi-change up"><i class="bi bi-caret-up-fill"></i> @Model.KPIs.TotalEmployeesChange%
+                        from prev month</span>
+                </div>
+                <i class="bi bi-people kpi-icon"></i>
+            </div>
+            <div class="kpi-card border-blue">
+                <div class="kpi-info">
+                    <span class="kpi-label">AVG RATING</span>
+                    <h2 class="kpi-value"><span id="kpiAvgRating">@Model.KPIs.AvgRating</span><small>/5</small></h2>
+                    <span class="kpi-change up"><i class="bi bi-caret-up-fill"></i> @Model.KPIs.AvgRatingChange from
+                        prev month</span>
+                </div>
+                <i class="bi bi-star kpi-icon"></i>
+            </div>
+            <div class="kpi-card border-orange">
+                <div class="kpi-info">
+                    <span class="kpi-label">TOP PERFORMERS</span>
+                    <h2 class="kpi-value" id="kpiTopPerformers">@Model.KPIs.TopPerformers</h2>
+                    <span class="kpi-change up"><i class="bi bi-caret-up-fill"></i> @Model.KPIs.TopPerformersChange%
+                        from prev month</span>
+                </div>
+                <i class="bi bi-trophy kpi-icon text-orange"></i>
+            </div>
+            <div class="kpi-card border-purple">
+                <div class="kpi-info">
+                    <span class="kpi-label">NEEDS IMPROVEMENT</span>
+                    <h2 class="kpi-value" id="kpiNeedsImprovement">@Model.KPIs.NeedsImprovement</h2>
+                    <span class="kpi-change @(Model.KPIs.NeedsImprovementChange < 0 ? "down" : "up")">
+                        <i class="bi bi-caret-@(Model.KPIs.NeedsImprovementChange < 0 ? "down" : "up")-fill"></i>
+                        @Math.Abs(Model.KPIs.NeedsImprovementChange)% from prev month
+                    </span>
+                </div>
+                <i class="bi bi-exclamation-triangle kpi-icon text-purple"></i>
+            </div>
+        </div>
+
         <!-- ── MIDDLE CHART ROW (IMAGE 4 ACCURACY) ── -->
-        <div class="middle-grid">
+        <!-- <div class="middle-grid">
             <div class="chart-section distribution-panel">
                 <div class="chart-header">
                     <h3>Rating Distribution</h3>
@@ -180,7 +180,7 @@
                     <canvas id="teamAvgChart"></canvas>
                 </div>
             </div>
-        </div>
+        </div> -->
 
         <div class="lower-flex-grid">
             <!-- ── LEADERBOARD ── -->
@@ -388,7 +388,7 @@
 
     .dashboard-container {
         max-width: 100%;
-        padding: 5px 30px 20px 30px;
+        padding: 0 30px 20px 30px;
         margin: 0;
     }
 
@@ -402,8 +402,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 16px 0 16px 0;
-        margin-bottom: 16px;
+        padding: 8px 0 12px 0;
+        margin-bottom: 12px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
         flex-wrap: nowrap;
         gap: 16px;
@@ -1079,6 +1079,15 @@
 
     .status-pill.good .pill-dot {
         background: var(--accent-blue);
+    }
+
+    .status-pill.not-started {
+        background: rgba(139, 161, 183, 0.1);
+        color: #8ba1b7;
+    }
+
+    .status-pill.not-started .pill-dot {
+        background: #8ba1b7;
     }
 
     /* Side Panel */
@@ -1769,34 +1778,38 @@
     }
 </style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
 <script>
     // ── DATA & CHARTS ──
     const trendData = @Html.Raw(Json.Serialize(Model.TrendData));
     const distData = @Html.Raw(Json.Serialize(Model.Distribution));
     const teamAvgData = @Html.Raw(Json.Serialize(Model.TeamAvgRatings));
-    const employeeData = @Html.Raw(Json.Serialize(Model.EmployeeRows));
+    window.employeeData = @Html.Raw(Json.Serialize(Model.EmployeeRows));
+    window.latestEmployeeData = window.employeeData;
 
-    let trendChart = null;
-    let radarChart = null;
-    let distChart = null;
-    let teamAvgChart = null;
-
+    let trendChart, distChart, teamAvgChart, radarChart;
     const colors = ['#3b82f6', '#a855f7', '#10b981', '#f97316', '#eab308', '#ef4444', '#22c55e', '#06b6d4', '#d946ef', '#84cc16'];
 
     const initCharts = () => {
-        // Trend Line Chart
+        // 1. Trend Line Chart
         const trendCtx = document.getElementById('trendChart').getContext('2d');
         const teams = (trendData.length > 0 ? Object.keys(trendData[0].teamScores) : []).filter(t => t !== "Development");
 
-        // Populate Pills
         const pillsContainer = document.getElementById('teamPills');
         if (pillsContainer) {
             pillsContainer.innerHTML = teams.map((team, i) => `
-                <div class="team-pill" style="border-color: ${colors[i % colors.length]}; background: ${colors[i % colors.length]}33; color: ${colors[i % colors.length]}">
+                <div class="team-pill" style="border-color: ${colors[i % colors.length]}; background: ${colors[i % colors.length]}33; color: ${colors[i % colors.length]}" onclick="toggleTrendLine('${team}', ${i})">
                     ${team}
                 </div>
             `).join('');
         }
+
+        const createGradient = (color) => {
+            const grad = trendCtx.createLinearGradient(0, 0, 0, 400);
+            grad.addColorStop(0, color + '22');
+            grad.addColorStop(1, color + '00');
+            return grad;
+        };
 
         trendChart = new Chart(trendCtx, {
             type: 'line',
@@ -1806,82 +1819,59 @@
                     label: team,
                     data: trendData.map(d => d.teamScores[team]),
                     borderColor: colors[i % colors.length],
-                    backgroundColor: 'transparent',
-                    tension: 0.4,
-                    borderWidth: 2,
-                    pointRadius: 3,
+                    backgroundColor: createGradient(colors[i % colors.length]),
+                    tension: 0.5,
+                    borderWidth: 2.5,
+                    pointRadius: 0,
                     pointHoverRadius: 6,
+                    pointBackgroundColor: colors[i % colors.length],
+                    fill: true,
                     hidden: false
                 }))
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                interaction: { mode: 'index', intersect: false },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(26, 31, 55, 0.95)',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        titleColor: '#fff',
+                        bodyColor: '#8ba1b7',
+                        usePointStyle: true,
+                    }
+                },
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8ba1b7' } },
-                    y: { min: 2, max: 5, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8ba1b7' } }
+                    x: { grid: { display: false }, ticks: { color: '#8ba1b7', font: { size: 11 } } },
+                    y: { 
+                        min: 0, max: 5, 
+                        grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false }, 
+                        ticks: { color: '#8ba1b7', font: { size: 11 }, stepSize: 1 } 
+                    }
+                },
+                onHover: (e, el) => {
+                    if (!trendChart) return;
+                    if (el.length > 0) {
+                        const activeIdx = el[0].datasetIndex;
+                        trendChart.data.datasets.forEach((ds, i) => {
+                            if (i === activeIdx) ds.borderWidth = 3;
+                            else ds.borderColor = colors[i % colors.length] + '33';
+                        });
+                    } else {
+                        trendChart.data.datasets.forEach((ds, i) => {
+                            ds.borderWidth = 2.5;
+                            ds.borderColor = colors[i % colors.length];
+                        });
+                    }
+                    trendChart.update('none');
                 }
             }
         });
 
-        // Pill Interaction Logic
-        document.querySelectorAll('.team-pill').forEach((pill, idx) => {
-            pill.addEventListener('click', () => {
-                const isVisible = trendChart.isDatasetVisible(idx);
-                trendChart.setDatasetVisibility(idx, !isVisible);
-                trendChart.update();
-                pill.classList.toggle('inactive', isVisible);
-            });
-        });
-
-    const toggleAllLines = (show) => {
-        if (!trendChart) return;
-        trendChart.data.datasets.forEach((ds, i) => trendChart.setDatasetVisibility(i, show));
-        trendChart.update();
-        document.querySelectorAll('.team-pill').forEach(p => {
-            if (show) p.classList.remove('inactive');
-            else p.classList.add('inactive');
-        });
-    };
-
-    const setTrendPeriod = (type) => {
-        if (!trendChart) return;
-        const btns = document.querySelectorAll('.trend-controls .ctrl-btn');
-        btns.forEach(b => {
-            b.classList.remove('active');
-            if (b.innerText === type) b.classList.add('active');
-        });
-
-        const isWeekly = type === 'Weekly';
-        trendChart.data.labels = isWeekly ? ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'] : trendData.map(d => d.month);
-        trendChart.data.datasets.forEach(ds => {
-            ds.data = isWeekly ? Array.from({ length: 8 }, () => (3.0 + Math.random() * 2.0).toFixed(1)) : trendData.map(d => d.teamScores[ds.label]);
-        });
-        trendChart.update('active');
-    };
-
-    const updateLiveDynamics = () => {
-        if (!trendChart) return;
-        trendChart.data.datasets.forEach(dst => {
-            if (!dst.hidden) {
-                const lastIdx = dst.data.length - 1;
-                const currentVal = parseFloat(dst.data[lastIdx]) || 0;
-                const change = (Math.random() - 0.5) * 0.04;
-                dst.data[lastIdx] = Math.max(2, Math.min(5, currentVal + change)).toFixed(2);
-            }
-        });
-        trendChart.update('active');
-    };
-
-    const showResetToast = () => {
-        const toast = document.getElementById('filtersClearedToast');
-        if (toast) {
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 3500);
-        }
-    };
-
-        // Distribution Chart
+        // 2. Distribution Chart
         const distCtx = document.getElementById('distChart').getContext('2d');
         distChart = new Chart(distCtx, {
             type: 'doughnut',
@@ -1896,7 +1886,7 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
 
-        // Team Avg Chart
+        // 3. Team Avg Chart
         const teamAvgCtx = document.getElementById('teamAvgChart').getContext('2d');
         teamAvgChart = new Chart(teamAvgCtx, {
             type: 'bar',
@@ -1921,7 +1911,176 @@
         });
     };
 
-    // ── INTERACTION LOGIC ──
+    window.toggleTrendLine = (team, idx) => {
+        if (!trendChart) return;
+        const isVisible = trendChart.isDatasetVisible(idx);
+        trendChart.setDatasetVisibility(idx, !isVisible);
+        trendChart.update();
+        const pill = document.querySelectorAll('.team-pill')[idx];
+        if (pill) pill.classList.toggle('inactive', isVisible);
+    };
+
+    window.toggleAllLines = (show) => {
+        if (!trendChart) return;
+        trendChart.data.datasets.forEach((ds, i) => trendChart.setDatasetVisibility(i, show));
+        trendChart.update();
+        document.querySelectorAll('.team-pill').forEach(p => {
+            if (show) p.classList.remove('inactive');
+            else p.classList.add('inactive');
+        });
+    };
+
+    window.setTrendPeriod = (type) => {
+        const btns = document.querySelectorAll('.trend-controls .ctrl-btn');
+        btns.forEach(b => {
+            b.classList.remove('active');
+            if (b.innerText === type) b.classList.add('active');
+        });
+        const periodVal = (type === 'Weekly' ? 'Weekly View' : 'Monthly View');
+        document.getElementById('periodFilter').value = periodVal;
+        window.applyFilters(); 
+    };
+
+    const updateDashboardUI = (data) => {
+        // Update KPIs
+        document.getElementById('kpiTotalEmployees').innerText = data.kpIs.totalEmployees;
+        document.getElementById('kpiAvgRating').innerText = data.kpIs.avgRating;
+        document.getElementById('kpiTopPerformers').innerText = data.kpIs.topPerformers;
+        document.getElementById('kpiNeedsImprovement').innerText = data.kpIs.needsImprovement;
+
+        // Update Trend Chart
+        if (trendChart) {
+            const teams = (data.trendData.length > 0 ? Object.keys(data.trendData[0].teamScores) : []).filter(t => t !== "Development");
+            trendChart.data.labels = data.trendData.map(d => d.month);
+            trendChart.data.datasets = teams.map((team, i) => ({
+                label: team,
+                data: data.trendData.map(d => d.teamScores[team]),
+                borderColor: colors[i % colors.length],
+                backgroundColor: 'transparent',
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                hidden: false
+            }));
+            trendChart.update();
+
+            // Refresh Pills
+            const pillsContainer = document.getElementById('teamPills');
+            if (pillsContainer) {
+                pillsContainer.innerHTML = teams.map((team, i) => `
+                    <div class="team-pill" style="border-color: ${colors[i % colors.length]}; background: ${colors[i % colors.length]}33; color: ${colors[i % colors.length]}" onclick="toggleTrendLine('${team}', ${i})">
+                        ${team}
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Update Distribution Chart
+        if (distChart) {
+            distChart.data.datasets[0].data = [data.distribution.excellentPct, data.distribution.goodPct, data.distribution.averagePct, data.distribution.poorPct];
+            distChart.update();
+            const distValEl = document.querySelector('.dist-val');
+            if (distValEl) distValEl.innerText = `${data.distribution.excellentPct}%`;
+        }
+
+        // Update Team Avg Chart
+        if (teamAvgChart) {
+            const filteredTeamAvg = data.teamAvgRatings.filter(t => t.teamName !== "Development");
+            teamAvgChart.data.labels = filteredTeamAvg.map(t => t.teamName);
+            teamAvgChart.data.datasets[0].data = filteredTeamAvg.map(t => t.avgRating);
+            teamAvgChart.data.datasets[0].backgroundColor = filteredTeamAvg.map(t => t.color);
+            teamAvgChart.update();
+        }
+
+        // Update Employee Table
+        const tbody = document.querySelector('#employeeTable tbody');
+        if (tbody) {
+            tbody.innerHTML = data.employeeRows.filter(r => r.team !== "Development").map(row => `
+                <tr class="employee-row" data-emp-id="${row.userId}" data-name="${row.name}" id="row-${row.userId}">
+                    <td>
+                        <div class="emp-cell">
+                            <div class="avatar" style="background-color: ${row.avatarColor}">${row.initials}</div>
+                            <div class="emp-info">
+                                <span class="emp-name">${row.name}</span>
+                                <span class="emp-role">${row.role}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="team-badge">${row.team}</span></td>
+                    <td>
+                        <div class="rating-cell">
+                            <div class="rating-bar-bg">
+                                <div class="rating-bar-fill" style="width: ${row.rating * 20}%; background-color: ${row.color};"></div>
+                            </div>
+                            <span class="rating-num">${row.rating}</span>
+                        </div>
+                    </td>
+                    <td><span class="task-num">${row.tasksDone}</span></td>
+                    <td><span class="status-pill ${row.statusClass}"><span class="pill-dot"></span> ${row.status}</span></td>
+                </tr>
+            `).join('');
+            
+            // Re-attach listeners
+            initInteractions();
+        }
+    };
+
+    window.applyFilters = () => {
+        const team = document.getElementById('teamFilter').value;
+        const rating = document.getElementById('ratingFilter').value;
+        const period = document.getElementById('periodFilter').value;
+        const searchInput = document.querySelector('.table-search input');
+        const search = searchInput ? searchInput.value : "";
+
+        fetch(`/Analytics/GetPerformanceData?team=${encodeURIComponent(team)}&rating=${encodeURIComponent(rating)}&period=${encodeURIComponent(period)}&search=${encodeURIComponent(search)}`)
+            .then(res => res.json())
+            .then(data => {
+                window.latestEmployeeData = data.employeeRows;
+                updateDashboardUI(data);
+            })
+            .catch(err => console.error("Filter update failed:", err));
+    };
+
+    window.resetDashboard = () => {
+        document.getElementById('teamFilter').value = 'All Teams';
+        document.getElementById('ratingFilter').value = 'All Ratings';
+        document.getElementById('periodFilter').value = 'Monthly View';
+        const searchInput = document.querySelector('.table-search input');
+        if (searchInput) searchInput.value = '';
+        window.applyFilters();
+        showResetToast();
+    };
+
+    window.searchTable = (v) => {
+        const rows = document.querySelectorAll('.employee-row');
+        rows.forEach(r => {
+            const name = r.getAttribute('data-name').toLowerCase();
+            r.style.display = name.includes(v.toLowerCase()) ? '' : 'none';
+        });
+    };
+
+    const updateLiveDynamics = () => {
+        if (!trendChart) return;
+        trendChart.data.datasets.forEach(dst => {
+            if (!dst.hidden) {
+                const lastIdx = dst.data.length - 1;
+                const currentVal = parseFloat(dst.data[lastIdx]) || 0;
+                const change = (Math.random() - 0.5) * 0.04;
+                dst.data[lastIdx] = Math.max(0, Math.min(5, currentVal + change)).toFixed(2);
+            }
+        });
+        trendChart.update('none');
+    };
+
+    const showResetToast = () => {
+        const toast = document.getElementById('filtersClearedToast');
+        if (toast) {
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3500);
+        }
+    };
+
     const showDetails = (emp) => {
         document.querySelectorAll('.employee-row').forEach(r => r.classList.remove('active'));
         const activeRow = document.getElementById(`row-${emp.userId}`);
@@ -1974,11 +2133,7 @@
                     spacing: 3
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     };
 
@@ -1988,32 +2143,10 @@
         document.getElementById('employeeDetail').classList.add('hidden');
     };
 
-    // ── FILTER & SEARCH ──
-    const applyFilters = () => {
-        const team = document.getElementById('teamFilter').value;
-        const rating = document.getElementById('ratingFilter').value;
-        const period = document.getElementById('periodFilter').value;
-        const url = new URL(window.location.href);
-        url.searchParams.set('team', team);
-        url.searchParams.set('rating', rating);
-        url.searchParams.set('period', period);
-        window.location.href = url.toString();
-    };
-    const resetDashboard = () => {
-        window.location.href = '/Analytics/PerformanceDashboard?reset=1';
-    };
-    const searchTable = (v) => {
-        const rows = document.querySelectorAll('.employee-row');
-        rows.forEach(r => {
-            const name = r.getAttribute('data-name').toLowerCase();
-            r.style.display = name.includes(v.toLowerCase()) ? '' : 'none';
-        });
-    };
-
     // ── MODAL LOGIC ──
-    const openPerformanceReviewModal = () => document.getElementById('reviewModal').classList.remove('hidden');
-    const closePerformanceReviewModal = () => document.getElementById('reviewModal').classList.add('hidden');
-    const populateReviewFields = (sel) => {
+    window.openPerformanceReviewModal = () => document.getElementById('reviewModal').classList.remove('hidden');
+    window.closePerformanceReviewModal = () => document.getElementById('reviewModal').classList.add('hidden');
+    window.populateReviewFields = (sel) => {
         const opt = sel.options[sel.selectedIndex];
         document.getElementById('modalTeam').value = opt.getAttribute('data-team');
         document.getElementById('modalRole').value = opt.getAttribute('data-role');
@@ -2040,13 +2173,11 @@
         });
     }
 
-    const updateDate = (item) => {
+    window.updateDate = (item) => {
         document.querySelectorAll('.menu-item').forEach(mi => mi.classList.remove('active'));
         item.classList.add('active');
-        
         let text = item.innerText;
         if (text === "January 2026") text = "Jan 1 – Jan 31, 2026";
-        
         document.getElementById('activeDate').innerText = text;
         if (dateMenu) dateMenu.classList.remove('show');
     };
@@ -2055,24 +2186,33 @@
         if (dateMenu) dateMenu.classList.remove('show');
     });
 
-    // ── INIT ──
     const initInteractions = () => {
         document.querySelectorAll('.employee-row').forEach(row => {
             row.addEventListener('dblclick', () => {
                 const empId = row.getAttribute('data-emp-id');
-                const emp = employeeData.find(e => e.userId.toString() === empId.toString());
+                const emp = (window.latestEmployeeData || window.employeeData).find(e => e.userId.toString() === empId.toString());
                 if (emp) showDetails(emp);
             });
         });
     };
 
+    const initSignalR = () => {
+        if (typeof signalR !== 'undefined') {
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/taskHub")
+                .withAutomaticReconnect()
+                .build();
+            connection.on("TaskStatusUpdated", () => window.applyFilters());
+            connection.on("TaskCreated", () => window.applyFilters());
+            connection.on("TaskDeleted", () => window.applyFilters());
+            connection.start().catch(err => console.error("SignalR connection error:", err));
+        }
+    };
+
     document.addEventListener('DOMContentLoaded', () => {
         initCharts();
         initInteractions();
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('reset')) showResetToast();
-        
+        initSignalR();
         setInterval(updateLiveDynamics, 4000);
     });
 </script>

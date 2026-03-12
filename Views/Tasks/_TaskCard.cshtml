@@ -88,9 +88,9 @@
             {
                         <span class="badge bg-light text-dark border d-flex align-items-center gap-1 small fw-normal" 
                               title="Due Date" 
-                              style="font-size: 0.7rem; white-space: nowrap;">
+                              style="font-size: 0.7rem; white-space: nowrap; padding: 1px 4px;">
                             <i class="bi bi-calendar-event text-danger"></i>
-                    @finalDueDate.Value.ToString("dd-MM-yyyy, HH:mm:ss")
+                    @finalDueDate.Value.ToString("dd-MM-yyyy, hh:mm tt")
                         </span>
             }
 
@@ -170,26 +170,26 @@
     <!-- FAIL NOTE -->
     @if (isFailed && !string.IsNullOrWhiteSpace(Model.ReviewNote))
     {
-                <div class="review-note-callout mt-2">
+                <div class="review-note-callout mt-1">
                     <i class="bi bi-chat-left-text me-1"></i>
                     <span>@Model.ReviewNote</span>
                 </div>
     }
 
     <!-- TITLE -->
-    <div class="task-title-text mt-2" style="font-size: 0.825rem; text-transform: lowercase;">@Model.Title</div>
+    <div class="task-title-text mt-1" style="font-size: 0.825rem; text-transform: lowercase;">@Model.Title</div>
 
     <!-- CUSTOM FIELDS -->
     @if (Model.CustomFieldValues != null && Model.CustomFieldValues.Any())
     {
-                <div class="custom-fields-summary mt-2">
+                <div class="custom-fields-summary mt-1">
             @foreach (var fv in Model.CustomFieldValues.Where(f => f.Field != null && f.Field.IsActive).Take(2))
             {
                                 <div class="cf-row">
                                     <span class="cf-label">@fv.Field.FieldName:</span>
                     @if (fv.Field.FieldType == "DateTime" && DateTime.TryParse(fv.Value, out var sdt))
                     {
-                                                <span>@sdt.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</span>
+                                                <span>@sdt.ToLocalTime().ToString("dd-MM-yyyy, hh:mm tt")</span>
                     }
                     else if (fv.Field.FieldType == "Image" && !string.IsNullOrEmpty(fv.Value))
                     {
@@ -225,7 +225,7 @@
                                 var user = latest.RootElement.GetProperty("u").GetString();
                                 var dateString = latest.RootElement.GetProperty("d").GetString();
                                 
-                                <div class="latest-remark-card mt-2 p-2 rounded" style="background: #f8fafc; border: 1px solid #e2e8f0; font-size: 0.75rem;">
+                                <div class="latest-remark-card mt-1 p-2 rounded" style="background: #f8fafc; border: 1px solid #e2e8f0; font-size: 0.75rem;">
                                     <div class="d-flex justify-content-between mb-1 opacity-75">
                                         <span class="fw-bold text-primary"><i class="bi bi-chat-left-text-fill me-1"></i>@user</span>
                                         <span>@dateString</span>
@@ -254,32 +254,37 @@
     -->
     @if (Model.AssignedToUser != null && Model.AssignedAt != null)
     {
-                <div class="assigned-info-block mt-2" data-task-id="@Model.Id">
-                    <div class="assigned-row"><span class="label">To:</span> <strong class="assigned-to-name">@(string.IsNullOrEmpty(Model.AssignedToUser.Name) ? Model.AssignedToUser.UserName : Model.AssignedToUser.Name)</strong></div>
-            @if (Model.AssignedByUser != null)
-            {
-                                <div class="assigned-row"><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
-            }
-                    <div class="assigned-row"><span class="label">At:</span> @Model.AssignedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</div>
+                <div class="assigned-info-block mt-1" data-task-id="@Model.Id">
+                    <div class="assigned-row d-flex justify-content-between">
+                        <div><span class="label">To:</span> <strong class="assigned-to-name">@(string.IsNullOrEmpty(Model.AssignedToUser.Name) ? Model.AssignedToUser.UserName : Model.AssignedToUser.Name)</strong></div>
+                        @if (Model.AssignedByUser != null)
+                        {
+                            <div><span class="label">By:</span> <strong>@(string.IsNullOrEmpty(Model.AssignedByUser.Name) ? Model.AssignedByUser.UserName : Model.AssignedByUser.Name)</strong></div>
+                        }
+                    </div>
+                    <div class="assigned-row d-flex justify-content-between mt-1 pt-1 border-top" style="font-size: 0.65rem; border-top-style: dotted !important;">
+                        <span class="label">ASSIGNED AT:</span> 
+                        <span>@Model.AssignedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, hh:mm tt")</span>
+                    </div>
                 </div>
     }
 
     @if (Model.ReviewedByUser != null && Model.ReviewedAt != null)
     {
                 <div class="task-meta mt-1">
-                    <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@(string.IsNullOrEmpty(Model.ReviewedByUser?.Name) ? Model.ReviewedByUser?.UserName : Model.ReviewedByUser.Name)</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</div>
+                    <div><i class="bi bi-clipboard-check me-1 text-warning"></i>Reviewed by <strong>@(string.IsNullOrEmpty(Model.ReviewedByUser?.Name) ? Model.ReviewedByUser?.UserName : Model.ReviewedByUser.Name)</strong> — @Model.ReviewedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, hh:mm tt")</div>
                 </div>
     }
 
     @if (Model.CompletedByUser != null && Model.CompletedAt != null)
     {
                 <div class="task-meta mt-1">
-                    <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@(string.IsNullOrEmpty(Model.CompletedByUser?.Name) ? Model.CompletedByUser?.UserName : Model.CompletedByUser.Name)</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, HH:mm:ss")</div>
+                    <div><i class="bi bi-check-circle me-1 text-success"></i>Completed by <strong>@(string.IsNullOrEmpty(Model.CompletedByUser?.Name) ? Model.CompletedByUser?.UserName : Model.CompletedByUser.Name)</strong> — @Model.CompletedAt.Value.ToLocalTime().ToString("dd-MM-yyyy, hh:mm tt")</div>
                 </div>
     }
 
     <!-- LATEST ACTIVITY INDICATOR -->
-    <div class="task-activity-indicator mt-2 pt-2 border-top" style="font-size: 0.7rem; color: #94a3b8; font-style: italic;">
+    <div class="task-activity-indicator mt-1 pt-1 border-top" style="font-size: 0.7rem; color: #94a3b8; font-style: italic;">
         <!-- <i class="bi bi-clock-history me-1"></i> -->
         <!-- if (Model.UpdatedAt != null)
         {
@@ -336,7 +341,7 @@
     </div>
 
     <!-- ⚙️ Actions -->
-    <div class="task-actions mt-2">
+    <div class="task-actions mt-1">
         @{
             var boardPerm = ViewData["UserPermissions"] as UserRoles.Models.BoardPermission;
             var colPerm = ViewData["ColumnPermission"] as UserRoles.Models.ColumnPermission;
