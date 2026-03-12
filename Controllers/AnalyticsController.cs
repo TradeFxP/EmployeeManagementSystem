@@ -27,6 +27,20 @@ namespace UserRoles.Controllers
         [Authorize(Roles = "Admin,Manager,SubManager")]
         public async Task<IActionResult> PerformanceDashboard(string team = "All Teams", string rating = "All Ratings", string period = "Monthly View", string search = "")
         {
+            var vm = await GetPerformanceDashboardViewModel(team, rating, period, search);
+            return View(vm);
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "Admin,Manager,SubManager")]
+        public async Task<IActionResult> GetPerformanceData(string team = "All Teams", string rating = "All Ratings", string period = "Monthly View", string search = "")
+        {
+            var vm = await GetPerformanceDashboardViewModel(team, rating, period, search);
+            return Json(vm);
+        }
+
+        private async Task<PerformanceDashboardViewModel> GetPerformanceDashboardViewModel(string team, string rating, string period, string search)
+        {
             var users = await _userManager.Users.Where(u => !u.IsDeleted).ToListAsync();
             var taskItems = await _context.TaskItems.AsNoTracking().ToListAsync();
             var teamsList = await _context.Teams.AsNoTracking().ToListAsync();
@@ -44,7 +58,7 @@ namespace UserRoles.Controllers
 
             vm.Filters.Teams.Add("All Teams");
             vm.Filters.Teams.AddRange(teamsList.Select(t => t.Name).Distinct());
-            vm.Filters.Ratings.AddRange(new List<string> { "Excellent", "Good", "Average", "Poor" });
+            vm.Filters.Ratings.AddRange(new List<string> { "Excellent", "Good", "Average", "Poor", "Not Started" });
             vm.Filters.Periods.AddRange(new List<string> { "Monthly View", "Weekly View", "Quarterly View" });
 
             // Pre-fetch roles
@@ -74,11 +88,11 @@ namespace UserRoles.Controllers
                 int totalCount = userTasks.Count;
                 int pct = totalCount > 0 ? (int)((double)completedCount / totalCount * 100) : 0;
 
-                // Robust Rating: If user has no tasks, we don't want them looking totally broken (Image 5 consistency)
-                decimal baseScore = totalCount > 0 ? Math.Round((decimal)pct / 20m, 1) : 3.5m + (decimal)random.NextDouble();
+                // Robust Rating: If user has no tasks, show rating 0 and status "Not Started"
+                decimal baseScore = totalCount > 0 ? Math.Round((decimal)pct / 20m, 1) : 0m;
                 if (baseScore > 5) baseScore = 5;
 
-                var statusInfo = GetStatusInfo(baseScore);
+                var statusInfo = GetStatusInfo(baseScore, totalCount > 0);
 
                 vm.EmployeeRows.Add(new EmployeeRatingRow
                 {
@@ -96,11 +110,7 @@ namespace UserRoles.Controllers
                     AvatarColor = colors[random.Next(colors.Length)],
                     Metrics = new List<PerformanceMetric>
                     {
-                        new PerformanceMetric { Label = "Communication", Value = Math.Round(3.5m + (decimal)random.NextDouble() * 1.5m, 1), Color = "#3b82f6" },
-                        new PerformanceMetric { Label = "Client Handling", Value = Math.Round(3.0m + (decimal)random.NextDouble() * 2.0m, 1), Color = "#10b981" },
                         new PerformanceMetric { Label = "Target Achievement", Value = Math.Round(baseScore, 1), Color = "#8b5cf6" },
-                        new PerformanceMetric { Label = "Teamwork", Value = Math.Round(3.8m + (decimal)random.NextDouble() * 1.2m, 1), Color = "#f59e0b" },
-                        new PerformanceMetric { Label = "Punctuality", Value = Math.Round(4.0m + (decimal)random.NextDouble() * 1.0m, 1), Color = "#ec4899" }
                     }
                 });
             }
@@ -118,7 +128,7 @@ namespace UserRoles.Controllers
                 vm.KPIs.TotalEmployees = vm.EmployeeRows.Count;
                 vm.KPIs.AvgRating = Math.Round(vm.EmployeeRows.Average(r => r.Rating), 1);
                 vm.KPIs.TopPerformers = vm.EmployeeRows.Count(r => r.Rating >= 4.5m);
-                vm.KPIs.NeedsImprovement = vm.EmployeeRows.Count(r => r.Rating < 3.0m);
+                vm.KPIs.NeedsImprovement = vm.EmployeeRows.Count(r => r.Rating < 3.0m && r.Rating > 0);
 
                 vm.KPIs.TotalEmployeesChange = 2.9;
                 vm.KPIs.AvgRatingChange = 0.3;
@@ -129,7 +139,7 @@ namespace UserRoles.Controllers
                 vm.Distribution.ExcellentPct = (vm.EmployeeRows.Count(r => r.Rating >= 4.5m) * 100) / total;
                 vm.Distribution.GoodPct = (vm.EmployeeRows.Count(r => r.Rating >= 3.5m && r.Rating < 4.5m) * 100) / total;
                 vm.Distribution.AveragePct = (vm.EmployeeRows.Count(r => r.Rating >= 2.5m && r.Rating < 3.5m) * 100) / total;
-                vm.Distribution.PoorPct = (vm.EmployeeRows.Count(r => r.Rating < 2.5m) * 100) / total;
+                vm.Distribution.PoorPct = (vm.EmployeeRows.Count(r => r.Rating > 0 && r.Rating < 2.5m) * 100) / total;
             }
             else
             {
@@ -151,23 +161,24 @@ namespace UserRoles.Controllers
 
             // ── TREND DATA (Functional Fallback as per Image 5) ─────
             string[] monthsList = { "Sep", "Oct", "Nov", "Dec", "Jan", "Feb" };
-            var trendTeams = teamsList.Select(t => t.Name).ToList();
-            if (!trendTeams.Any()) trendTeams = new List<string> { "BDE", "Frontend", "Sales", "Backend", "DevOps", "HR", "Accounts", "Cyber Sec", "Digi Leads", "Digi Mktg" };
+            if (period == "Weekly View")
+            {
+                monthsList = new string[] { "Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6", "Week 7", "Week 8" };
+            }
 
             foreach (var month in monthsList)
             {
                 var point = new TrendPoint { Month = month };
                 int i = 0;
-                foreach (var tName in trendTeams)
+                foreach (var tName in teamsList.Select(t => t.Name).Distinct())
                 {
-                    // Generate smooth, high-fidelity trend scores
                     point.TeamScores[tName] = Math.Round(3.2m + (decimal)(i % 5) * 0.2m + (decimal)random.NextDouble() * 0.6m, 1);
                     i++;
                 }
                 vm.TrendData.Add(point);
             }
 
-            return View(vm);
+            return vm;
         }
 
         [HttpPost]
@@ -176,8 +187,9 @@ namespace UserRoles.Controllers
             return RedirectToAction(nameof(PerformanceDashboard));
         }
 
-        private (string Label, string Class, string Color) GetStatusInfo(decimal score)
+        private (string Label, string Class, string Color) GetStatusInfo(decimal score, bool hasTasks)
         {
+            if (!hasTasks) return ("Not Started", "not-started", "#8ba1b7");
             if (score >= 4.5m) return ("Excellent", "excellent", "#10b981");
             if (score >= 3.5m) return ("Good", "good", "#3b82f6");
             if (score >= 2.5m) return ("Average", "average", "#f59e0b");

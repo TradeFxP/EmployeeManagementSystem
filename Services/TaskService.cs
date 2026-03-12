@@ -530,7 +530,7 @@ namespace UserRoles.Services
             var filteredAssignees = BuildFilteredAssignees(allUsers, teamUserIds, userId, viewerRoles, feUserRolesMap);
 
             // Build grouped user list
-            var (teamGroups, managementUsers) = await BuildTeamGroupsAsync(allUsers, feUserRolesMap, team);
+            var (teamGroups, managementUsers) = await BuildTeamGroupsAsync(allUsers, feUserRolesMap, team, userId, viewerRoles);
 
             // Custom fields
             var customFields = await _context.TaskCustomFields
@@ -575,7 +575,7 @@ namespace UserRoles.Services
             var feUserRolesMap = BuildFeUserRolesMap(allUsers, userRolesMap);
 
             // Use an empty team name or "Global" for initial grouping
-            var (teamGroups, managementUsers) = await BuildTeamGroupsAsync(allUsers, feUserRolesMap, string.Empty);
+            var (teamGroups, managementUsers) = await BuildTeamGroupsAsync(allUsers, feUserRolesMap, string.Empty, userId, viewerRoles);
 
             return new TeamBoardViewModel
             {
@@ -892,7 +892,7 @@ namespace UserRoles.Services
         }
 
         private async Task<(List<TeamGroupViewModel>, List<UserHierarchyItem>)> BuildTeamGroupsAsync(
-            List<Users> allUsers, Dictionary<string, string> feUserRolesMap, string currentTeam)
+            List<Users> allUsers, Dictionary<string, string> feUserRolesMap, string currentTeam, string userId, IList<string> viewerRoles)
         {
             var managementUsers = new List<UserHierarchyItem>();
             var teamGroups = new List<TeamGroupViewModel>();
@@ -900,21 +900,59 @@ namespace UserRoles.Services
             var allTeamNames = await _context.UserTeams.AsNoTracking().Select(ut => ut.TeamName).Distinct().ToListAsync();
             var allUserTeams = await _context.UserTeams.AsNoTracking().ToListAsync();
 
-            // Global managers
-            var globalManagers = allUsers
+            // ── RESTRICTION LOGIC ──
+            var viewer = allUsers.FirstOrDefault(u => u.Id == userId);
+            var isAdmin = viewerRoles.Contains("Admin");
+            var isManager = viewerRoles.Contains("Manager");
+            // A sub-manager is someone with the role OR a Manager with a ParentUserId
+            var isSubManager = viewerRoles.Contains("Sub-Manager") || viewerRoles.Contains("SubManager") || 
+                               (isManager && viewer != null && !string.IsNullOrEmpty(viewer.ParentUserId));
+            
+            var myTeams = allUserTeams.Where(ut => ut.UserId == userId).Select(ut => ut.TeamName).ToHashSet();
+            var isTechnicalUser = myTeams.Any(t => IsTechnicalTeam(t));
+            var isTechnicalSubManager = isSubManager && isTechnicalUser;
+
+            // TECHNICAL SUB-MANAGERS & REGULAR USERS cannot see management. 
+            // Only Admins and true top-level Managers can.
+            var canSeeManagement = isAdmin || (isManager && !isSubManager);
+            
+            Func<string, bool> isTeamAllowed = (tName) =>
+            {
+                // Admins and Top-level Managers see all
+                if (isAdmin || (isManager && !isSubManager)) return true;
+                
+                // If it's the current team board we're looking at, it should be visible
+                if (!string.IsNullOrEmpty(currentTeam) && tName.Trim().Equals(currentTeam.Trim(), StringComparison.OrdinalIgnoreCase)) return true;
+
+                // Sub-Managers from technical teams see THE ENTIRE technical trio only (and hide everything else)
+                if (isTechnicalSubManager) return IsTechnicalTeam(tName);
+
+                // Regular users OR non-tech Sub-Managers only see their own teams
+                return myTeams.Contains(tName);
+            };
+
+            // Global managers - Only visible to Admins and Top-level Managers
+            if (canSeeManagement)
+            {
+                var globalManagers = allUsers
+                    .Where(u => { var role = feUserRolesMap.GetValueOrDefault(u.Id, "User"); return role == "Admin" || role == "Manager"; })
+                    .OrderByDescending(u => feUserRolesMap.GetValueOrDefault(u.Id, "User"))
+                    .ThenBy(u => u.Name ?? u.UserName)
+                    .ToList();
+
+                foreach (var m in globalManagers)
+                    managementUsers.Add(new UserHierarchyItem { Id = m.Id, Name = m.Name ?? m.UserName, RoleName = feUserRolesMap.GetValueOrDefault(m.Id, "User"), Level = 0 });
+            }
+
+            var globalManagerIds = allUsers
                 .Where(u => { var role = feUserRolesMap.GetValueOrDefault(u.Id, "User"); return role == "Admin" || role == "Manager"; })
-                .OrderByDescending(u => feUserRolesMap[u.Id])
-                .ThenBy(u => u.Name ?? u.UserName)
-                .ToList();
-
-            foreach (var m in globalManagers)
-                managementUsers.Add(new UserHierarchyItem { Id = m.Id, Name = m.Name ?? m.UserName, RoleName = feUserRolesMap[m.Id], Level = 0 });
-
-            var globalManagerIds = globalManagers.Select(m => m.Id).ToHashSet();
+                .Select(m => m.Id).ToHashSet();
 
             // Team groups
             foreach (var tName in allTeamNames)
             {
+                if (!isTeamAllowed(tName)) continue;
+
                 var usersInTeamIds = allUserTeams.Where(ut => ut.TeamName == tName).Select(ut => ut.UserId).ToHashSet();
                 var teamUsers = allUsers.Where(u => usersInTeamIds.Contains(u.Id) && !globalManagerIds.Contains(u.Id)).ToList();
 
@@ -949,6 +987,13 @@ namespace UserRoles.Services
                 .ToList();
 
             return (teamGroups, managementUsers);
+        }
+
+        private bool IsTechnicalTeam(string teamName)
+        {
+            if (string.IsNullOrEmpty(teamName)) return false;
+            var t = teamName.Trim().ToLower();
+            return t.Contains("frontend") || t.Contains("backend") || t.Contains("testing") || t.Contains("tesign");
         }
 
         private async Task<TeamColumn?> GetFirstColumnForTeam(string teamName)
