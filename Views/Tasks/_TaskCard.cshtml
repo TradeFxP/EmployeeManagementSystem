@@ -177,13 +177,35 @@
     }
 
     <!-- TITLE -->
-    <div class="task-title-text mt-1" style="font-size: 0.825rem; text-transform: lowercase;">@Model.Title</div>
+    @{
+        var displayTitle = Model.Title;
+        // If title is missing or generic "task", try to find a custom field named "Title"
+        if (string.IsNullOrWhiteSpace(displayTitle) || displayTitle.Trim().ToLower() == "task")
+        {
+            var cfTitle = Model.CustomFieldValues?.FirstOrDefault(f => f.Field?.FieldName?.Trim()?.ToLower() == "title")?.Value;
+            if (!string.IsNullOrWhiteSpace(cfTitle))
+            {
+                displayTitle = cfTitle;
+            }
+        }
+    }
+    <div class="task-title-text mt-1" style="font-size: 0.85rem; font-weight: 700; color: #1e293b;">@displayTitle</div>
+
+    <!-- DESCRIPTION -->
+    @if (!string.IsNullOrWhiteSpace(Model.Description))
+    {
+        <div class="task-desc-text mt-1" style="font-size: 0.75rem; color: #64748b; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;">
+            @Model.Description
+        </div>
+    }
 
     <!-- CUSTOM FIELDS -->
     @if (Model.CustomFieldValues != null && Model.CustomFieldValues.Any())
     {
                 <div class="custom-fields-summary mt-1">
-            @foreach (var fv in Model.CustomFieldValues.Where(f => f.Field != null && f.Field.IsActive).Take(2))
+            @foreach (var fv in Model.CustomFieldValues.Where(f => f.Field != null && f.Field.IsActive && 
+                f.Field.FieldName.Trim().ToLower() != "title" && 
+                f.Field.FieldName.Trim().ToLower() != "description").Take(2))
             {
                                 <div class="cf-row">
                                     <span class="cf-label">@fv.Field.FieldName:</span>

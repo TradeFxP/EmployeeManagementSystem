@@ -21,6 +21,7 @@ namespace UserRoles.Controllers
         private readonly ITaskHistoryService _historyService;
         private readonly IHubContext<TaskHub> _hubContext;
         private readonly ITaskPermissionService _permissions;
+        private readonly ITaskService _taskService;
         private readonly ILogger<TaskReviewController> _logger;
  
         public TaskReviewController(
@@ -29,6 +30,7 @@ namespace UserRoles.Controllers
             ITaskHistoryService historyService,
             IHubContext<TaskHub> hubContext,
             ITaskPermissionService permissions,
+            ITaskService taskService,
             ILogger<TaskReviewController> logger)
         {
             _context = context;
@@ -36,6 +38,7 @@ namespace UserRoles.Controllers
             _historyService = historyService;
             _hubContext = hubContext;
             _permissions = permissions;
+            _taskService = taskService;
             _logger = logger;
         }
 
@@ -189,30 +192,73 @@ namespace UserRoles.Controllers
             if (string.IsNullOrWhiteSpace(team))
                 return BadRequest();
 
-            var archivedTasks = await _context.TaskItems
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Unauthorized();
+
+            var archivedTasksQuery = _context.TaskItems
                 .Where(t => t.TeamName == team && t.IsArchived)
                 .Include(t => t.AssignedToUser)
                 .Include(t => t.CompletedByUser)
-                .OrderByDescending(t => t.ArchivedAt)
+                .OrderByDescending(t => t.ArchivedAt);
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (roles.Contains("Admin"))
+            {
+            var allTasksForAdmin = await archivedTasksQuery.ToListAsync();
+            return Ok(allTasksForAdmin.Select(t => new
+            {
+                t.Id,
+                t.Title,
+                t.Description,
+                CompletedBy = t.CompletedByUser?.UserName ?? t.AssignedToUser?.UserName ?? "Unknown",
+                t.CompletedAt,
+                t.ArchivedAt,
+                Priority = (int)t.Priority,
+                ReviewStatus = t.ReviewStatus.ToString()
+            }).ToList());
+            }
+
+            // For non-admins, we need to check visibility
+            var allTasks = await archivedTasksQuery.ToListAsync();
+            
+            var userRolesMap = await (from ur in _context.UserRoles
+                                      join r in _context.Roles on ur.RoleId equals r.Id
+                                      select new { ur.UserId, RoleName = r.Name })
+                                     .AsNoTracking()
+                                     .ToListAsync();
+
+            var rolesMap = userRolesMap.GroupBy(ur => ur.UserId)
+                                       .ToDictionary(g => g.Key, g => (IList<string>)g.Select(ur => ur.RoleName).ToList());
+
+            var hierarchyMap = await _userManager.Users
+                .AsNoTracking()
+                .Select(u => new { u.Id, u.ManagerId })
+                .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+
+            var visibleTasks = allTasks
+                .Where(t => _taskService.CanUserSeeTask(t, user.Id, roles, rolesMap, hierarchyMap))
                 .Select(t => new
                 {
                     t.Id,
                     t.Title,
                     t.Description,
-                    CompletedBy = t.CompletedByUser != null ? t.CompletedByUser.UserName : (t.AssignedToUser != null ? t.AssignedToUser.UserName : "Unknown"),
-                    CompletedAt = t.CompletedAt,
-                    ArchivedAt = t.ArchivedAt,
+                    CompletedBy = t.CompletedByUser?.UserName ?? t.AssignedToUser?.UserName ?? "Unknown",
+                    t.CompletedAt,
+                    t.ArchivedAt,
                     Priority = (int)t.Priority,
                     ReviewStatus = t.ReviewStatus.ToString()
                 })
-                .ToListAsync();
+                .ToList();
 
-            return Ok(archivedTasks);
+            return Ok(visibleTasks);
         }
 
         [HttpGet]
         public async Task<IActionResult> GetArchivedTaskDetail(int id)
         {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Unauthorized();
+
             var task = await _context.TaskItems
                 .Include(t => t.CreatedByUser)
                 .Include(t => t.AssignedToUser)
@@ -224,6 +270,27 @@ namespace UserRoles.Controllers
                 .FirstOrDefaultAsync(t => t.Id == id && t.IsArchived);
 
             if (task == null) return NotFound();
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!roles.Contains("Admin"))
+            {
+                var userRolesMap = await (from ur in _context.UserRoles
+                                          join r in _context.Roles on ur.RoleId equals r.Id
+                                          select new { ur.UserId, RoleName = r.Name })
+                                         .AsNoTracking()
+                                         .ToListAsync();
+
+                var rolesMap = userRolesMap.GroupBy(ur => ur.UserId)
+                                           .ToDictionary(g => g.Key, g => (IList<string>)g.Select(ur => ur.RoleName).ToList());
+
+                var hierarchyMap = await _userManager.Users
+                    .AsNoTracking()
+                    .Select(u => new { u.Id, u.ManagerId })
+                    .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+
+                if (!_taskService.CanUserSeeTask(task, user.Id, roles, rolesMap, hierarchyMap))
+                    return Forbid();
+            }
 
             return Ok(new
             {
