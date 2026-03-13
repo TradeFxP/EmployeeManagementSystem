@@ -47,6 +47,7 @@ namespace UserRoles.Services
                 "ReviewTask" => perms.CanReviewTask,
                 "ImportExcel" => perms.CanImportExcel,
                 "AssignTask" => perms.CanAssignTask,
+                "ManagePermissions" => perms.CanManagePermissions,
                 _ => false
             };
         }

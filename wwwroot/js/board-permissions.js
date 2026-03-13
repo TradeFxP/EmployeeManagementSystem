@@ -92,6 +92,7 @@ function renderPermissionTable() {
                 <th class="text-center small text-uppercase fw-bold text-muted">Del Task</th>
                 <th class="text-center small text-uppercase fw-bold text-muted">Review</th>
                 <th class="text-center small text-uppercase fw-bold text-muted">Excel</th>
+                <th class="text-center small text-uppercase fw-bold text-muted">Permissions</th>
                 <th class="text-center small text-uppercase fw-bold text-muted">Assign</th>
                 <th class="text-center small text-uppercase fw-bold text-muted">All</th>
             </tr>
@@ -160,6 +161,7 @@ function renderBoardPermissionRows(data, type) {
                 <td class="text-center">${renderSwitch(p.userId, 'canDeleteTask', p.canDeleteTask)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canReviewTask', p.canReviewTask)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canImportExcel', p.canImportExcel)}</td>
+                <td class="text-center">${renderSwitch(p.userId, 'canManagePermissions', p.canManagePermissions)}</td>
                 <td class="text-center">${renderSwitch(p.userId, 'canAssignTask', p.canAssignTask)}</td>
             `;
         } else if (type === 'Column') {
@@ -415,6 +417,7 @@ async function grantAllBoardPermissions(btn, userId, teamName) {
         dto.canDeleteTask = targetState;
         dto.canReviewTask = targetState;
         dto.canImportExcel = targetState;
+        dto.canManagePermissions = targetState;
         dto.canAssignTask = targetState;
     } else if (viewType === 'Column') {
         const colId = parseInt(document.getElementById('permissionColumnFilter').value);

@@ -18,27 +18,52 @@ namespace UserRoles.Controllers
         private readonly AppDbContext _context;
         private readonly UserManager<Users> _userManager;
         private readonly IHubContext<TaskHub> _hubContext;
+        private readonly ITaskPermissionService _permissionService;
         private readonly ILogger<TaskPermissionsController> _logger;
 
         public TaskPermissionsController(
             AppDbContext context,
             UserManager<Users> userManager,
             IHubContext<TaskHub> hubContext,
+            ITaskPermissionService permissionService,
             ILogger<TaskPermissionsController> logger)
         {
             _context = context;
             _userManager = userManager;
             _hubContext = hubContext;
+            _permissionService = permissionService;
             _logger = logger;
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetBoardPermissions(string team)
         {
             if (string.IsNullOrWhiteSpace(team)) return BadRequest();
 
-            var users = await _userManager.Users.AsNoTracking().OrderBy(u => u.UserName).ToListAsync();
+            // Check if user has permission to manage permissions for this team
+            if (!await _permissionService.AuthorizeBoardAction(User, team, "ManagePermissions"))
+            {
+                return Forbid();
+            }
+
+            var currentUserId = _userManager.GetUserId(User);
+            var isAdmin = User.IsInRole("Admin");
+
+            // 1. Get users belonging to THIS team
+            var teamUserIds = await _context.UserTeams
+                .AsNoTracking()
+                .Where(ut => EF.Functions.ILike(ut.TeamName, team.Trim()))
+                .Select(ut => ut.UserId)
+                .ToHashSetAsync();
+
+            // 2. Fetch the targeted users (strictly team members)
+            var users = await _userManager.Users
+                .AsNoTracking()
+                .Where(u => teamUserIds.Contains(u.Id))
+                .OrderBy(u => u.UserName)
+                .ToListAsync();
+
             var perms = await _context.BoardPermissions
                 .AsNoTracking()
                 .Where(p => EF.Functions.ILike(p.TeamName, team.Trim()))
@@ -46,6 +71,7 @@ namespace UserRoles.Controllers
 
             var userRolesData = await (from ur in _context.UserRoles
                                        join r in _context.Roles on ur.RoleId equals r.Id
+                                       where teamUserIds.Contains(ur.UserId)
                                        select new { ur.UserId, RoleName = r.Name })
                                       .AsNoTracking()
                                       .ToListAsync();
@@ -64,12 +90,6 @@ namespace UserRoles.Controllers
                 .Where(cp => columnIds.Contains(cp.ColumnId))
                 .ToListAsync();
 
-            var teamUserIds = await _context.UserTeams
-                .AsNoTracking()
-                .Where(ut => ut.TeamName == team)
-                .Select(ut => ut.UserId)
-                .ToHashSetAsync();
-
             var result = new List<BoardPermissionDto>();
 
             foreach (var u in users)
@@ -83,9 +103,13 @@ namespace UserRoles.Controllers
                     primaryRole = "Sub Manager";
                 }
 
-                bool isTopLevelManager = primaryRole == "Manager";
-                if (!isTopLevelManager && !teamUserIds.Contains(u.Id))
+                bool isManager = primaryRole == "Manager";
+
+                // Filter 1: Manager Isolation (If I'm not Admin, don't show other Managers)
+                if (!isAdmin && isManager && u.Id != currentUserId)
+                {
                     continue;
+                }
 
                 var p = perms.FirstOrDefault(x => x.UserId == u.Id);
                 var userColPerms = colPerms.Where(cp => cp.UserId == u.Id).ToList();
@@ -104,6 +128,8 @@ namespace UserRoles.Controllers
                     CanDeleteTask = p?.CanDeleteTask ?? false,
                     CanReviewTask = p?.CanReviewTask ?? false,
                     CanImportExcel = p?.CanImportExcel ?? false,
+                    CanAssignTask = p?.CanAssignTask ?? false,
+                    CanManagePermissions = p?.CanManagePermissions ?? false,
                     AllowedTransitions = !string.IsNullOrEmpty(p?.AllowedTransitionsJson)
                         ? JsonSerializer.Deserialize<Dictionary<int, List<int>>>(p.AllowedTransitionsJson) ?? new()
                         : new(),
@@ -142,12 +168,18 @@ namespace UserRoles.Controllers
             return Ok(sortedResult);
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> UpdateBoardPermission([FromBody] BoardPermissionDto dto)
         {
             if (dto == null || string.IsNullOrWhiteSpace(dto.UserId) || string.IsNullOrWhiteSpace(dto.TeamName))
                 return BadRequest();
+
+            // Check if user has permission to manage permissions for this team
+            if (!await _permissionService.AuthorizeBoardAction(User, dto.TeamName, "ManagePermissions"))
+            {
+                return Forbid();
+            }
 
             var allExisting = await _context.BoardPermissions
                 .Where(p => p.UserId == dto.UserId && EF.Functions.ILike(p.TeamName, dto.TeamName.Trim()))
@@ -183,6 +215,7 @@ namespace UserRoles.Controllers
             existing.CanReviewTask = dto.CanReviewTask;
             existing.CanImportExcel = dto.CanImportExcel;
             existing.CanAssignTask = dto.CanAssignTask;
+            existing.CanManagePermissions = dto.CanManagePermissions;
             existing.AllowedTransitionsJson = JsonSerializer.Serialize(dto.AllowedTransitions ?? new());
             existing.CanViewHistory = dto.CanViewHistory;
 

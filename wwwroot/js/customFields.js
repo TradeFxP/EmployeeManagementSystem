@@ -1,4 +1,4 @@
-// customFields.js - Custom field management for tasks
+﻿// customFields.js - Custom field management for tasks
 
 window.customFieldsCache = window.customFieldsCache || null;
 
@@ -825,7 +825,7 @@ function addStandaloneOption(value = "", containerId = 'newFieldOptionsList') {
 
     row.innerHTML = `
         <input type="text" class="form-control dropdown-standalone-input rounded-pill-start border-light bg-light px-3" 
-               value="${value}" placeholder="Standalone option" required style="font-size: 12px;">
+               value="${value}" placeholder="Single Drop Down" required style="font-size: 12px;">
         <button class="btn btn-outline-danger rounded-pill-end bg-white border-light" type="button" onclick="this.parentElement.remove()">
             <i class="bi bi-trash"></i>
         </button>
@@ -836,7 +836,7 @@ function addStandaloneOption(value = "", containerId = 'newFieldOptionsList') {
 // New robust population function
 function populateFieldOptionsGrouped(field) {
     const containerId = `edit_options_list_${field.id}`;
-    
+
     // Always add action buttons at the top
     const buttonsHtml = `
         <div class="d-flex gap-2 mb-3 mt-1">
@@ -853,7 +853,7 @@ function populateFieldOptionsGrouped(field) {
         </div>
         <div id="options_content_${field.id}"></div>
     `;
-    
+
     const container = document.getElementById(containerId);
     if (container) {
         container.innerHTML = buttonsHtml;
@@ -861,7 +861,7 @@ function populateFieldOptionsGrouped(field) {
 
     const ops = field.dropdownOptions || "";
     const content = document.getElementById(`options_content_${field.id}`) || container;
-    
+
     if (!ops || typeof addParentGroup !== 'function') return;
 
     const list = ops.split(',').filter(o => o.trim());

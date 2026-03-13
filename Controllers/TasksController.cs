@@ -493,6 +493,33 @@ namespace UserRoles.Controllers
         [HttpGet("/Tasks/{taskId}/History"), Authorize]
         public async Task<IActionResult> GetTaskHistory(int taskId)
         {
+            var task = await _context.TaskItems.AsNoTracking().FirstOrDefaultAsync(t => t.Id == taskId);
+            if (task == null) return NotFound();
+
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null) return Unauthorized();
+
+            var roles = await _userManager.GetRolesAsync(user);
+            if (!roles.Contains("Admin"))
+            {
+                var userRolesMap = await (from ur in _context.UserRoles
+                                          join r in _context.Roles on ur.RoleId equals r.Id
+                                          select new { ur.UserId, RoleName = r.Name })
+                                         .AsNoTracking()
+                                         .ToListAsync();
+
+                var rolesMap = userRolesMap.GroupBy(ur => ur.UserId)
+                                           .ToDictionary(g => g.Key, g => (IList<string>)g.Select(ur => ur.RoleName).ToList());
+
+                var hierarchyMap = await _userManager.Users
+                    .AsNoTracking()
+                    .Select(u => new { u.Id, u.ManagerId })
+                    .ToDictionaryAsync(u => u.Id, u => u.ManagerId);
+
+                if (!_taskService.CanUserSeeTask(task, user.Id, roles, rolesMap, hierarchyMap))
+                    return Forbid();
+            }
+
             var history = await _historyService.GetTaskHistory(taskId);
             return Ok(history);
         }

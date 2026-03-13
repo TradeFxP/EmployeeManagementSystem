@@ -19,6 +19,7 @@ namespace UserRoles.DTOs
         public bool CanReviewTask { get; set; }
         public bool CanImportExcel { get; set; }
         public bool CanAssignTask { get; set; }
+        public bool CanManagePermissions { get; set; }
 
         // Task Level (Specific permissions requested: Assign, Task, Delete, History)
         // Note: Assign and Delete overlap with board level, but we can reuse or specify.

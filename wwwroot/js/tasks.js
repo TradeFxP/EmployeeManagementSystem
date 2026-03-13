@@ -665,6 +665,59 @@ function openReviewModal(taskId, taskTitle) {
     document.getElementById('reviewNote').value = '';
     document.querySelector('#reviewPass').checked = true;
 
+    const detailsContainer = document.getElementById('reviewTaskDetails');
+    if (detailsContainer) {
+        detailsContainer.style.display = 'block';
+        detailsContainer.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
+        
+        fetch(`/Tasks/GetTaskDetail?id=${taskId}`)
+            .then(res => res.json())
+            .then(t => {
+                let html = '';
+                
+                // Description
+                if (t.description) {
+                    html += `<div class="mb-3">
+                        <label class="small fw-bold text-muted text-uppercase" style="letter-spacing: 0.5px; font-size: 0.65rem;">Description</label>
+                        <div style="font-size: 0.85rem; color: #334155; line-height: 1.5;">${escapeHtml(t.description)}</div>
+                    </div>`;
+                }
+                
+                // Custom Fields (Tabular Format)
+                if (t.customFields && t.customFields.length > 0) {
+                    html += `<div class="mb-2"><label class="small fw-bold text-muted text-uppercase" style="letter-spacing: 0.5px; font-size: 0.65rem;">Task Information</label></div>`;
+                    html += `<div class="table-responsive rounded border mb-3">
+                        <table class="table table-sm table-hover mb-0" style="table-layout: fixed;">
+                            <tbody>`;
+                    
+                    t.customFields.forEach(f => {
+                        if (f.value) {
+                            html += `
+                                <tr>
+                                    <td style="width: 35%; background: #f8fafc; border-right: 1px solid #e2e8f0; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 8px 12px; vertical-align: middle;">
+                                        ${escapeHtml(f.fieldName)}
+                                    </td>
+                                    <td style="width: 65%; font-size: 0.8rem; font-weight: 600; padding: 8px 12px; word-wrap: break-word;">
+                                        <div style="max-height: 150px; overflow-y: auto; padding-right: 5px;">
+                                            ${escapeHtml(f.value)}
+                                        </div>
+                                    </td>
+                                </tr>`;
+                        }
+                    });
+                    
+                    html += `</tbody></table></div>`;
+                }
+
+                if (!html) html = '<div class="text-muted small">No additional details available</div>';
+                detailsContainer.innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                detailsContainer.innerHTML = '<div class="text-danger small">Failed to load task details</div>';
+            });
+    }
+
     const modal = new bootstrap.Modal(document.getElementById('reviewTaskModal'));
     modal.show();
 }

@@ -71,7 +71,7 @@
             }
         }
 
-        @if (User.IsInRole("Admin"))
+        @if (User.IsInRole("Admin") || (Model.UserPermissions?.CanManagePermissions == true))
         {
             <button class="btn btn-sm btn-outline-info" onclick="openBoardPermissionModal('@Model.TeamName')"
                 title="Manage Board Permissions">
@@ -205,6 +205,7 @@
     data-perm-edit-tasks="@((Model.UserPermissions?.CanEditAllFields ?? false) ? "true" : "false")"
     data-perm-delete-task="@((Model.UserPermissions?.CanDeleteTask ?? false) ? "true" : "false")"
     data-perm-review-task="@((Model.UserPermissions?.CanReviewTask ?? false) ? "true" : "false")"
+    data-perm-manage-permissions="@((Model.UserPermissions?.CanManagePermissions ?? false) ? "true" : "false")"
     data-perm-assign-task="@((Model.UserPermissions?.CanAssignTask ?? false) ? "true" : "false")">
 
     <script>
