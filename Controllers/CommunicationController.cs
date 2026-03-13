@@ -129,7 +129,9 @@ namespace UserRoles.Controllers
                 var user = await _userManager.GetUserAsync(User);
                 var fromEmail = user?.Email ?? _settings.FromAddress;
 
-                return Json(new { success = true, html = html, toEmail = toEmail, fromEmail = fromEmail });
+                var subject = templateName.Replace("_", " ") + " - JetFyX";
+
+                return Json(new { success = true, html = html, toEmail = toEmail, fromEmail = fromEmail, subject = subject });
             }
             catch (Exception ex)
             {
@@ -214,6 +216,40 @@ namespace UserRoles.Controllers
             {
                 _logger.LogError(ex, "Failed to send Outlook email for Task {TaskId}", taskId);
                 return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> LogOutlookRedirect(int taskId, string toEmail, string subject)
+        {
+            try
+            {
+                var task = await _context.TaskItems.FindAsync(taskId);
+                if (task == null) return NotFound("Task not found");
+
+                var user = await _userManager.GetUserAsync(User);
+
+                var log = new EmailLog
+                {
+                    FromEmail = user?.Email ?? _settings.FromAddress,
+                    ToEmail = toEmail,
+                    Subject = subject,
+                    EmailType = "Outlook Redirect",
+                    SentByUserId = user?.Id,
+                    TaskId = taskId,
+                    Status = "Outlook Redirected",
+                    SentAt = DateTime.UtcNow
+                };
+
+                _context.EmailLogs.Add(log);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to log Outlook redirect for Task {TaskId}", taskId);
+                return BadRequest(new { success = false, message = "Failed to log interaction" });
             }
         }
 

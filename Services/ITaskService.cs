@@ -26,6 +26,7 @@ namespace UserRoles.Services
         // ── Board Data ────────────────────────────────────────────
         Task<TeamBoardViewModel> BuildTeamBoardAsync(string team, string userId, IList<string> viewerRoles);
         Task<TeamBoardViewModel> GetQuickAssignModelAsync(string userId, IList<string> viewerRoles);
+        Task AutoArchiveOldCompletedTasksAsync(string team, string userId);
 
         // ── Visibility helpers ────────────────────────────────────
         bool CanUserSeeTask(TaskItem task, string userId, IList<string> viewerRoles,

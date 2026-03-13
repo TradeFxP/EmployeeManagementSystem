@@ -1,4 +1,4 @@
-﻿// customFields.js - Custom field management for tasks
+// customFields.js - Custom field management for tasks
 
 window.customFieldsCache = window.customFieldsCache || null;
 
@@ -836,7 +836,32 @@ function addStandaloneOption(value = "", containerId = 'newFieldOptionsList') {
 // New robust population function
 function populateFieldOptionsGrouped(field) {
     const containerId = `edit_options_list_${field.id}`;
+    
+    // Always add action buttons at the top
+    const buttonsHtml = `
+        <div class="d-flex gap-2 mb-3 mt-1">
+            <button type="button" class="btn btn-xs btn-outline-primary d-flex align-items-center gap-2 px-3 py-1 bg-white shadow-sm" 
+                    style="font-size: 11px; border-radius: 8px; font-weight: 600;" 
+                    onclick="addParentGroup('', '${containerId}')">
+                <i class="bi bi-folder2-open text-primary"></i> Drop down Inside Drop Down
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-secondary d-flex align-items-center gap-2 px-3 py-1 bg-white shadow-sm" 
+                    style="font-size: 11px; border-radius: 8px; font-weight: 600;" 
+                    onclick="addStandaloneOption('', '${containerId}')">
+                <i class="bi bi-plus-circle text-secondary"></i> Single Drop Down
+            </button>
+        </div>
+        <div id="options_content_${field.id}"></div>
+    `;
+    
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.innerHTML = buttonsHtml;
+    }
+
     const ops = field.dropdownOptions || "";
+    const content = document.getElementById(`options_content_${field.id}`) || container;
+    
     if (!ops || typeof addParentGroup !== 'function') return;
 
     const list = ops.split(',').filter(o => o.trim());
@@ -854,10 +879,10 @@ function populateFieldOptionsGrouped(field) {
     });
 
     for (const p in groups) {
-        const childId = addParentGroup(p, containerId);
+        const childId = addParentGroup(p, `options_content_${field.id}`);
         groups[p].forEach(c => addChildOption(c, childId));
     }
-    standalone.forEach(s => addStandaloneOption(s, containerId));
+    standalone.forEach(s => addStandaloneOption(s, `options_content_${field.id}`));
 }
 
 // Toggle options section based on field type is now handled by toggleNewOptionsSection() in Index.cshtml
@@ -882,7 +907,7 @@ async function loadFieldsList(team) {
 
         container.innerHTML = `<div class="row g-1 sortable-fields">
             ${fields.map(f => `
-                <div class="col-md-3 field-order-item" data-id="${f.id}">
+                <div class="col-md-4 field-order-item" data-id="${f.id}">
                     <div class="field-item d-flex flex-column border shadow-sm" id="field_item_${f.id}" 
                          style="border-radius: 6px; background: #fff; transition: all 0.2s ease; min-height: 48px; margin-bottom: 4px; border-color: rgba(0,0,0,0.05) !important;">
                         <div class="p-1 px-2 flex-grow-1 d-flex align-items-center justify-content-between">
@@ -896,8 +921,8 @@ async function loadFieldsList(team) {
                                 f.fieldType === 'Number' ? '<i class="bi bi-hash text-primary" style="font-size: 11px;"></i>' :
                                     f.fieldType === 'List' ? '<i class="bi bi-columns text-primary" style="font-size: 11px;"></i>' : '<i class="bi bi-fonts text-primary" style="font-size: 11px;"></i>'}
                                 </div>
-                                <div class="overflow-hidden">
-                                    <h6 class="mb-0 text-dark fw-bold text-truncate" style="font-size: 0.75rem; letter-spacing: -0.1px;">${f.fieldName}</h6>
+                                <div class="overflow-hidden flex-grow-1">
+                                    <h6 class="mb-0 text-dark fw-bold" style="font-size: 0.75rem; letter-spacing: -0.1px; line-height: 1.2;">${f.fieldName}</h6>
                                     <div class="d-flex align-items-center gap-1" style="font-size: 8px; margin-top: -1px;">
                                         <span class="text-muted text-uppercase fw-semibold opacity-75">${f.fieldType}</span>
                                         ${f.isRequired ? '<span class="text-danger fw-bold">[REQ]</span>' : ''}
@@ -949,17 +974,10 @@ async function loadFieldsList(team) {
                             
                             <div id="edit_options_section_${f.id}" class="${f.fieldType === 'Dropdown' ? '' : 'd-none'} mb-2">
                                 <label class="x-small fw-bold text-muted mb-1" style="font-size: 9px; display: block;">OPTIONS</label>
-                                <div id="edit_options_list_${f.id}" class="edit-options-list mb-1 bg-white rounded border p-1" style="max-height: 120px; overflow-y: auto;">
+                                <div id="edit_options_list_${f.id}" class="edit-options-list mb-1 bg-white rounded border p-1" style="max-height: 600px; overflow-y: auto;">
                                     <!-- Options loaded here -->
                                 </div>
-                                <div class="d-flex gap-1">
-                                    <button type="button" class="btn btn-xs btn-outline-primary py-0" style="font-size: 9px; height: 18px;" onclick="addParentGroup('', 'edit_options_list_${f.id}')">
-                                        + Group
-                                    </button>
-                                    <button type="button" class="btn btn-xs btn-outline-secondary py-0" style="font-size: 9px; height: 18px;" onclick="addStandaloneOption('', 'edit_options_list_${f.id}')">
-                                        + Option
-                                    </button>
-                                </div>
+                              
                             </div>
 
                             <div class="d-flex gap-2 justify-content-end pt-2 border-top mt-1">
@@ -1156,17 +1174,20 @@ async function toggleNewOptionsSection() {
         section.classList.remove('d-none');
         list.innerHTML = `
             <div class="d-flex gap-2 mb-3 mt-1">
-                <button type="button" class="btn btn-xs btn-outline-primary" onclick="addParentGroup('', 'newFieldOptionsList')">
-                    <i class="bi bi-collection me-1"></i> Add Parent Group
+                <button type="button" class="btn btn-xs btn-outline-primary d-flex align-items-center gap-2 px-3 py-1 bg-white shadow-sm" 
+                        style="font-size: 11px; border-radius: 8px; font-weight: 600;" 
+                        onclick="addParentGroup('', 'newFieldOptionsList')">
+                    <i class="bi bi-folder2-open text-primary"></i> Drop down Inside Drop Down
                 </button>
-                <button type="button" class="btn btn-xs btn-outline-secondary" onclick="addStandaloneOption('', 'newFieldOptionsList')">
-                    <i class="bi bi-plus-circle me-1"></i> Add Standalone Option
+                <button type="button" class="btn btn-xs btn-outline-secondary d-flex align-items-center gap-2 px-3 py-1 bg-white shadow-sm" 
+                        style="font-size: 11px; border-radius: 8px; font-weight: 600;" 
+                        onclick="addStandaloneOption('', 'newFieldOptionsList')">
+                    <i class="bi bi-plus-circle text-secondary"></i> Single Drop Down
                 </button>
             </div>
+            <div id="newFieldOptionsContent"></div>
         `;
-        // Add one initial group for user convenience
-        const childId = addParentGroup('Category', 'newFieldOptionsList');
-        addChildOption('Option 1', childId);
+        // No default options added anymore as per user request
     } else if (type === 'List') {
         section.classList.remove('d-none');
         list.innerHTML = '<div class="p-2 text-muted small"><i class="bi bi-info-circle me-1"></i> This field will display board columns as a dropdown.</div>';
