@@ -1,8 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 
 <html>
 <head>
-    <meta name="viewport" content="width=device-width" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>@ViewBag.Title - EMS</title>
     
     <!-- Premium Typography -->
@@ -45,6 +47,24 @@
     
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <style>
+        /* Fallback and global tweaks */
+        body, html {
+            margin:0; padding:0; height:100%; width:100%;
+            background-color: #0f172a; /* Dark fallback */
+        }
+        
+        .account-body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: #0f172a;
+        }
+
+        /* Prevent flash of unstyled content */
+        [cloak] { display: none !important; }
+    </style>
 </head>
 <body class="account-body">
     <div>
