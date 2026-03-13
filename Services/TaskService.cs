@@ -400,29 +400,39 @@ namespace UserRoles.Services
             }
 
             // Apply move
+            bool wasArchived = task.IsArchived;
             task.PreviousColumnId = task.ColumnId;
             task.ColumnId = targetColumn.Id;
 
-            task.Status = targetColumn.ColumnName switch
+            task.Status = targetColName switch
             {
-                "ToDo" => TaskStatusEnum.ToDo,
-                "Doing" => TaskStatusEnum.Doing,
-                "Review" => TaskStatusEnum.Review,
+                "todo" => TaskStatusEnum.ToDo,
+                "doing" => TaskStatusEnum.Doing,
+                "review" => TaskStatusEnum.Review,
                 "completed" => TaskStatusEnum.Complete,
                 _ => task.Status
             };
+
+            // DEFERRED Auto-Archive: Stay in Completed if moved today
+            if (targetColName == "completed")
+            {
+                task.ReviewStatus = ReviewStatus.Passed;
+                task.IsArchived = false; 
+                task.CompletedByUserId = task.AssignedToUserId;
+                task.CompletedAt = DateTime.UtcNow;
+                // No LogArchivedToHistory here, it happens during actual archive
+            }
+            else
+            {
+                task.IsArchived = false;
+                task.ArchivedAt = null;
+            }
 
             if (targetColName == "review")
             {
                 task.ReviewStatus = ReviewStatus.Pending;
                 task.ReviewNote = null;
-                await _historyService.LogReviewSubmitted(task.Id, user.Id);
-            }
-
-            if (targetColName == "completed")
-            {
-                task.CompletedByUserId = task.AssignedToUserId;
-                task.CompletedAt = DateTime.UtcNow;
+                await _historyService.LogReviewSubmitted(task.Id, userId);
             }
 
             task.UpdatedAt = DateTime.UtcNow;
@@ -433,14 +443,27 @@ namespace UserRoles.Services
 
             await _historyService.LogColumnMove(task.Id, oldColId, targetColumn.Id, user.Id);
 
-            await BroadcastSafe(task.TeamName, "TaskMoved", new
+            if (wasArchived && !task.IsArchived)
             {
-                taskId = task.Id,
-                newColumnId = targetColumn.Id,
-                oldColumnId = oldColId,
-                movedBy = user.UserName,
-                columnName = targetColumn.ColumnName
-            });
+                // Restored from history: must broadcast as Added because it didn't exist in active UI
+                await BroadcastSafe(task.TeamName, "TaskAdded", new
+                {
+                    taskId = task.Id,
+                    teamName = task.TeamName,
+                    columnId = targetColumn.Id
+                });
+            }
+            else
+            {
+                await BroadcastSafe(task.TeamName, "TaskMoved", new
+                {
+                    taskId = task.Id,
+                    newColumnId = targetColumn.Id,
+                    oldColumnId = oldColId,
+                    movedBy = user.UserName,
+                    columnName = targetColumn.ColumnName
+                });
+            }
 
             // Also broadcast directly to the person who assigned this task, if they are not in the team group
             if (!string.IsNullOrEmpty(task.AssignedByUserId))
@@ -467,6 +490,9 @@ namespace UserRoles.Services
         // ════════════════════════════════════════════════════════
         public async Task<TeamBoardViewModel> BuildTeamBoardAsync(string team, string userId, IList<string> viewerRoles)
         {
+            // ✅ Cleanup: Auto-Archive tasks from previous days that are still in Completed
+            await AutoArchiveOldCompletedTasksAsync(team, userId);
+
             // Load columns with enforced order
             var columnsRaw = await _context.TeamColumns
                 .Where(c => c.TeamName == team)
@@ -566,6 +592,46 @@ namespace UserRoles.Services
                 TeamGroups = teamGroups,
                 ManagementUsers = managementUsers
             };
+        }
+
+        public async Task AutoArchiveOldCompletedTasksAsync(string team, string userId)
+        {
+            try
+            {
+                // We use local Indian time for "Today" as per project context if possible, 
+                // but for now let's use Utc + 5.5 or just Date comparison.
+                var today = DateTime.UtcNow.AddHours(5.5).Date;
+
+                var staleTasks = await _context.TaskItems
+                    .Where(t => t.TeamName == team
+                             && !t.IsArchived
+                             && t.ReviewStatus == ReviewStatus.Passed
+                             && t.CompletedAt != null
+                             && t.CompletedAt.Value.AddHours(5.5).Date < today)
+                    .ToListAsync();
+
+                if (!staleTasks.Any()) return;
+
+                foreach (var task in staleTasks)
+                {
+                    task.IsArchived = true;
+                    task.ArchivedAt = DateTime.UtcNow;
+                    await _historyService.LogArchivedToHistory(task.Id, userId);
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Broadcast to update UIs real-time
+                foreach (var task in staleTasks)
+                {
+                    await BroadcastSafe(team, "TaskArchived", new { taskId = task.Id });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silently fail to not block board loading
+                Console.WriteLine($"Auto-Archive Error: {ex.Message}");
+            }
         }
 
         public async Task<TeamBoardViewModel> GetQuickAssignModelAsync(string userId, IList<string> viewerRoles)

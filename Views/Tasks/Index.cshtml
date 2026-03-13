@@ -1182,12 +1182,12 @@
                         <div id="newFieldOptionsSection" class="mt-2 p-2 bg-light border rounded d-none">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="x-small fw-bold text-muted text-uppercase" style="font-size: 9px;">Configure Options</label>
-                                <div class="d-flex gap-1">
+                               @* <div class="d-flex gap-1">
                                     <button type="button" class="btn btn-xs btn-outline-primary" style="font-size: 9px; padding: 1px 6px;" onclick="addParentGroup('', 'newFieldOptionsList')">+ Group</button>
                                     <button type="button" class="btn btn-xs btn-outline-secondary" style="font-size: 9px; padding: 1px 6px;" onclick="addStandaloneOption('', 'newFieldOptionsList')">+ Opt</button>
-                                </div>
+                                </div>*@
                             </div>
-                            <div id="newFieldOptionsList" class="p-1 bg-white border rounded" style="max-height: 120px; overflow-y: auto;">
+                            <div id="newFieldOptionsList" class="p-1 bg-white border rounded" style="max-height: 400px; overflow-y: auto;">
                                 <!-- Dynamic options -->
                             </div>
                         </div>
@@ -2002,6 +2002,11 @@
         handleTaskRemovedUpdate(data);
     });
 
+    taskHubConnection.on("TaskArchived", function (data) {
+        console.log("Task archived received:", data);
+        handleTaskArchivedUpdate(data);
+    });
+
     taskHubConnection.on("TaskAdded", function (data) {
         console.log("Task added received:", data);
         handleTaskAddedUpdate(data);
@@ -2059,15 +2064,16 @@
         const targetColumn = document.querySelector(`.kanban-column[data-column-id="${data.newColumnId}"]`);
         if (!targetColumn) return;
 
+        const colName = data.columnName.toLowerCase().trim();
+        const isReview = colName === 'review';
+        const isCompleted = colName === 'completed';
+
         const taskList = targetColumn.querySelector('.kanban-tasks');
         if (!taskList) return;
 
         taskList.appendChild(card);
         card.dataset.columnId = data.newColumnId;
 
-        const colName = data.columnName.toLowerCase().trim();
-        const isReview = colName === 'review';
-        const isCompleted = colName === 'completed';
         const isRestricted = isReview || isCompleted;
 
         const assignBtn = card.querySelector('.action-btn-assign');
@@ -2155,9 +2161,27 @@
         }
     }
 
-    function handleTaskAddedUpdate(data) {
-        if (document.querySelector(`.task-card[data-task-id="${data.taskId}"]`)) return;
-        if (window.currentTeamName && data.teamName && window.currentTeamName.toLowerCase() !== data.teamName.toLowerCase()) return;
+    function handleTaskArchivedUpdate(data) {
+        const card = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+        if (card) {
+            card.remove();
+            updateColumnCounts();
+            if (typeof filterBoardTasks === 'function') filterBoardTasks();
+            if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
+            console.log(`Task #${data.taskId} archived by system`);
+        }
+    }
+
+    function handleTaskAddedUpdate(data, forceRefresh = false) {
+        const existingCard = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+        
+        // If it's already there and we're not forcing refresh, check if it's a "history-card"
+        if (existingCard && !forceRefresh) {
+            if (!existingCard.classList.contains('history-card')) {
+                return; // Already a full card
+            }
+            // It's a history card being restored or similar, continue to replace it
+        }
 
         fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
             .then(res => {
@@ -2173,11 +2197,16 @@
                 const taskList = targetColumn.querySelector('.kanban-tasks');
                 if (!taskList) return;
 
-                taskList.insertAdjacentHTML('afterbegin', html);
+                if (existingCard) {
+                    existingCard.outerHTML = html;
+                } else {
+                    taskList.insertAdjacentHTML('afterbegin', html);
+                }
+                
                 updateColumnCounts();
                 if (typeof filterBoardTasks === 'function') filterBoardTasks();
                 if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
-                showToast(`New task #${data.taskId} added to this board`, 'success');
+                showToast(`Task #${data.taskId} is now active on this board`, 'success');
             })
             .catch(err => console.error("Error adding task:", err));
     }
@@ -2317,6 +2346,9 @@
                 if (typeof syncBoardPermissions === "function") syncBoardPermissions();
                 if (typeof enableColumnDrag === "function") enableColumnDrag();
                 if (typeof enableTaskDragDrop === "function") enableTaskDragDrop();
+                
+                // ✅ Load history for the new board
+                if (typeof loadArchivedTasks === "function") loadArchivedTasks(team);
             })
             .catch(err => {
                 console.error(err);
@@ -3097,8 +3129,11 @@
         const role = (typeof currentUserRole !== 'undefined') ? currentUserRole : 'User';
 
         document.querySelectorAll('.kanban-tasks').forEach(container => {
-            // Skip History column task list (read-only)
-            if (container.id === 'historyTasksList') return;
+            // Check if this is the history column
+            const isHistory = container.id === 'historyTasksList' || container.dataset.columnId === 'history';
+            
+            // Skip History column for non-admins
+            if (isHistory && role !== 'Admin') return;
 
             if (container._taskSortable) {
                 container._taskSortable.destroy();
@@ -3107,7 +3142,7 @@
             container._taskSortable = new Sortable(container, {
                 group: {
                     name: 'tasks',
-                    pull: container.closest('.kanban-column')?.classList.contains('col-completed') ? false : true,
+                    pull: (container.closest('.kanban-column')?.classList.contains('col-completed') && role !== 'Admin') ? false : true,
                     put: true
                 },
                 animation: 200,
@@ -3155,8 +3190,14 @@
                     const colName = targetColumnEl?.dataset.columnName?.toLowerCase().trim();
 
                     // Revalidate restrictions
-                    if (colName === 'history' || (colName === 'completed' && role !== 'Admin' && (!window.boardPermissions || !window.boardPermissions.canReviewTask))) {
-                        showToast(colName === 'history' ? '📋 History is read-only.' : '🔒 Only authorized reviewers or admins can move tasks to Completed.', 'warning');
+                    if (colName === 'history' && role !== 'Admin') {
+                        showToast('📋 History is read-only for members.', 'warning');
+                        loadTeamBoard(currentTeamName);
+                        return;
+                    }
+                    
+                    if (colName === 'completed' && role !== 'Admin' && (!window.boardPermissions || !window.boardPermissions.canReviewTask)) {
+                        showToast('🔒 Only authorized reviewers or admins can move tasks to Completed.', 'warning');
                         loadTeamBoard(currentTeamName);
                         return;
                     }

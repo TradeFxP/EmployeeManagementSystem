@@ -759,9 +759,12 @@ function archiveSingleTask(taskId) {
         data: JSON.stringify(taskId),
         success: function () {
             showToast('Task archived to history', 'success');
-            if (window.currentTeamName && window.loadTeamBoard) {
-                window.loadTeamBoard(window.currentTeamName, true);
-            }
+            // Remove from main board and refresh history
+            const card = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+            if (card) card.remove();
+            
+            if (typeof updateColumnCounts === 'function') updateColumnCounts();
+            if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
         },
         error: function (xhr) {
             showToast(xhr.responseText || 'Archive failed', 'danger');
@@ -1253,46 +1256,92 @@ document.addEventListener('DOMContentLoaded', () => {
         btnSend.addEventListener('click', function () {
             const taskId = document.getElementById('emailTemplateTaskId').value;
             const templateName = templateSelect.value;
-            if (!taskId || !templateName) return;
+            if (!taskId || !templateName || !currentPreviewData) return;
 
             // Loading state
             const icon = document.getElementById('sendEmailIcon');
             const text = document.getElementById('sendEmailText');
             icon.className = 'spinner-border spinner-border-sm';
-            text.textContent = 'Sending...';
+            text.textContent = 'Copying & Redirecting...';
             btnSend.disabled = true;
             if (btnBack) btnBack.disabled = true;
 
             const token = window.getAntiForgeryToken ? window.getAntiForgeryToken() : '';
 
-            fetch(`/Communication/SendTemplateEmail?taskId=${taskId}&templateName=${encodeURIComponent(templateName)}`, {
+            // 1. Log the redirect to the backend
+            fetch(`/Communication/LogOutlookRedirect?taskId=${taskId}&toEmail=${encodeURIComponent(currentPreviewData.toEmail)}&subject=${encodeURIComponent(currentPreviewData.subject)}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'RequestVerificationToken': token
                 }
             })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        if (typeof showToast === 'function') showToast(data.message, 'success');
-                        const modalEl = document.getElementById('emailTemplateModal');
-                        const modal = bootstrap.Modal.getInstance(modalEl);
-                        if (modal) modal.hide();
-                    } else {
-                        if (typeof showToast === 'function') showToast(data.message || 'Failed to send email', 'danger');
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    if (typeof showToast === 'function') showToast('An error occurred while sending', 'danger');
-                })
-                .finally(() => {
-                    icon.className = 'bi bi-send-fill';
-                    text.textContent = 'Confirm & Send Mail';
-                    btnSend.disabled = false;
-                    if (btnBack) btnBack.disabled = false;
-                });
+            .then(() => {
+                // 2. Open Outlook redirect
+                const to = currentPreviewData.toEmail;
+                const subject = currentPreviewData.subject;
+                const richHtml = currentPreviewData.html;
+                
+                // --- RICH TEMPLATE SUPPORT: CLEAN PLAIN TEXT ---
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = richHtml;
+                
+                // Aggressively remove style and script tags so they don't leak into plain text
+                const styles = tempDiv.querySelectorAll('style, script');
+                styles.forEach(s => s.remove());
+                
+                let plainText = tempDiv.innerText || tempDiv.textContent;
+                
+                // Aggressive text cleaning for URL size
+                plainText = plainText.replace(/\n\s*\n/g, '\n');
+                plainText = plainText.replace(/\s+/g, ' ');
+
+                if (plainText.length > 800) {
+                    plainText = plainText.substring(0, 800).trim() + "...";
+                }
+
+                // --- RICH TEMPLATE SUPPORT: CLIPBOARD COPY ---
+                // We wrap the HTML in basic tags to ensure Outlook recognizes it as a document
+                const outlookCompatibleHtml = `<html><body>${richHtml}</body></html>`;
+                
+                try {
+                    const blobHtml = new Blob([outlookCompatibleHtml], { type: 'text/html' });
+                    const blobText = new Blob([plainText], { type: 'text/plain' });
+                    const data = [new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })];
+                    
+                    navigator.clipboard.write(data).then(() => {
+                        console.log("Rich template copied to clipboard");
+                        if (typeof showToast === 'function') {
+                            showToast("📋 Template copied! Press Ctrl+V in Outlook to paste original styling.", "info");
+                        }
+                    });
+                } catch (err) {
+                    console.warn("Clipboard API failed, falling back to simple text copy", err);
+                    navigator.clipboard.writeText(plainText);
+                }
+                
+                const outlookUrl = `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plainText)}`;
+                
+                // Open Outlook after a tiny delay to ensure clipboard action starts
+                setTimeout(() => {
+                    window.open(outlookUrl, '_blank');
+
+                    // 3. Close modal and reset
+                    const modalEl = document.getElementById('emailTemplateModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                }, 150);
+            })
+            .catch(err => {
+                console.error(err);
+                if (typeof showToast === 'function') showToast('Failed to log redirection', 'danger');
+            })
+            .finally(() => {
+                icon.className = 'bi bi-content-paste';
+                text.textContent = 'Copy & Open Outlook';
+                btnSend.disabled = false;
+                if (btnBack) btnBack.disabled = false;
+            });
         });
     }
 });
