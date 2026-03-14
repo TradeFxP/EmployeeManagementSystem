@@ -1126,6 +1126,42 @@ namespace UserRoles.Controllers
             return Ok();
         }
 
+        [Authorize(Roles = "Admin")]
+        [HttpPost]
+        public async Task<IActionResult> UpdateEmsAccess(string userId, bool hasAccess)
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                return BadRequest(new { success = false, message = "Invalid user ID." });
+            }
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { success = false, message = "User not found." });
+            }
+
+            // Safety: cannot change own access
+            var currentUserId = _userManager.GetUserId(User);
+            if (user.Id == currentUserId)
+            {
+                return BadRequest(new { success = false, message = "You cannot change your own EMS access." });
+            }
+
+            user.HasEmsAccess = hasAccess;
+            var result = await _userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                 return BadRequest(new { success = false, message = "Failed to update EMS access." });
+            }
+            
+            // Force security stamp update to invalidate any active sessions immediately
+            await _userManager.UpdateSecurityStampAsync(user);
+
+            return Ok(new { success = true, message = $"EMS access {(hasAccess ? "enabled" : "disabled")} successfully." });
+        }
+
         private List<Users> GetDescendantManagers(
             string managerId,
             List<Users> allManagers)

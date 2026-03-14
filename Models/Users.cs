@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -48,5 +48,6 @@ namespace UserRoles.Models
         public DateTime? EmailChangeCodeExpiry { get; set; }
         public bool IsDeleted { get; set; } = false;
 
+        public bool HasEmsAccess { get; set; } = true;
     }
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
@@ -45,6 +45,13 @@ builder.Services.AddIdentity<Users, IdentityRole>(options =>
 })
 .AddEntityFrameworkStores<AppDbContext>()
 .AddDefaultTokenProviders();
+
+// ================= SECURITY STAMP INTERVAL =================
+builder.Services.Configure<SecurityStampValidatorOptions>(options =>
+{
+    // Force Identity to check the database on EVERY request to see if the SecurityStamp has changed.
+    options.ValidationInterval = TimeSpan.Zero;
+});
 
 // ================= EMAIL =================
 builder.Services.Configure<EmailSettings>(

@@ -18,6 +18,7 @@
                     <tr>
                         <th class="ps-4">Employee</th>
                         <th>Role</th>
+                        <th class="text-center">EMS Access</th>
                         @foreach (var team in allTeams)
                         {
                             <th class="text-center">@team</th>
@@ -41,6 +42,13 @@
                                 <span class="badge @(userRoles[user.Id] == "Admin" ? "bg-danger" : userRoles[user.Id] == "Manager" ? "bg-warning text-dark" : userRoles[user.Id] == "Sub Manager" ? "bg-primary" : "bg-info text-white")">
                                     @userRoles[user.Id]
                                 </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox"
+                                           @(user.HasEmsAccess ? "checked" : "")
+                                           onchange="updateEmsAccess('@user.Id', this.checked)">
+                                </div>
                             </td>
                             @foreach (var team in allTeams)
                             {

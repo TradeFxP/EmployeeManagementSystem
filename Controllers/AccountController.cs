@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using UserRoles.Models;
 using UserRoles.Services;
@@ -57,6 +57,12 @@ namespace UserRoles.Controllers
                 return View(model);
             }
 
+            if (!user.HasEmsAccess)
+            {
+                ModelState.AddModelError("", "You are not authorized to login. Contact administration.");
+                return View(model);
+            }
+
             var result = await signInManager.PasswordSignInAsync(
                 user,
                 model.Password,
@@ -102,6 +108,12 @@ namespace UserRoles.Controllers
                 user.EmailChangeCodeExpiry < DateTime.UtcNow)
             {
                 ModelState.AddModelError("", "Invalid or expired login code.");
+                return View();
+            }
+
+            if (!user.HasEmsAccess)
+            {
+                ModelState.AddModelError("", "You are not authorized to login. Contact administration.");
                 return View();
             }
 

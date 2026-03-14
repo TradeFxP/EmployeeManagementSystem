@@ -68,6 +68,33 @@ function updateUserTeamAssignment(userId, teamName, isAssigned) {
     });
 }
 
+function updateEmsAccess(userId, hasAccess) {
+    const fd = new FormData();
+    fd.append("userId", userId);
+    fd.append("hasAccess", hasAccess);
+
+    fetch('/Users/UpdateEmsAccess', {
+        method: 'POST',
+        headers: {
+            'RequestVerificationToken': window.getAntiForgeryToken()
+        },
+        body: fd
+    }).then(res => {
+        if (!res.ok) {
+            alert("Failed to update EMS access");
+             // Option to reload the panel or toggle it back, but simple alert for now
+             loadEmployeesAdminPanel();
+        } else {
+             // Optional: Show a brief success toast, but silence is also golden
+             console.log("EMS access updated successfully.");
+        }
+    }).catch(err => {
+        console.error(err);
+        alert("Error updating EMS access");
+        loadEmployeesAdminPanel();
+    });
+}
+
 // ===== PROJECT PANEL =====
 function toggleProjectPanel() {
     const dropdown = document.getElementById("projectDropdown");
