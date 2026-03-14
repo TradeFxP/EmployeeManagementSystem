@@ -155,16 +155,13 @@ namespace UserRoles.Services
 
             if (!string.IsNullOrEmpty(model.AssignedToUserId))
             {
-                if (principal.IsInRole("Admin") || await _permissions.AuthorizeBoardAction(principal, task.TeamName, "AssignTask"))
+                if (task.AssignedToUserId != model.AssignedToUserId)
                 {
-                    if (task.AssignedToUserId == model.AssignedToUserId)
+                    if (principal.IsInRole("Admin") || await _permissions.AuthorizeBoardAction(principal, task.TeamName, "AssignTask"))
                     {
-                        var u = await _userManager.FindByIdAsync(model.AssignedToUserId);
-                        return ServiceResult.Fail($"The task is already assigned to {u?.Name ?? u?.UserName ?? "this user"}.");
+                        await _historyService.LogAssignment(task.Id, model.AssignedToUserId, userId);
+                        task.AssignedToUserId = model.AssignedToUserId;
                     }
-
-                    await _historyService.LogAssignment(task.Id, model.AssignedToUserId, userId);
-                    task.AssignedToUserId = model.AssignedToUserId;
                 }
             }
 
@@ -178,10 +175,9 @@ namespace UserRoles.Services
             await _context.SaveChangesAsync();
 
             // SignalR
-            await BroadcastSafe(task.TeamName, "TaskAssigned", new
+            await BroadcastSafe(task.TeamName, "TaskUpdated", new
             {
-                taskId = task.Id,
-                assignedTo = task.AssignedToUser?.Name ?? task.AssignedToUser?.UserName ?? "Unassigned"
+                taskId = task.Id
             });
 
             return ServiceResult.Ok();

@@ -404,7 +404,7 @@ async function openEditTaskModal(taskId) {
 
         // Render custom fields
         if (typeof renderCustomFieldInputs === 'function') {
-            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team, task.description);
+            await renderCustomFieldInputs('editCustomFieldsContainer', task.customFieldValues || {}, team, task);
         }
 
         const modalEl = document.getElementById('editTaskModal');
@@ -510,8 +510,10 @@ function submitEditTask() {
     const descEl = document.getElementById('editTaskDescription');
     const description = descEl ? descEl.value.trim() : "";
 
-    const priority = parseInt(document.getElementById('editTaskPriority').value);
-    const assignedToUserId = document.getElementById('editTaskAssignedTo').value;
+    const priorityEl = document.getElementById('editTaskPriority');
+    const priority = priorityEl ? parseInt(priorityEl.value) : 1;
+    const assignedToEl = document.getElementById('editTaskAssignedTo');
+    const assignedToUserId = assignedToEl ? assignedToEl.value : "";
 
     const titleGroup = document.getElementById('groupEditTaskTitle');
     const isTitleVisible = titleGroup && titleGroup.style.display !== 'none';
@@ -555,8 +557,7 @@ function submitEditTask() {
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
 
-            // Reload board if necessary, though SignalR should handle it
-            if (window.currentTeamName && window.loadTeamBoard) loadTeamBoard(window.currentTeamName);
+            // SignalR 'TaskUpdated' event will handle seamlessly refreshing the task card
         })
         .catch(err => {
             console.error(err);

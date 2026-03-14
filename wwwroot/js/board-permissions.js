@@ -318,7 +318,7 @@ async function updateTransition(checkbox) {
         });
         if (!resp.ok) throw new Error('Failed to update transitions');
 
-        if (typeof showToast === 'function') showToast('Transitions updated', 'success');
+        if (typeof showToast === 'function') showToast('Permission updated successfully', 'success');
     } catch (err) {
         if (typeof showToast === 'function') showToast(err.message, 'danger');
         checkbox.checked = !isChecked; // revert
