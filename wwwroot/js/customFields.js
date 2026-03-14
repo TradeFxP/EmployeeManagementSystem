@@ -1,4 +1,4 @@
-﻿// customFields.js - Custom field management for tasks
+// customFields.js - Custom field management for tasks
 
 window.customFieldsCache = window.customFieldsCache || null;
 
@@ -117,7 +117,7 @@ async function loadCustomFields(team) {
 }
 
 // Render custom field inputs in a form - NOW ASYNC
-async function renderCustomFieldInputs(containerId, existingValues = {}, team = null, description = null) {
+async function renderCustomFieldInputs(containerId, existingValues = {}, team = null, taskOrDescription = null) {
     const container = document.getElementById(containerId);
     if (!container) {
         console.error('Container not found:', containerId);
@@ -162,6 +162,11 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
 
     const isLeadTeam = team === 'Digi Leads' || team === 'sales1';
     const isAdmin = window.isAdmin === true || window.currentUserRole === 'Admin';
+    
+    // Support passing full task object or just description
+    const description = typeof taskOrDescription === 'object' && taskOrDescription !== null ? taskOrDescription.description : taskOrDescription;
+    const taskTitle = typeof taskOrDescription === 'object' && taskOrDescription !== null ? taskOrDescription.title : null;
+
     const leadFields = [
         "Full Name", "FULL_NAME",
         "Phone", "PHONE",
@@ -174,11 +179,21 @@ async function renderCustomFieldInputs(containerId, existingValues = {}, team = 
     ];
 
     fields.forEach(field => {
+        // Auto-fill TITLE and DESCRIPTION custom fields from core task if they are empty
+        if (!existingValues[field.id] || existingValues[field.id].length === 0 || (Array.isArray(existingValues[field.id]) && !existingValues[field.id][0])) {
+            const lowerName = field.fieldName.trim().toLowerCase();
+            if (lowerName === 'title' && taskTitle) {
+                existingValues[field.id] = [taskTitle];
+            } else if (lowerName === 'description' && description) {
+                existingValues[field.id] = [description];
+            }
+        }
+
         // For Lead Teams, if value is missing from DB, try to extract from description
-        if (isLeadTeam && description && (!existingValues[field.id] || existingValues[field.id].length === 0)) {
+        if (isLeadTeam && description && (!existingValues[field.id] || existingValues[field.id].length === 0 || (Array.isArray(existingValues[field.id]) && !existingValues[field.id][0]))) {
             const extracted = extractLeadField(description, field.fieldName);
             if (extracted) {
-                existingValues[field.id] = extracted;
+                existingValues[field.id] = [extracted];
             }
         }
 
@@ -1016,7 +1031,7 @@ async function loadFieldsList(team) {
                                 body: JSON.stringify(ids)
                             });
                             if (response.ok) {
-                                if (typeof showToast === 'function') showToast('âœ… Field order updated!', 'success');
+                                if (typeof showToast === 'function') showToast('Field order updated successfully!', 'success');
                                 refreshOpenModals();
                             }
                         } catch (e) { console.error('Failed to reorder fields', e); }

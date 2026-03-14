@@ -718,7 +718,7 @@
             <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
                 <div class="modal-header d-flex align-items-center"
                     style="background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 16px 16px 0 0;">
-                    <h5 class="modal-title text-white mb-0 d-flex align-items-center flex-wrap gap-2">
+                    <h5 class="modal-title text-white mb-0 d-flex align-items-center flex-wrap gap-2" id="taskOverviewMainTitle">
                         <i class="bi bi-card-text me-2"></i>Task Overview
                         <div id="taskOverviewBadges" class="d-flex gap-2 ms-2"></div>
                     </h5>
@@ -922,7 +922,7 @@
                             <label class="form-label mb-1" id="labelEditTaskDueDate">Due Date & Time</label>
                             <input type="datetime-local" id="editTaskDueDate" class="form-control" />
                         </div>
-                        <div class="col-md-6 mb-3" id="groupEditTaskAssignTo">
+                       @* <div class="col-md-6 mb-3" id="groupEditTaskAssignTo">
                              <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label mb-0" id="labelEditTaskAssignTo">Assign To</label>
                                     <div class="btn-group btn-group-sm">
@@ -968,7 +968,7 @@
                                     }
                                 }
                             </select>
-                        </div>
+                        </div>*@
                          @*
                         <div class="col-md-6 mb-3" id="groupEditTaskMoveTo">
                            <label class="form-label mb-1" id="labelEditTaskMoveTo">Move To Column</label>
@@ -2025,6 +2025,11 @@
         handleTaskAssignedUpdate(data);
     });
 
+    taskHubConnection.on("TaskUpdated", function (data) {
+        console.log("Task updated received:", data);
+        handleTaskUpdatedUpdate(data);
+    });
+
     taskHubConnection.on("NewMoveRequest", function (data) {
         console.log("New move request received:", data);
         if (typeof showToast === 'function') {
@@ -2217,6 +2222,23 @@
                 showToast(`Task #${data.taskId} is now active on this board`, 'success');
             })
             .catch(err => console.error("Error adding task:", err));
+    }
+
+    function handleTaskUpdatedUpdate(data) {
+        const card = document.querySelector(`.task-card[data-task-id="${data.taskId}"]`);
+        if (!card) return;
+
+        fetch(`/Tasks/GetTaskCardPartial?taskId=${data.taskId}`)
+            .then(res => res.text())
+            .then(html => {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                const newCard = tempDiv.firstElementChild;
+                card.parentNode.replaceChild(newCard, card);
+                if (typeof filterBoardTasks === 'function') filterBoardTasks();
+                if (window.currentTeamName && typeof loadArchivedTasks === 'function') loadArchivedTasks(window.currentTeamName);
+            })
+            .catch(err => console.error("Error updating task card:", err));
     }
 
     function handleTaskAssignedUpdate(data) {
@@ -2447,6 +2469,17 @@
                 return res.json();
             })
             .then(t => {
+                let displayTitle = t.title;
+                if (!displayTitle || displayTitle.trim().toLowerCase() === 'task') {
+                    const cfTitle = (t.customFields || []).find(f => f.fieldName && f.fieldName.trim().toLowerCase() === 'title');
+                    if (cfTitle && cfTitle.value) displayTitle = cfTitle.value;
+                }
+                const mainTitleEl = document.getElementById('taskOverviewMainTitle');
+                if (mainTitleEl) {
+                    mainTitleEl.innerHTML = `<i class="bi bi-card-text me-2"></i>${escapeHtml(displayTitle || 'Task Overview')}
+                                             <div id="taskOverviewBadges" class="d-flex gap-2 ms-2"></div>`;
+                }
+
                 const customPriorityObj = (t.customFields || []).find(f => f.fieldName && f.fieldName.trim().toLowerCase() === 'priority');
                 const effectivePriority = (customPriorityObj && customPriorityObj.value) ? customPriorityObj.value : t.priority;
 
